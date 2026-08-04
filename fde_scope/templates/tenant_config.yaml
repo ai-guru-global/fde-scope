@@ -1,0 +1,25 @@
+# TenantConfig — consumed by `fde-scope deploy`.
+# Describes one tenant's deployment. Hand-tuned by the FDE on site.
+
+id: client_a
+name: Client A
+model: qwen-max                   # agentscope model config name
+
+# Optional: path to a forged CorpusReport JSON from `corpus forge`
+corpus_path: reports/corpus_report.json
+
+# Optional: the tenant's ticket write-back API (surfaced as an agent tool)
+ticket_api: https://client-a.example.com/api/tickets
+
+# Sandbox / isolation
+resource_quota: "2cpu-4gb"        # advisory; applied by the workspace backend
+
+# Human-in-the-loop policy → maps to AgentScope 2.0 RequireUserConfirmEvent flow
+approval_policy:
+  mode: conservative              # conservative | balanced | autonomous
+  timeout_seconds: 300
+
+# Studio dashboard configuration (optional)
+dashboard_config:
+  show_bad_cases: true
+  show_flywheel: true

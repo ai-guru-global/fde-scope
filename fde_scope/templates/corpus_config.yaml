@@ -1,0 +1,33 @@
+# CorpusConfig — consumed by `fde-scope corpus forge`.
+# Every key is optional; missing keys fall back to the defaults in
+# fde_scope/config.py. A minimal or empty file is valid.
+
+# PII scrubbing rules: {regex: label}. Matches are replaced with [REDACTED](label).
+pii_rules:
+  patterns:
+    "1[3-9]\\d{9}": PHONE          # CN mobile
+    "[\\w.+-]+@[\\w-]+\\.[\\w.-]+": EMAIL
+    "\\b\\d{17}[\\dXx]\\b": IDCARD # CN ID card
+    "\\b\\d{16,19}\\b": BANKCARD
+  placeholder: "[REDACTED]"
+
+# Semantic-ish deduplication
+dedup_threshold: 0.92              # Jaccard/sequence ratio at which two items are duplicates
+
+# Quality gate
+quality_min_score: 3.0             # 1-5; items below this are dropped
+
+# Field mapping (what columns to treat as content/category/id)
+text_field: content
+category_field: category
+id_field: id
+
+# Coverage analysis
+min_samples_per_category: 100      # below this → gap → synthesis target
+
+# Synthesis
+synth_per_gap: 50                  # max synthetic samples generated per gap
+synth_quality_min_score: 3.5       # quality gate the synthesizer must clear
+
+# Train/eval/test split ratios (must sum to ~1.0)
+split_ratios: [0.8, 0.1, 0.1]

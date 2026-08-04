@@ -1,0 +1,12 @@
+{"id":"a-001","content":"机器人关节2电流过载，峰值达到额定值的135%，触发安全停机。请检查负载与减速比设置。","category":"过载保护","channel":"opcua_alarm"}
+{"id":"a-002","content":"抓取失败：夹爪压力传感器读数异常偏低（0.2MPa，正常0.4-0.6），工件滑落。建议校准压力传感器。","category":"抓取故障","channel":"ros2_log"}
+{"id":"a-003","content":"视觉系统无法识别目标位姿，点云匹配置信度0.31低于阈值0.7。可能是工件反光或标定漂移。","category":"视觉异常","channel":"ros2_log"}
+{"id":"a-004","content":"协作机器人与操作员距离小于500mm，速度监控触发降速。安全状态正常但需复核工位布局。","category":"安全监控","channel":"safety_plc"}
+{"id":"a-005","content":"焊接工位节拍连续3次低于takt time，实际8.2s vs 要求7.5s。检查焊枪磨损与程序优化空间。","category":"节拍异常","channel":"mes_downtime"}
+{"id":"a-006","content":"AMR在通道C7位置丢失定位，激光雷达数据跳变。已自动停车等待重新规划路径。","category":"导航异常","channel":"mqtt_sparkplug"}
+{"id":"a-007","content":"人形机器人在搬运任务中步态不稳定，右髋关节扭矩波动±15N·m。建议暂停该任务并检查驱动器。","category":"运动异常","channel":"ros2_log"}
+{"id":"a-008","content":"PLC与MES通信中断超过30秒，OPC UA连接断开。工单状态无法同步，已切换本地模式。","category":"通信故障","channel":"opcua_alarm"}
+{"id":"a-009","content":"涂装机器人喷涂厚度不均，膜厚标准差0.018mm超过规格0.012mm。检查喷嘴与雾化参数。","category":"质量缺陷","channel":"vision_inspect"}
+{"id":"a-010","content":"紧急停止按钮被按下，整线停机。操作员报告异响来自焊装工位3的伺服电机。待维护确认。","category":"急停事件","channel":"safety_plc"}
+{"id":"a-011","content":"夹爪未在规定时间内完成闭合动作，超时2.3s。可能是气动压力不足或机械卡阻。","category":"执行器故障","channel":"ros2_log"}
+{"id":"a-012","content":" historians 数据丢失：振动传感器V-204在14:30-15:00时段无数据记录。检查采集链路与存储。","category":"数据缺失","channel":"historian"}

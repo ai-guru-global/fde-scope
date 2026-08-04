@@ -1,0 +1,77 @@
+# Runbook · {{ ctx.customer }} · {{ agent_name }}
+
+> 由 FDE Scope 生成 · engagement `{{ ctx.id }}` · profile `{{ ctx.profile }}`
+
+## 1. 系统概述
+
+- **客户**: {{ ctx.customer }}
+- **场景 profile**: `{{ ctx.profile }}`
+- **当前阶段**: {{ ctx.current_phase }} ({{ ctx.current_zone.value }})
+
+## 2. 值班联系人 / On-call
+
+| 角色 | 联系 |
+|---|---|
+| 主 on-call | TBD |
+| FDE on-call | TBD |
+| 客户运维 | TBD |
+
+{% if ctx.slos %}
+## 3. SLO 定义
+
+| SLO | 目标 | 错误预算 | 告警路由 | 窗口 |
+|---|---|---|---|---|
+{% for s in ctx.slos %}| {{ s.name }} | {{ s.target }} | {{ s.error_budget or '—' }} | {{ s.alert_route or '—' }} | {{ s.window }} |
+{% endfor %}
+{% else %}
+## 3. SLO 定义
+⚠️ 未定义 SLO —— 上线前必须补齐（见 SLO gate）。
+{% endif %}
+
+## 4. 常见事件响应
+
+### 4.1 Agent 回复质量退化
+- **症状**: bad_case_rate 超过 SLO 阈值；客户投诉回复不准确。
+- **诊断**: 检查飞轮 `labeling_queue` 是否积压；对比最近一周 eval 报告。
+- **处置**: 触发增量重训；必要时回滚到上一版模型快照。
+- **升级**: FDE on-call。
+
+### 4.2 数据接入中断
+- **症状**: connector stream 停止；语料飞轮新样本归零。
+- **诊断**: 检查 OPC UA / MQTT / MES 连接；网络/OT 隔离变更。
+- **处置**: 重连；必要时切换到离线快照语料继续服务。
+
+{% if ctx.is_industrial %}
+### 4.3 安全事件（工业现场）
+- **症状**: e-stop / 碰撞 / 干预率突增；功能安全回路触发。
+- **处置**: **立即** 停用 agent，隔离到只读；联系安全负责人；记录事件用于 ISO 13849 / ISO 10218 复核。
+- **红线**: 未经功能安全 gate 通过前不得重新启用。
+{% endif %}
+
+## 5. 回滚步骤
+
+1. 停止 agent（`fde-scope deploy --tenant {{ ctx.id }} --stop`，路线图）。
+2. 回滚到上一个语料快照（`reports/corpus_report_*.json`）。
+3. 通知干系人，记录事故时间线。
+
+## 6. 移交状态
+
+{% if ctx.assets.get("handoff_package") %}
+- 移交包: ✅ 已生成
+- 客户接受: {{ '✅' if ctx.assets['handoff_package'].get('customer_accepted') else '❌ 未签' }}
+{% else %}
+- 移交包: ❌ 未生成（`fde-scope handoff {{ ctx.id }}`）
+{% endif %}
+
+## 7. 功能安全快照（仅工业）
+
+{% if ctx.is_industrial %}
+- ISO 13849 PLr / 达成 PL: {{ ctx.safety.required_plr or '—' }} / {{ ctx.safety.achieved_pl or '—' }}
+- IEC 61508 SIL 要求/达成: {{ ctx.safety.sil_required or '—' }} / {{ ctx.safety.sil_achieved or '—' }}
+- ISO 10218 评估: {{ '✅' if ctx.safety.iso10218_assessed else '❌' }}
+- CE marking: {{ '✅' if ctx.safety.ce_marking_done else '❌' }}
+- 危险分析: {{ '✅' if ctx.safety.hazard_analysis_done else '❌' }}
+{% endif %}
+
+---
+*此 runbook 是 FDE Scope 交付物的一部分。*

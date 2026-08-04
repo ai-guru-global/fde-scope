@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>FDE Scope · 语料报告</title>
+  <style>
+    :root {
+      --bg: #0f1115; --card: #1a1f29; --fg: #e6e6e6; --muted: #9aa4b2;
+      --accent: #2dd4bf; --warn: #fbbf24; --bad: #f87171; --good: #4ade80;
+      --border: #2a3140;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: -apple-system, "PingFang SC", "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--fg); line-height: 1.6;
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 32px 24px; }
+    h1 { font-size: 1.8rem; margin: 0 0 4px; }
+    h1 .v { color: var(--accent); }
+    .sub { color: var(--muted); margin-bottom: 28px; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .card .label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+    .card .num { font-size: 2rem; font-weight: 700; margin-top: 4px; }
+    .card.real .num { color: var(--good); }
+    .card.synth .num { color: var(--accent); }
+    .card.dropped .num { color: var(--bad); }
+    h2 { font-size: 1.2rem; margin: 28px 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; }
+    .bar { height: 8px; border-radius: 4px; background: #2a3140; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: var(--accent); }
+    .gap { color: var(--warn); }
+    .ok { color: var(--good); }
+    .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .72rem; background: #242b3a; color: var(--muted); }
+    footer { color: var(--muted); font-size: .8rem; margin-top: 36px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>FDE Scope <span class="v">语料报告</span></h1>
+    <div class="sub">从原始数据到可用语料的可审计交付物 · CorpusReport</div>
+
+    <div class="grid">
+      <div class="card"><div class="label">总量</div><div class="num">{{ report.total }}</div></div>
+      <div class="card real"><div class="label">真实样本</div><div class="num">{{ report.real }}</div></div>
+      <div class="card synth"><div class="label">合成样本</div><div class="num">{{ report.synthetic }}</div></div>
+      <div class="card dropped"><div class="label">已剔除</div><div class="num">{{ report.dropped }}</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="label">PII 脱敏数</div><div class="num">{{ report.pii_entities_masked }}</div></div>
+      <div class="card"><div class="label">覆盖类别</div><div class="num">{{ report.coverage.category_counts | length }}</div></div>
+      <div class="card"><div class="label">多样性指数</div><div class="num">{{ '%.2f' | format(report.coverage.diversity_index) }}</div></div>
+      <div class="card"><div class="label">缺口数</div><div class="num">{{ report.coverage.gaps | length }}</div></div>
+    </div>
+
+    <h2>覆盖度分析</h2>
+    <table>
+      <thead><tr><th>类别</th><th>样本数</th><th>占比</th><th>状态</th></tr></thead>
+      <tbody>
+      {% set total = report.coverage.total or 1 %}
+      {% for cat, count in report.coverage.category_counts.items() %}
+        {% set is_gap = count < report.coverage.target_per_category %}
+        <tr>
+          <td>{{ cat }}</td>
+          <td>{{ count }}</td>
+          <td>
+            <div class="bar"><span style="width: {{ (count / total * 100) | round }}%"></span></div>
+          </td>
+          <td class="{{ 'gap' if is_gap else 'ok' }}">{{ '⚠ 缺口' if is_gap else '✓ 达标' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% if report.coverage.gaps %}
+    <h2>合成补盲</h2>
+    <table>
+      <thead><tr><th>缺口类别</th><th>现有</th><th>目标</th><th>缺口大小</th></tr></thead>
+      <tbody>
+      {% for g in report.coverage.gaps %}
+        <tr>
+          <td>{{ g.category }}</td>
+          <td>{{ g.current_count }}</td>
+          <td>{{ g.target_count }}</td>
+          <td><span class="pill">+{{ g.shortfall }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <h2>数据分割</h2>
+    <div class="grid">
+      <div class="card"><div class="label">train</div><div class="num">{{ report.train.size }}</div></div>
+      <div class="card"><div class="label">eval</div><div class="num">{{ report.eval.size }}</div></div>
+      <div class="card"><div class="label">test</div><div class="num">{{ report.test.size }}</div></div>
+      <div class="card"><div class="label">golden</div><div class="num">{{ report.golden }}</div></div>
+    </div>
+
+    <footer>由 FDE Scope 生成 · 基于真实 AgentScope 2.0 API · 此报告为可审计交付物</footer>
+  </div>
+</body>
+</html>
