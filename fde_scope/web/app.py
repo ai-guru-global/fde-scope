@@ -224,11 +224,235 @@ app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")
 
 
 # ---------------------------------------------------------------------------
-# HTML dashboard (single self-contained page)
+# HTML pages
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
+def overview() -> str:
+    """The landing page: a one-screen overview of every capability."""
+    return _OVERVIEW_HTML
+
+
+@app.get("/console", response_class=HTMLResponse)
 def dashboard() -> str:
+    """The engagement console (the detailed workbench)."""
     return _DASHBOARD_HTML
+
+
+_OVERVIEW_HTML = """<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FDE Scope · 功能总览</title>
+<style>
+:root{--bg:#0b0e14;--panel:#131822;--panel2:#1a2030;--fg:#e6edf3;--muted:#8b98a9;
+--accent:#2dd4bf;--warn:#fbbf24;--bad:#f87171;--good:#4ade80;--border:#242c3d;--code:#0d1117}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"PingFang SC","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);line-height:1.6}
+header{padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px}
+header .logo{font-size:1.5rem;font-weight:800}
+header .logo span{color:var(--accent)}
+header .tag{color:var(--accent);font-size:.75rem;background:#0d2e2a;padding:3px 10px;border-radius:6px;font-weight:600}
+header .nav{margin-left:auto;display:flex;gap:6px}
+header .nav a{color:var(--muted);font-size:.85rem;padding:6px 12px;border-radius:6px;border:1px solid transparent}
+header .nav a:hover{color:var(--fg);border-color:var(--border)}
+header .nav a.active{color:var(--accent);border-color:var(--accent)}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 24px}
+.hero{text-align:center;padding:36px 0 28px}
+.hero h2{font-size:1.9rem;margin:0 0 10px;font-weight:800}
+.hero p{color:var(--muted);font-size:1.05rem;margin:0 auto;max-width:680px}
+.hero .cta{margin-top:22px;display:flex;gap:10px;justify-content:center}
+.btn{background:var(--accent);color:#04201d;border:0;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.95rem;text-decoration:none;display:inline-block}
+.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
+.btn:hover{opacity:.9}
+.sec-title{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:36px 0 14px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.grid{display:grid;gap:14px}
+.cols-4{grid-template-columns:repeat(4,1fr)}
+.cols-3{grid-template-columns:repeat(3,1fr)}
+.cols-2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:900px){.cols-4,.cols-3,.cols-2{grid-template-columns:1fr}}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .15s,transform .15s}
+.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tile .icon{font-size:1.8rem;margin-bottom:8px}
+.tile .name{font-weight:700;font-size:1rem;margin-bottom:4px}
+.tile .desc{color:var(--muted);font-size:.82rem;line-height:1.5}
+.tile .status{display:inline-block;margin-top:8px;padding:1px 8px;border-radius:999px;font-size:.68rem;font-weight:600}
+.s-ok{background:#0f3d2e;color:var(--good)}
+.s-partial{background:#3b2a1a;color:var(--warn)}
+.s-stub{background:#2a1a1a;color:var(--bad)}
+.step-flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0}
+.zone{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin:0 4px;position:relative}
+.zone .ztag{font-size:.7rem;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.zone .zname{font-size:.95rem;font-weight:700;margin:4px 0 8px}
+.zone ol{margin:0;padding-left:18px;font-size:.82rem;color:var(--muted)}
+.zone ol li{margin-bottom:3px}
+.zone ol li b{color:var(--fg)}
+.stat{text-align:center;padding:14px;background:var(--panel2);border:1px solid var(--border);border-radius:10px}
+.stat .num{font-size:2rem;font-weight:800;color:var(--accent)}
+.stat .lab{font-size:.78rem;color:var(--muted)}
+.kpi-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+.kpi-row:last-child{border:0}
+.kpi-row .v{font-weight:700;color:var(--accent)}
+.cli{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:"SF Mono",Consolas,monospace;font-size:.8rem;overflow-x:auto}
+.cli .c{color:var(--muted)}
+.cli .cmd{color:var(--accent)}
+footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;border-top:1px solid var(--border);margin-top:30px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">FDE <span>Scope</span></div>
+  <span class="tag">72h · raw data → deployed agent</span>
+  <nav class="nav">
+    <a href="/" class="active">功能总览</a>
+    <a href="/console">Engagement 控制台 →</a>
+    <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<div class="hero">
+  <h2>FDE 的完整现场工作台</h2>
+  <p>从第一次 Gemba walk 到签字移交——覆盖软件/SaaS 与具身机器人/制造业两类场景。
+     18 阶段 SOP、10 个可执行合规 gate、9 个数据连接器、真实生产 KPI。</p>
+  <div class="cta">
+    <a class="btn" href="/console">进入 Engagement 控制台</a>
+    <a class="btn ghost" href="#quickstart">快速上手</a>
+  </div>
+</div>
+
+<div class="grid cols-4" style="margin-bottom:8px">
+  <div class="stat"><div class="num">18</div><div class="lab">SOP 阶段（4 zones）</div></div>
+  <div class="stat"><div class="num">10</div><div class="lab">可执行 gate</div></div>
+  <div class="stat"><div class="num">9</div><div class="lab">数据连接器</div></div>
+  <div class="stat"><div class="num">151</div><div class="lab">测试全绿</div></div>
+</div>
+
+<div class="sec-title">🗺 完整 SOP · 18 阶段 · 4 Zones</div>
+<div class="step-flow">
+  <div class="zone">
+    <div class="ztag">Zone A</div><div class="zname">立项勘察</div>
+    <ol><li><b>qualification</b> 问题框定</li><li><b>site_survey</b> 🚦🏭 Gemba</li><li><b>stakeholder_map</b> 双 sponsor</li><li><b>success_criteria</b> 🚦 契约化</li></ol>
+  </div>
+  <div class="zone">
+    <div class="ztag">Zone B</div><div class="zname">构建</div>
+    <ol><li><b>connect</b> 数据接入</li><li><b>corpus</b> 语料锻造</li><li><b>prototype</b> 真实数据原型</li><li><b>validate</b> 验证</li><li><b>deploy</b> 🚦🏭 FAT/SAT</li><li><b>eval</b> 评估</li></ol>
+  </div>
+  <div class="zone">
+    <div class="ztag">Zone C</div><div class="zname">运营化</div>
+    <ol><li><b>slo_sla</b> 🚦 SLO+on-call</li><li><b>runbook</b> 应急手册</li><li><b>monitoring</b> 漂移检测</li><li><b>change_mgmt</b> 🚦🏭 工会</li><li><b>flywheel</b> 飞轮产品化</li></ol>
+  </div>
+  <div class="zone">
+    <div class="ztag">Zone D</div><div class="zname">交接退场</div>
+    <ol><li><b>ops_handoff</b> 运维移交</li><li><b>knowledge_transfer</b> 知识转移</li><li><b>disengage</b> 🚦 签字退场</li></ol>
+  </div>
+</div>
+
+<div class="sec-title">🚦 10 个可执行合规 Gate（工业 overlay）</div>
+<div class="grid cols-4">
+  <div class="tile"><div class="name">site_survey 🏭</div><div class="desc">现场勘察记录校验</div></div>
+  <div class="tile"><div class="name">success_criteria</div><div class="desc">双 sponsor + 可度量 done</div></div>
+  <div class="tile"><div class="name">fat_sat 🏭</div><div class="desc">FAT/SAT 验收签字</div></div>
+  <div class="tile"><div class="name">functional_safety 🏭</div><div class="desc">ISO 13849 / IEC 61508 / ISO 10218</div></div>
+  <div class="tile"><div class="name">conformity 🏭</div><div class="desc">CE / EU AI Act conformity</div></div>
+  <div class="tile"><div class="name">works_council 🏭</div><div class="desc">德国 BetrVG §87 工会共决</div></div>
+  <div class="tile"><div class="name">air_gap 🏭</div><div class="desc">air-gapped 部署清单</div></div>
+  <div class="tile"><div class="name">shift_handover 🏭</div><div class="desc">24/7 班次交接集成</div></div>
+  <div class="tile"><div class="name">slo</div><div class="desc">SLO + on-call 定义</div></div>
+  <div class="tile"><div class="name">handoff_signoff</div><div class="desc">移交包签字确认</div></div>
+</div>
+
+<div class="sec-title">🔌 9 个数据连接器</div>
+<div class="grid cols-4">
+  <div class="tile"><div class="icon">📄</div><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><div class="icon">🗄</div><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><div class="icon">📡</div><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
+  <div class="tile"><div class="icon">🏭</div><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">JSONL 可用</span></div>
+  <div class="tile"><div class="icon">⚙️</div><div class="name">OPC UA</div><div class="desc">PLC tag 读取</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">🤖</div><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">📈</div><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">🎫</div><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">☁️</div><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-stub">stub</span></div>
+</div>
+
+<div class="sec-title">⚙️ 6 大功能模块</div>
+<div class="grid cols-3">
+  <div class="tile"><div class="icon">🔬</div><div class="name">Corpus Engine</div><div class="desc">脱敏→去重→质量门→覆盖度分析→缺口检测→针对性合成→报告。<b>核心差异化</b>：合成是补盲区不是凑数量。</div></div>
+  <div class="tile"><div class="icon">📊</div><div class="name">Eval 评估</div><div class="desc">ticket 指标 + 制造业 KPI（OEE/MTBF/抓取率/碰撞率）+ bad case 挖掘 + 自动建议。</div></div>
+  <div class="tile"><div class="icon">🚀</div><div class="name">Deploy 部署</div><div class="desc">DockerWorkspace + PermissionEngine + KnowledgeBase 三层隔离，对齐真实 AgentScope 2.0 API。</div></div>
+  <div class="tile"><div class="icon">🔄</div><div class="name">Flywheel 飞轮</div><div class="desc">概念事件→真实事件映射 + 语料回流 + 周度增量重训。</div></div>
+  <div class="tile"><div class="icon">🗂</div><div class="name">SOP 状态机</div><div class="desc">18 阶段推进/回滚，gate 不通过即拦截。</div></div>
+  <div class="tile"><div class="icon">🌐</div><div class="name">Web 控制台</div><div class="desc">交互式 engagement 仪表盘 + gate + forge + KPI。</div></div>
+</div>
+
+<div class="sec-title">📈 制造业 KPI（实测 BMW 数据）</div>
+<div class="grid cols-4">
+  <div class="tile"><div class="name">OEE</div><div class="kpi-row"><span>设备综合效率</span><span class="v">0.724</span></div><div class="desc">世界级 ≥0.85</div></div>
+  <div class="tile"><div class="name">抓取成功率</div><div class="kpi-row"><span>pick success</span><span class="v">0.793</span></div><div class="desc">DexNet 基准 ~0.80</div></div>
+  <div class="tile"><div class="name">MTBF</div><div class="kpi-row"><span>平均无故障(h)</span><span class="v">39.8</span></div><div class="desc">越高越好</div></div>
+  <div class="tile"><div class="name">碰撞/干预率</div><div class="kpi-row"><span>per cycle</span><span class="v">1.08%</span></div><div class="desc">越低越好</div></div>
+</div>
+
+<div class="sec-title" id="quickstart">🚀 快速上手</div>
+<div class="grid cols-2">
+  <div class="tile">
+    <div class="name">CLI 命令行</div>
+    <div class="cli">
+<span class="c"># 安装（核心层零依赖）</span><br>
+<span class="cmd">pip install -e ".[dev]"</span><br><br>
+<span class="c"># 启动制造业 engagement</span><br>
+<span class="cmd">fde-scope</span> engage init --customer BMW --profile manufacturing<br><br>
+<span class="c"># 推进 SOP（gate 拦截）</span><br>
+<span class="cmd">fde-scope</span> engage advance &lt;id&gt;<br>
+<span class="cmd">fde-scope</span> gate check &lt;id&gt; --gate fat_sat<br><br>
+<span class="c"># 语料锻造 + KPI</span><br>
+<span class="cmd">fde-scope</span> corpus --input alarm.jsonl --out r.html<br>
+<span class="cmd">fde-scope</span> kpi &lt;id&gt; --samples station.jsonl<br><br>
+<span class="c"># 生成移交包</span><br>
+<span class="cmd">fde-scope</span> handoff &lt;id&gt; --accept
+    </div>
+  </div>
+  <div class="tile">
+    <div class="name">Web 界面</div>
+    <div class="cli">
+<span class="c"># 启动交互控制台</span><br>
+<span class="cmd">pip install -e ".[web]"</span><br>
+<span class="cmd">fde-scope</span> web<br><br>
+<span class="c">→ http://127.0.0.1:8080</span><br><br>
+<span class="c"># 控制台功能：</span><br>
+· 新建 engagement（选 profile）<br>
+· 18 阶段可视化 + gate 拦截<br>
+· CSV → 语料锻造（HTML 报告）<br>
+· KPI 计算（ticket / 制造业）<br>
+· 推进/回滚 SOP 状态机
+    </div>
+  </div>
+</div>
+
+<div class="sec-title">📦 两种场景</div>
+<div class="grid cols-2">
+  <div class="tile">
+    <div class="name">🎫 ticket · 客服工单</div>
+    <div class="desc">CSV/Zammad/Salesforce/MySQL 接入。意图准确率、回复采纳率、升级率评估。无工业 gate。</div>
+    <span class="status s-ok">完整可用</span>
+  </div>
+  <div class="tile">
+    <div class="name">🏭 manufacturing · 具身机器人</div>
+    <div class="desc">OPC UA/MQTT/ROS2/MES/Historian 接入。OEE/MTBF/抓取率/碰撞率 + 6 个工业合规 gate。</div>
+    <span class="status s-partial">核心可用 · 工业IO部分 stub</span>
+  </div>
+</div>
+
+<footer>
+  FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
+  151 tests passed · 50 source files · 零配置可跑
+</footer>
+
+</div>
+</body>
+</html>
+"""
 
 
 _DASHBOARD_HTML = """<!DOCTYPE html>
@@ -294,6 +518,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
 <header>
   <h1>FDE Scope <span class="v">Engagement Console</span></h1>
   <span class="sub">72h from raw data to a deployed agent · 全 SOP 工作台</span>
+  <a href="/" style="margin-left:auto;color:var(--muted);font-size:.85rem">← 功能总览</a>
 </header>
 <div class="layout">
   <aside class="sidebar">

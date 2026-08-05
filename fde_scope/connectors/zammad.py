@@ -22,7 +22,7 @@ from .schema import Schema, SchemaField
 class ZammadConnector(DataConnector):
     """Connect to a Zammad ticketing instance via its REST API."""
 
-    connector_type = "zammad"
+    type = "zammad"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

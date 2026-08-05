@@ -21,7 +21,7 @@ from .schema import Schema, SchemaField
 class SalesforceConnector(DataConnector):
     """Connect to Salesforce (Case object) via the REST API."""
 
-    connector_type = "salesforce"
+    type = "salesforce"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

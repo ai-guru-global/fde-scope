@@ -21,7 +21,7 @@ from .schema import Schema, SchemaField
 class HistorianConnector(DataConnector):
     """Query a process historian for tag time-series."""
 
-    connector_type = "historian"
+    type = "historian"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

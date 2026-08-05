@@ -22,8 +22,17 @@ def test_health(client) -> None:
     assert r.json()["status"] == "ok"
 
 
-def test_dashboard_html(client) -> None:
+def test_overview_html(client) -> None:
+    """The landing page at / shows the feature overview."""
     r = client.get("/")
+    assert r.status_code == 200
+    assert "FDE Scope" in r.text
+    assert "SOP" in r.text  # the overview mentions the SOP
+
+
+def test_console_html(client) -> None:
+    """The engagement console lives at /console."""
+    r = client.get("/console")
     assert r.status_code == 200
     assert "Engagement Console" in r.text
 

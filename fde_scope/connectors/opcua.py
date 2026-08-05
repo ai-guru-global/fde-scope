@@ -102,7 +102,7 @@ def _browse_payload(node_id: str, display_name: str, data_type: str | None) -> d
 class OpcUaConnector(DataConnector):
     """Connect to an OPC UA server and surface its Variables as a corpus."""
 
-    connector_type: ClassVar[str] = "opcua"
+    type: ClassVar[str] = "opcua"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

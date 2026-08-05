@@ -11,9 +11,12 @@ imports agentscope, so it runs with zero config.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from fde_scope.corpus.types import CorpusReport
 
 from .bad_case_miner import BadCaseMiner, BadCaseReport
 from .metrics import (
@@ -43,7 +46,12 @@ class FDEBenchmark:
 
     METRICS = METRICS
 
-    def run(self, reply_fn: ReplyFn, eval_cases: list[EvalCase]) -> EvalReport:
+    def run(
+        self,
+        reply_fn: ReplyFn,
+        eval_cases: list[EvalCase],
+        corpus_report: "CorpusReport | None" = None,
+    ) -> EvalReport:
         # Materialize agent replies (the only place an LLM would be called).
         scored: list[EvalCase] = []
         for case in eval_cases:
@@ -51,6 +59,13 @@ class FDEBenchmark:
             scored.append(case.model_copy(update={"agent_reply": reply}))
 
         metrics = self._aggregate(scored)
+        # Backfill the corpus dimension from the forge report when the caller
+        # supplies one, so the eval isn't stuck reporting 0.0 for coverage.
+        if corpus_report is not None:
+            cov = corpus_report.coverage
+            metrics["corpus_coverage"] = _corpus_coverage_fraction(cov)
+            metrics["corpus_quality_avg"] = _corpus_quality_avg(corpus_report)
+            metrics["corpus_diversity"] = cov.diversity_index
         bad = BadCaseMiner().mine(scored)
         return EvalReport(
             metrics=metrics,
@@ -111,3 +126,22 @@ class MockReplyFn:
         if self._rng.random() <= self.accuracy:
             return f"已为您处理：{user_input[:30]}…（mock 回复）"
         return "抱歉，我不太理解您的问题。（mock 回复）"
+
+
+# ---------------------------------------------------------------------------
+# Corpus-dimension helpers — backfill metrics from a CorpusReport
+# ---------------------------------------------------------------------------
+def _corpus_coverage_fraction(coverage) -> float:
+    """Fraction of categories that meet the target sample count (0-1)."""
+    if not coverage.category_counts:
+        return 0.0
+    met = sum(1 for c in coverage.category_counts.values() if c >= coverage.target_per_category)
+    return met / len(coverage.category_counts)
+
+
+def _corpus_quality_avg(report) -> float:
+    """Mean quality score (1-5) across all forged items."""
+    items = report.train.items + report.eval.items + report.test.items
+    if not items:
+        return 0.0
+    return sum(i.quality_score for i in items) / len(items)

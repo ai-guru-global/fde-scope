@@ -55,6 +55,31 @@ def test_benchmark_runs_with_mock_reply() -> None:
     assert "intent_accuracy" in report.metric_labels
 
 
+def test_benchmark_backfills_corpus_metrics_from_forge_report(sample_rows: list[dict]) -> None:
+    """Corpus-dimension metrics (coverage/quality/diversity) come from the forge report."""
+    from fde_scope.config import CorpusConfig
+    from fde_scope.corpus import CorpusForge
+
+    forge_report = CorpusForge(CorpusConfig(min_samples_per_category=5, synth_per_gap=2)).forge_rows(sample_rows)
+    eval_report = FDEBenchmark().run(MockReplyFn(accuracy=1.0), _cases(), corpus_report=forge_report)
+
+    # coverage = fraction of categories meeting target (0-1); with a tiny sample
+    # and high min_samples, most categories are gaps → coverage may be 0, but it
+    # must be a real number, not the old hardcoded 0.0-without-corpus sentinel.
+    assert eval_report.metrics["corpus_coverage"] >= 0.0
+    # quality_avg is the mean of item quality scores (1-5 band)
+    assert eval_report.metrics["corpus_quality_avg"] > 0.0
+    # diversity is normalized Shannon entropy (0-1)
+    assert 0.0 <= eval_report.metrics["corpus_diversity"] <= 1.0
+
+
+def test_benchmark_corpus_metrics_stay_zero_without_forge_report() -> None:
+    """Without a forge report, corpus metrics remain 0.0 (no silent guess)."""
+    report = FDEBenchmark().run(MockReplyFn(accuracy=1.0), _cases())
+    assert report.metrics["corpus_coverage"] == 0.0
+    assert report.metrics["corpus_quality_avg"] == 0.0
+
+
 def test_bad_case_miner_finds_mismatch() -> None:
     # craft cases: one passes, one mismatches intent
     cases = [

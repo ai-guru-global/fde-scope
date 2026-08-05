@@ -23,7 +23,7 @@ from .schema import Schema, SchemaField
 class Ros2BagConnector(DataConnector):
     """Read messages from a rosbag2 file."""
 
-    connector_type = "ros2_bag"
+    type = "ros2_bag"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
