@@ -107,7 +107,3 @@ disallow_untyped_defs = false     # pragmatic: keep optional-deps modules import
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-check_untyped_defs = false

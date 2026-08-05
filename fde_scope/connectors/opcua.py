@@ -284,13 +284,15 @@ class OpcUaConnector(DataConnector):
         async def _read_all() -> list[dict[str, Any]]:
             client = await self._async_connect(asyncua)
             try:
-                nodes = [client.get_node(nid) for nid in node_ids]
-                values = await asyncio.gather(*(n.read_data_value() for n in nodes), return_exceptions=True)
                 rows: list[dict[str, Any]] = []
-                for nid, dv in zip(node_ids, values, strict=True):
-                    if isinstance(dv, Exception):
+                for nid in node_ids:
+                    try:
+                        node = client.get_node(nid)
+                        dv = await node.read_data_value()
+                    except Exception:  # noqa: BLE001 — per-node failure is fine
                         # Skip unreadable nodes (access rights, stale session).
-                        # FDE sees the gap in extract_sample and decides.
+                        # The FDE sees the gap in extract_sample and decides
+                        # whether to re-subscribe with different credentials.
                         continue
                     rows.append(
                         {
