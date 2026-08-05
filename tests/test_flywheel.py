@@ -52,6 +52,33 @@ def test_flywheel_ignores_unknown_concept() -> None:
     assert wheel.snapshot()["collected"] == 0
 
 
+def test_corpus_store_add_appends_exactly_once() -> None:
+    """Regression: add() used to double-write (getattr + if/elif)."""
+    from fde_scope.flywheel.collectors import CorpusStore
+    from fde_scope.corpus.types import CorpusItem
+
+    store = CorpusStore()
+    item = CorpusItem(id="x", content="hi", category="c")
+    store.add(item, bucket="labeling_queue")
+    assert len(store.labeling_queue) == 1  # not 2
+    assert store.total == 1
+
+    store.add(item, bucket="edge_cases")
+    assert len(store.edge_cases) == 1
+    assert store.total == 2
+
+    # default bucket
+    store.add(item)
+    assert len(store.accepted) == 1
+    assert store.total == 3
+
+    # unknown bucket raises
+    import pytest
+
+    with pytest.raises(ValueError):
+        store.add(item, bucket="nonsense")
+
+
 def test_retrain_scheduler_threshold() -> None:
     sched = RetrainScheduler()
     job = sched.jobs[0]  # weekly incremental, min 200

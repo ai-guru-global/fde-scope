@@ -29,15 +29,15 @@ class CorpusStore:
     failures: list[CorpusItem] = field(default_factory=list)
 
     def add(self, item: CorpusItem, *, bucket: str = "accepted") -> None:
-        getattr(self, bucket if bucket != "accepted" else "accepted").append(item)
-        if bucket == "accepted":
-            self.accepted.append(item)
-        elif bucket == "labeling_queue":
-            self.labeling_queue.append(item)
-        elif bucket == "edge_cases":
-            self.edge_cases.append(item)
-        elif bucket == "failures":
-            self.failures.append(item)
+        """Append ``item`` to the named bucket exactly once.
+
+        Valid buckets: ``accepted`` (default), ``labeling_queue``,
+        ``edge_cases``, ``failures``.
+        """
+        valid = {"accepted", "labeling_queue", "edge_cases", "failures"}
+        if bucket not in valid:
+            raise ValueError(f"unknown bucket {bucket!r}; choose from {valid}")
+        getattr(self, bucket).append(item)
 
     @property
     def total(self) -> int:

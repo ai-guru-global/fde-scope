@@ -61,4 +61,51 @@ testpaths = ["tests"]
 addopts = "-ra -q"
 markers = [
     "agentscope: tests that import the optional agentscope extra (skipped if not installed)",
+    "mysql: tests that require a real MySQL server (skipped unless FDE_SCOPE_MYSQL_DSN is set)",
 ]
+
+# ---------------------------------------------------------------------------
+# ruff — fast linter + formatter (replaces flake8/isort/black)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 110
+extend-exclude = [".venv", "build", "dist", ".pytest_cache"]
+
+[tool.ruff.lint]
+# A reasonable, opinionated baseline: pycodestyle (E/W), pyflakes (F),
+# isort (I), comprehensions (C4), bugbear (B), simplify (SIM).
+select = ["E", "W", "F", "I", "C4", "B", "SIM", "UP"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # function-call-in-default-arg is idiomatic for FastAPI/Pydantic
+    "B905",  # zip() without strict=; we accept implicit truncating
+    "SIM108", # ternary vs if/else is stylistic
+    "SIM117", # combined with-statements hurt readability in CLI
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["B011"]  # asserts are fine in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# mypy — static type-checker (advisory, not blocking on missing imports)
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true     # agentscope / fastapi / pydantic all have stubs but
+                                  # third-party industrial libs (asyncua, paho) often don't
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false     # pragmatic: keep optional-deps modules importable
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = false

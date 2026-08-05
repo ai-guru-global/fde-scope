@@ -4,6 +4,13 @@
 > From first gemba walk to signed-off handoff — across software/SaaS *and*
 > embodied-robotics / manufacturing. Built on [AgentScope 2.0](https://github.com/agentscope-ai/agentscope).
 
+[![CI](https://github.com/ai-guru-global/fde-scope/actions/workflows/ci.yml/badge.svg)](https://github.com/ai-guru-global/fde-scope/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ai-guru-global/fde-scope/graph/badge.svg)](https://codecov.io/gh/ai-guru-global/fde-scope)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Code style: formatter](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 FDE is 2026's hottest AI role (OpenAI, Anthropic, Google, Palantir all build FDE
 teams; listings up ~7× YoY). But every FDE shows up to a customer site and
 rebuilds the same workflow from scratch — and most teams only model the "build"
