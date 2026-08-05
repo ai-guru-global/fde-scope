@@ -146,7 +146,7 @@ def evaluate_gate(eid: str, slug: str) -> dict:
 
 
 @app.post("/api/engagements/{eid}/context")
-def update_context(eid: str, body: dict = None) -> dict:
+def update_context(eid: str, body: dict | None = None) -> dict:
     """Patch an engagement context (site / safety / slo / stakeholders / assets)."""
     eng = _load(eid)
     body = body or {}

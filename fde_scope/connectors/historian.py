@@ -33,7 +33,7 @@ class HistorianConnector(DataConnector):
     def _ensure_driver(self) -> None:
         # PI Web API is HTTP (requests); Influx uses influxdb-client.
         try:
-            import requests  # type: ignore  # noqa: F401
+            import requests  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError("HistorianConnector needs 'requests': pip install requests") from exc
 

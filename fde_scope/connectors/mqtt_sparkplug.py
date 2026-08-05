@@ -32,7 +32,7 @@ class MqttSparkplugConnector(DataConnector):
 
     def _ensure_driver(self) -> None:
         try:
-            import paho.mqtt.client  # type: ignore  # noqa: F401
+            import paho.mqtt.client  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError("MqttSparkplugConnector needs paho-mqtt: pip install paho-mqtt") from exc
 

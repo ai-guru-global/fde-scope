@@ -75,7 +75,7 @@ def build_engine(blueprint: PermissionBlueprint):
     mutable.
     """
     try:
-        from agentscope.permission import (  # type: ignore
+        from agentscope.permission import (
             PermissionBehavior,
             PermissionContext,
             PermissionEngine,

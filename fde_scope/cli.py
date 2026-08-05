@@ -505,7 +505,7 @@ def web(
     """Launch the FDE Scope Web UI (engagement dashboard + gates + reports)."""
     _banner("web ui")
     try:
-        import uvicorn  # type: ignore
+        import uvicorn
     except ImportError:
         console.print("[red]Web UI needs the 'web' extra:[/red] pip install 'fde-scope[web]'")
         raise typer.Exit(2) from None

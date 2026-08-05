@@ -59,7 +59,7 @@ class TenantDeployer:
         self._has_as = agentscope_extra
         if self._has_as is None:
             try:
-                import agentscope  # type: ignore  # noqa: F401
+                import agentscope  # noqa: F401
 
                 self._has_as = True
             except ImportError:
@@ -135,7 +135,7 @@ class TenantDeployer:
         ``HarnessAgent(...)`` block: same intent (corpus tool + ticket tool +
         workspace + permission + HITL), real types.
         """
-        from agentscope.agent import Agent, ReActConfig  # type: ignore
+        from agentscope.agent import Agent, ReActConfig
 
         sys_prompt = self._build_prompt(tenant)
         # ReActConfig replaces the implicit reasoning loop of the fictional

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, ClassVar
 
 from .schema import Schema
 
@@ -34,7 +34,9 @@ class DataConnector(ABC):
     """FDE data-connector base class."""
 
     #: short slug used by the CLI (``--type csv``) and the registry
-    type: str = "base"
+    #: Marked ``ClassVar`` so mypy doesn't conflate it with the builtin
+    #: ``type`` constructor when we annotate ``type["DataConnector"]``.
+    type: ClassVar[str] = "base"
 
     def __init__(self, source: str, **options: Any) -> None:
         self.source = source

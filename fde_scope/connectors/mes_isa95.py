@@ -81,6 +81,8 @@ class MesConnector(DataConnector):
         return self._jsonl_path is not None and self._jsonl_path.exists()
 
     def _iter_jsonl(self) -> Iterator[dict[str, Any]]:
+        if self._jsonl_path is None:
+            return
         with open(self._jsonl_path, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()

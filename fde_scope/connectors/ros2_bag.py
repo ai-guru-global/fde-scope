@@ -32,7 +32,7 @@ class Ros2BagConnector(DataConnector):
 
     def _ensure_driver(self) -> None:
         try:
-            from rosbags.highlevel import AnyReader  # type: ignore  # noqa: F401
+            from rosbags.highlevel import AnyReader  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError("Ros2BagConnector needs the 'rosbags' package: pip install rosbags") from exc
 

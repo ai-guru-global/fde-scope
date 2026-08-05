@@ -138,7 +138,7 @@ class MySQLConnector(DataConnector):
     # -- driver lazy import -----------------------------------------------------
     def _ensure_driver(self) -> None:
         try:
-            import mysql.connector  # type: ignore  # noqa: F401
+            import mysql.connector  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "MySQLConnector needs the optional 'mysql' extra "

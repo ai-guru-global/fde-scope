@@ -98,6 +98,7 @@ indent-style = "space"
 python_version = "3.10"
 ignore_missing_imports = true     # agentscope / fastapi / pydantic all have stubs but
                                   # third-party industrial libs (asyncua, paho) often don't
+plugins = ["pydantic.mypy"]        # teach mypy how pydantic v2 Field defaults work
 warn_return_any = false
 warn_unused_configs = true
 disallow_untyped_defs = false     # pragmatic: keep optional-deps modules importable

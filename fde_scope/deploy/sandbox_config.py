@@ -61,7 +61,7 @@ def build_workspace(spec: SandboxSpec):
     error if the optional extra isn't installed.
     """
     try:
-        from agentscope.workspace import DockerWorkspace, LocalWorkspace  # type: ignore
+        from agentscope.workspace import DockerWorkspace, LocalWorkspace
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "Tenant deployment needs the optional 'agentscope' extra: pip install 'fde-scope[agentscope]'"

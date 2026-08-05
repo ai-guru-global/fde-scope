@@ -33,7 +33,7 @@ class OpcUaConnector(DataConnector):
 
     def _ensure_driver(self) -> None:
         try:
-            import asyncua  # type: ignore  # noqa: F401
+            import asyncua  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "OpcUaConnector needs the optional 'opcua' extra (asyncua): pip install asyncua"
