@@ -120,7 +120,7 @@ def _looks_like_pii(column_name: str) -> bool:
 class MySQLConnector(DataConnector):
     """Connect to a MySQL 8+ server and surface its tables as a corpus."""
 
-    type = "mysql"
+    connector_type = "mysql"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

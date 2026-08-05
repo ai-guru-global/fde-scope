@@ -23,7 +23,7 @@ from .schema import Schema, SchemaField
 class OpcUaConnector(DataConnector):
     """Connect to an OPC UA server endpoint."""
 
-    type = "opcua"
+    connector_type = "opcua"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

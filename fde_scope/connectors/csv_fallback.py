@@ -58,7 +58,7 @@ def _is_float(v: Any) -> bool:
 class CSVConnector(DataConnector):
     """Read ticket-like rows from a CSV file or directory of CSV files."""
 
-    type = "csv"
+    connector_type = "csv"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

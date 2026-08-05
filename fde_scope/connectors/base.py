@@ -36,7 +36,7 @@ class DataConnector(ABC):
     #: short slug used by the CLI (``--type csv``) and the registry
     #: Marked ``ClassVar`` so mypy doesn't conflate it with the builtin
     #: ``type`` constructor when we annotate ``type["DataConnector"]``.
-    type: ClassVar[str] = "base"
+    connector_type: ClassVar[str] = "base"
 
     def __init__(self, source: str, **options: Any) -> None:
         self.source = source
@@ -75,5 +75,5 @@ def register(connector_cls: type[DataConnector]) -> type[DataConnector]:
     """Decorator: register a connector under its ``type`` slug."""
     from . import _registry
 
-    _registry.register(connector_cls.type, connector_cls)
+    _registry.register(connector_cls.connector_type, connector_cls)
     return connector_cls

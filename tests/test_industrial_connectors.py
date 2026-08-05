@@ -23,7 +23,7 @@ INDUSTRIAL_SLUGS = ["opcua", "mqtt_sparkplug", "ros2_bag", "mes", "historian"]
 def test_registry_resolves_industrial_connector(slug: str) -> None:
     cls = get(slug)
     assert issubclass(cls, DataConnector)
-    assert cls.type == slug
+    assert cls.connector_type == slug
 
 
 @pytest.mark.parametrize("slug", INDUSTRIAL_SLUGS)

@@ -22,7 +22,7 @@ from .schema import Schema, SchemaField
 class MqttSparkplugConnector(DataConnector):
     """Subscribe to an MQTT broker, optionally decoding Sparkplug B."""
 
-    type = "mqtt_sparkplug"
+    connector_type = "mqtt_sparkplug"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)

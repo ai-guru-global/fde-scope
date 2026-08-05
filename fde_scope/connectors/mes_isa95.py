@@ -67,7 +67,7 @@ class MesConnector(DataConnector):
     export (fully working). The connector auto-detects which.
     """
 
-    type = "mes"
+    connector_type = "mes"
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
