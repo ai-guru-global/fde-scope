@@ -34,6 +34,7 @@ dependencies = [
 # Runtime layer unlocks deploy/flywheel real-type assembly.
 agentscope = ["agentscope>=2.0.5"]
 mysql = ["mysql-connector-python>=8.3"]
+opcua = ["asyncua>=1.0"]
 web = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"]
 dev = [
     "pytest>=8.0",
@@ -62,6 +63,7 @@ addopts = "-ra -q"
 markers = [
     "agentscope: tests that import the optional agentscope extra (skipped if not installed)",
     "mysql: tests that require a real MySQL server (skipped unless FDE_SCOPE_MYSQL_DSN is set)",
+    "opcua: tests that require a real OPC UA server (skipped unless FDE_SCOPE_OPCUA_URL is set)",
 ]
 
 # ---------------------------------------------------------------------------
