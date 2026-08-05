@@ -19,21 +19,21 @@ class RetrainJob:
     """One scheduled retrain job descriptor."""
 
     name: str
-    cron: str                 # 5-field cron, local TZ
-    min_new_samples: int      # skip the run if fewer new samples accumulated
-    kind: str                 # "incremental" | "full_eval"
+    cron: str  # 5-field cron, local TZ
+    min_new_samples: int  # skip the run if fewer new samples accumulated
+    kind: str  # "incremental" | "full_eval"
 
 
 DEFAULT_JOBS: list[RetrainJob] = [
     RetrainJob(
         name="weekly_incremental_retrain",
-        cron="0 2 * * 1",     # every Monday 02:00
+        cron="0 2 * * 1",  # every Monday 02:00
         min_new_samples=200,
         kind="incremental",
     ),
     RetrainJob(
         name="monthly_full_eval",
-        cron="0 3 1 * *",     # 1st of the month 03:00
+        cron="0 3 1 * *",  # 1st of the month 03:00
         min_new_samples=0,
         kind="full_eval",
     ),

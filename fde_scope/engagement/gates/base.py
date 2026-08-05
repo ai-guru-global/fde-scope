@@ -24,7 +24,7 @@ class GateResult:
     warnings: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
-    def merge(self, other: "GateResult") -> "GateResult":
+    def merge(self, other: GateResult) -> GateResult:
         return GateResult(
             slug=self.slug,
             passed=self.passed and other.passed,

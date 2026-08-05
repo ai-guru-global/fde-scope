@@ -25,7 +25,7 @@ class TicketProfile(Profile):
     def compute_kpis(self, samples: list[dict]) -> dict[str, float]:
         """Recompute ticket KPIs from per-ticket records (idempotent)."""
         if not samples:
-            return {k: 0.0 for k in self.kpi_catalogue}
+            return dict.fromkeys(self.kpi_catalogue, 0.0)
         n = len(samples)
         acc = sum(1 for s in samples if s.get("intent_correct", True)) / n
         adopted = sum(1 for s in samples if s.get("adopted", True)) / n

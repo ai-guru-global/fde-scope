@@ -65,8 +65,8 @@ class EvalCase(BaseModel):
     expected_category: str | None = None
     expected_output: str | None = None
     agent_reply: str = ""
-    adopted: bool | None = None          # True if human used the reply as-is
-    escalated: bool = False              # True if it had to go to a human
+    adopted: bool | None = None  # True if human used the reply as-is
+    escalated: bool = False  # True if it had to go to a human
     resolved_first_contact: bool = True
     handle_time_seconds: float = 0.0
     baseline_handle_time_seconds: float = 480.0  # 8min human baseline

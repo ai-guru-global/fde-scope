@@ -70,8 +70,7 @@ def test_advance_blocked_returns_result(client) -> None:
     r = client.post("/api/engagements", data={"customer": "BlockedCo", "profile": "ticket"})
     eid = r.json()["engagement_id"]
     # jump to success_criteria phase without sponsors/criteria
-    client.post(f"/api/engagements/{eid}/context",
-                json={"success_criteria": [], "stakeholders": []})
+    client.post(f"/api/engagements/{eid}/context", json={"success_criteria": [], "stakeholders": []})
     # manually move context forward to success_criteria
     from fde_scope.engagement import Engagement, EngagementContext
     from fde_scope.web.app import _eng_path
@@ -110,15 +109,29 @@ def test_forge_endpoint(client, sample_csv_bytes: bytes) -> None:
 def test_kpi_endpoint_manufacturing(client) -> None:
     import json
 
-    payload = "\n".join(json.dumps({
-        "availability": 0.9, "performance": 0.95, "quality": 0.99,
-        "uptime_hours": 100, "failures": 2, "repair_hours": 4,
-        "good_units": 95, "started_units": 100, "defects": 5,
-        "opportunities_per_unit": 1,
-        "grasp_successes": 80, "grasp_attempts": 100,
-        "tasks_succeeded": 90, "tasks_attempted": 100,
-        "interventions": 3, "cycles": 1000,
-    }) for _ in range(3))
+    payload = "\n".join(
+        json.dumps(
+            {
+                "availability": 0.9,
+                "performance": 0.95,
+                "quality": 0.99,
+                "uptime_hours": 100,
+                "failures": 2,
+                "repair_hours": 4,
+                "good_units": 95,
+                "started_units": 100,
+                "defects": 5,
+                "opportunities_per_unit": 1,
+                "grasp_successes": 80,
+                "grasp_attempts": 100,
+                "tasks_succeeded": 90,
+                "tasks_attempted": 100,
+                "interventions": 3,
+                "cycles": 1000,
+            }
+        )
+        for _ in range(3)
+    )
     r = client.post(
         "/api/kpi",
         files={"file": ("s.jsonl", payload.encode(), "application/jsonl")},

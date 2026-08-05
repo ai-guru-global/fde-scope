@@ -21,10 +21,10 @@ from dataclasses import dataclass
 class EventMapping:
     """One row of the concept→real-event table."""
 
-    concept: str              # the flywheel's domain name for it
-    real_event_class: str     # the actual 2.0 event type (string for lazy import)
+    concept: str  # the flywheel's domain name for it
+    real_event_class: str  # the actual 2.0 event type (string for lazy import)
     collection_strategy: str  # how the flywheel treats it
-    quality_on_capture: float # quality score assigned to the captured sample
+    quality_on_capture: float  # quality score assigned to the captured sample
 
 
 # The authoritative mapping. Verify against agentscope.event when wiring live.

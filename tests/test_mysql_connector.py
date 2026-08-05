@@ -23,7 +23,7 @@ import sys
 import types
 from collections.abc import Iterator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -44,7 +44,7 @@ class _FakeCursor:
     ``fetchall``/``fetchone``/``fetchmany`` hand back dicts or tuples.
     """
 
-    def __init__(self, conn: "_FakeConnection", *, dictionary: bool = False) -> None:
+    def __init__(self, conn: _FakeConnection, *, dictionary: bool = False) -> None:
         self._conn = conn
         self._dictionary = dictionary
         self._current: list = []
@@ -61,9 +61,7 @@ class _FakeCursor:
             self._current = [tuple(r.values()) for r in next_set]
         # Synthesize a description from the first row's keys, if any.
         if next_set and isinstance(next_set[0], dict):
-            self.description = [
-                (k, None, None, None, None, None, None) for k in next_set[0].keys()
-            ]
+            self.description = [(k, None, None, None, None, None, None) for k in next_set[0]]
         else:
             self.description = None
 

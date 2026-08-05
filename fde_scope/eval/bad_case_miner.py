@@ -12,8 +12,7 @@ from collections import Counter
 
 from pydantic import BaseModel, Field
 
-from .metrics import EvalCase
-from .metrics import score_intent_accuracy, score_adoption
+from .metrics import EvalCase, score_adoption, score_intent_accuracy
 
 
 class BadCase(BaseModel):

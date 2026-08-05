@@ -11,12 +11,11 @@ function pipeline; the LLM v1 swaps stage internals, not the orchestration.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .agents import PIIScrub, Deduplication, QualityGate, SchemaNormalizer, build_stages
+from .agents import QualityGate, SchemaNormalizer, build_stages
 from .coverage_analyzer import CoverageAnalyzer
 from .synthesizer import CorpusSynthesizer
 from .types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Provenance
@@ -29,7 +28,7 @@ if TYPE_CHECKING:
 class CorpusForge:
     """One-call forge: raw connector rows → a CorpusReport."""
 
-    def __init__(self, config: "CorpusConfig") -> None:
+    def __init__(self, config: CorpusConfig) -> None:
         self.config = config
         self.normalizer = SchemaNormalizer(
             text_field=config.text_field,
@@ -45,7 +44,7 @@ class CorpusForge:
         """Forge from an iterable of raw connector rows."""
         return self._forge(list(rows))
 
-    def forge_connector(self, connector: "DataConnector") -> CorpusReport:
+    def forge_connector(self, connector: DataConnector) -> CorpusReport:
         """Forge from a connected data source (streams all rows)."""
         rows: list[dict] = []
         for batch in connector.stream():
@@ -69,9 +68,7 @@ class CorpusForge:
 
         # Step 3: targeted synthesis to fill the gaps
         gaps = coverage.identify_gaps()
-        synthetic = self.synthesizer.fill_gaps(
-            real_items, gaps, per_gap_cap=self.config.synth_per_gap
-        )
+        synthetic = self.synthesizer.fill_gaps(real_items, gaps, per_gap_cap=self.config.synth_per_gap)
 
         # Step 4: merge + split
         full = real_items + synthetic

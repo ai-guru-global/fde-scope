@@ -118,5 +118,5 @@ class EngagementContext(BaseModel):
         return p
 
     @classmethod
-    def load(cls, path: str | Path) -> "EngagementContext":
+    def load(cls, path: str | Path) -> EngagementContext:
         return cls.model_validate_json(Path(path).read_text(encoding="utf-8"))

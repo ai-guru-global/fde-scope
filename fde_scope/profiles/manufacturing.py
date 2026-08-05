@@ -55,7 +55,7 @@ class ManufacturingProfile(Profile):
         cycles.
         """
         if not samples:
-            return {k: 0.0 for k in self.kpi_catalogue}
+            return dict.fromkeys(self.kpi_catalogue, 0.0)
 
         agg = _aggregate(samples)
 

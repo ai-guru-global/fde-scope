@@ -17,10 +17,9 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 
 from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
@@ -71,10 +70,15 @@ def health() -> dict:
 
 @app.get("/api/profiles")
 def profiles() -> dict:
-    return {slug: {"name": p.name, "industrial": p.is_industrial,
-                   "connectors": p.primary_connectors,
-                   "kpis": p.kpi_catalogue}
-            for slug, p in all_profiles().items()}
+    return {
+        slug: {
+            "name": p.name,
+            "industrial": p.is_industrial,
+            "connectors": p.primary_connectors,
+            "kpis": p.kpi_catalogue,
+        }
+        for slug, p in all_profiles().items()
+    }
 
 
 @app.get("/api/phases")
@@ -112,10 +116,12 @@ def engagement_gates(eid: str) -> dict:
     for slug, gate in _default_gate_registry().items():
         if gate.applies(eng.ctx):
             result = gate.check(eng.ctx)
-            out[slug] = {"name": gate.name,
-                         "passed": result.passed,
-                         "blockers": result.blockers,
-                         "warnings": result.warnings}
+            out[slug] = {
+                "name": gate.name,
+                "passed": result.passed,
+                "blockers": result.blockers,
+                "warnings": result.warnings,
+            }
     return out
 
 
@@ -136,8 +142,7 @@ def evaluate_gate(eid: str, slug: str) -> dict:
     eng = _load(eid)
     result = eng.evaluate_gate(slug)
     _save(eng)
-    return {"slug": slug, "passed": result.passed,
-            "blockers": result.blockers, "warnings": result.warnings}
+    return {"slug": slug, "passed": result.passed, "blockers": result.blockers, "warnings": result.warnings}
 
 
 @app.post("/api/engagements/{eid}/context")

@@ -5,8 +5,8 @@ from __future__ import annotations
 from fde_scope.config import CorpusConfig
 from fde_scope.corpus import (
     CorpusForge,
-    PIIScrub,
     Deduplication,
+    PIIScrub,
     QualityGate,
     SchemaNormalizer,
     score_item,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fde_scope.engagement import Engagement, EngagementContext, SafetyPosture, SiteInfo, Stakeholder
+from fde_scope.engagement import Engagement, EngagementContext, SafetyPosture, SiteInfo
 from fde_scope.engagement.engagement import _default_gate_registry
 
 
@@ -13,8 +13,7 @@ def _eng(profile="manufacturing", **kw) -> Engagement:
 
 # -- functional safety -------------------------------------------------------
 def test_functional_safety_blocks_on_low_pl() -> None:
-    eng = _eng(safety=SafetyPosture(required_plr="d", achieved_pl="b",
-                                    hazard_analysis_done=True))
+    eng = _eng(safety=SafetyPosture(required_plr="d", achieved_pl="b", hazard_analysis_done=True))
     result = eng.evaluate_gate("functional_safety")
     assert not result.passed
     assert any("ISO 13849" in b for b in result.blockers)
@@ -28,8 +27,11 @@ def test_functional_safety_blocks_on_missing_hazard_analysis() -> None:
 
 
 def test_functional_safety_passes_when_met() -> None:
-    eng = _eng(safety=SafetyPosture(required_plr="d", achieved_pl="e",
-                                    iso10218_assessed=True, hazard_analysis_done=True))
+    eng = _eng(
+        safety=SafetyPosture(
+            required_plr="d", achieved_pl="e", iso10218_assessed=True, hazard_analysis_done=True
+        )
+    )
     result = eng.evaluate_gate("functional_safety")
     assert result.passed
 
@@ -133,7 +135,16 @@ def test_handoff_gate_blocks_without_package() -> None:
 
 def test_all_gates_registered() -> None:
     reg = _default_gate_registry()
-    for slug in ["site_survey", "success_criteria", "fat_sat", "functional_safety",
-                 "conformity", "works_council", "air_gap", "shift_handover",
-                 "slo", "handoff_signoff"]:
+    for slug in [
+        "site_survey",
+        "success_criteria",
+        "fat_sat",
+        "functional_safety",
+        "conformity",
+        "works_council",
+        "air_gap",
+        "shift_handover",
+        "slo",
+        "handoff_signoff",
+    ]:
         assert slug in reg

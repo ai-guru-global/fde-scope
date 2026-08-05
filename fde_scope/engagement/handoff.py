@@ -8,8 +8,6 @@ hands over.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from .context import EngagementContext
 from .gates.base import Gate, GateResult
 
@@ -48,7 +46,6 @@ def build_handoff_package(
     customer_accepted: bool = False,
 ) -> dict:
     """Assemble the knowledge-transfer deliverable record."""
-    from .operationalization import render_runbook
 
     package = {
         "customer": ctx.customer,

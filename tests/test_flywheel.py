@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from fde_scope.flywheel import (
-    DataFlywheel,
     MAPPINGS,
+    DataFlywheel,
     RetrainScheduler,
     all_concepts,
     real_event_for,
@@ -54,8 +54,8 @@ def test_flywheel_ignores_unknown_concept() -> None:
 
 def test_corpus_store_add_appends_exactly_once() -> None:
     """Regression: add() used to double-write (getattr + if/elif)."""
-    from fde_scope.flywheel.collectors import CorpusStore
     from fde_scope.corpus.types import CorpusItem
+    from fde_scope.flywheel.collectors import CorpusStore
 
     store = CorpusStore()
     item = CorpusItem(id="x", content="hi", category="c")

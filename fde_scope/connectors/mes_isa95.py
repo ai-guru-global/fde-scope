@@ -74,7 +74,7 @@ class MesConnector(DataConnector):
         self.base_url = source.rstrip("/") if "://" in source else source
         self.api_token = options.get("api_token", "")
         self.entity = options.get("entity", "work_orders")
-        self._jsonl_path = Path(source) if not "://" in source else None
+        self._jsonl_path = Path(source) if "://" not in source else None
 
     @property
     def _is_jsonl(self) -> bool:

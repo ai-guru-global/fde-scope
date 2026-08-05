@@ -126,7 +126,9 @@ class MySQLConnector(DataConnector):
         super().__init__(source, **options)
         # `source` is the DSN; per-call overrides may be passed via options.
         params = _parse_dsn(source)
-        params.update({k: v for k, v in options.items() if k in {"host", "port", "database", "user", "password"}})
+        params.update(
+            {k: v for k, v in options.items() if k in {"host", "port", "database", "user", "password"}}
+        )
         self._conn_params: dict[str, Any] = params
         # Optional: scope the connector to a specific table (or a LIKE pattern).
         self._table_filter: str | None = options.get("table")

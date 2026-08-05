@@ -21,9 +21,9 @@ from pydantic import BaseModel, Field
 class Provenance(str, Enum):
     """Where a corpus item came from."""
 
-    REAL = "real"            # pulled verbatim from the connector
+    REAL = "real"  # pulled verbatim from the connector
     SYNTHETIC = "synthetic"  # generated to fill a coverage gap
-    GOLDEN = "golden"        # captured from a human override in the flywheel
+    GOLDEN = "golden"  # captured from a human override in the flywheel
 
 
 class CorpusItem(BaseModel):
@@ -39,7 +39,7 @@ class CorpusItem(BaseModel):
     # transformation trace — which forge stages touched this item
     trace: list[str] = Field(default_factory=list)
 
-    def with_trace(self, stage: str, **updates: Any) -> "CorpusItem":
+    def with_trace(self, stage: str, **updates: Any) -> CorpusItem:
         """Return a copy with a stage recorded and arbitrary fields updated."""
         data = self.model_copy(update=updates)
         data.trace = [*self.trace, stage]

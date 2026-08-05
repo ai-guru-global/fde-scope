@@ -44,6 +44,7 @@ class PIIScrub:
             content = item.content
             masked = 0
             for rx, label in self._compiled:
+
                 def _sub(m: re.Match, _label: str = label) -> str:
                     return f"{self.placeholder}({_label})"
 
@@ -189,8 +190,9 @@ class SchemaNormalizer:
     defined in :class:`CorpusConfig` and stamps an id when one is missing.
     """
 
-    def __init__(self, text_field: str = "content", category_field: str = "category",
-                 id_field: str = "id") -> None:
+    def __init__(
+        self, text_field: str = "content", category_field: str = "category", id_field: str = "id"
+    ) -> None:
         self.text_field = text_field
         self.category_field = category_field
         self.id_field = id_field
@@ -207,8 +209,11 @@ class SchemaNormalizer:
             category=category,
             channel=channel,
             trace=["normalize"],
-            metadata={k: v for k, v in row.items()
-                      if k not in (self.text_field, self.category_field, self.id_field, "channel")},
+            metadata={
+                k: v
+                for k, v in row.items()
+                if k not in (self.text_field, self.category_field, self.id_field, "channel")
+            },
         )
 
     def __call__(self, rows: list[dict]) -> list[CorpusItem]:
@@ -216,7 +221,7 @@ class SchemaNormalizer:
 
 
 # Convenience factory: build all stages from a CorpusConfig in one call.
-def build_stages(config: "CorpusConfig") -> tuple[PIIScrub, Deduplication, QualityGate]:
+def build_stages(config: CorpusConfig) -> tuple[PIIScrub, Deduplication, QualityGate]:
     """Instantiate the three post-normalization stages from a config."""
     return (
         PIIScrub(config.pii_rules.patterns, config.pii_rules.placeholder),

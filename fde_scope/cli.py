@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -38,7 +37,7 @@ def connect(
     type: str = typer.Option("csv", "--type", "-t", help="Connector type: csv|zammad|salesforce|mysql"),
     source: str = typer.Option(..., "--source", "-s", help="Path or URL of the data source"),
     sample_size: int = typer.Option(100, "--sample-size", help="Rows to extract for preview"),
-    api_key: Optional[str] = typer.Option(None, "--api-key", help="API token (zammad/salesforce)"),
+    api_key: str | None = typer.Option(None, "--api-key", help="API token (zammad/salesforce)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't read data"),
 ) -> None:
     """[Layer 1] Connect to a data source and preview its schema + sample."""
@@ -86,7 +85,9 @@ def connect(
 @app.command()
 def corpus(
     input: str = typer.Option(..., "--input", "-i", help="Input dir/file of raw rows (JSON) or CSV path"),
-    config: str = typer.Option("fde_scope/templates/corpus_config.yaml", "--config", "-c", help="CorpusConfig YAML"),
+    config: str = typer.Option(
+        "fde_scope/templates/corpus_config.yaml", "--config", "-c", help="CorpusConfig YAML"
+    ),
     out: str = typer.Option("reports/corpus_report.html", "--out", "-o", help="Output HTML report path"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't forge"),
 ) -> None:
@@ -148,7 +149,7 @@ def _load_rows(path: str) -> list[dict]:
 def deploy(
     tenant: str = typer.Option(..., "--tenant", "-t", help="Tenant ID"),
     name: str = typer.Option("Tenant", "--name", help="Tenant display name"),
-    corpus: Optional[str] = typer.Option(None, "--corpus", help="Path to forged corpus JSON"),
+    corpus: str | None = typer.Option(None, "--corpus", help="Path to forged corpus JSON"),
     model: str = typer.Option("qwen-max", "--model", "-m", help="Model config name"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't assemble/start"),
 ) -> None:
@@ -184,7 +185,7 @@ def eval(
 ) -> None:
     """[Layer 4] Run the FDE benchmark over a test set."""
     _banner(f"eval · {agent}")
-    from .eval import EvalCase, FDEBenchmark, MockReplyFn
+    from .eval import FDEBenchmark, MockReplyFn
 
     cases = _load_eval_cases(test_set)
     reply_fn = MockReplyFn(accuracy=accuracy) if agent == "mock" else MockReplyFn(accuracy=accuracy)
@@ -221,7 +222,9 @@ def _load_eval_cases(path: str) -> list:
 @app.command()
 def flywheel(
     agent: str = typer.Option(..., "--agent", "-a", help="Agent ID"),
-    events: Optional[str] = typer.Option(None, "--events", help="Path to a JSON array of concept events to replay"),
+    events: str | None = typer.Option(
+        None, "--events", help="Path to a JSON array of concept events to replay"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't collect"),
 ) -> None:
     """[Layer 5] Start (or replay into) the data flywheel."""
@@ -281,7 +284,7 @@ def _save_engagement(eng) -> None:
 def engage_init(
     customer: str = typer.Option(..., "--customer", "-c"),
     profile: str = typer.Option("ticket", "--profile", "-p", help="ticket | manufacturing"),
-    engagement_id: Optional[str] = typer.Option(None, "--id", help="Explicit engagement id"),
+    engagement_id: str | None = typer.Option(None, "--id", help="Explicit engagement id"),
 ) -> None:
     """Start a new FDE engagement."""
     _banner(f"engage init · {profile}")
@@ -339,7 +342,7 @@ def engage_advance(
         _save_engagement(eng)
         raise typer.Exit(1) from exc
     except StopIteration as exc:
-        console.print(f"[yellow]Engagement already complete.[/yellow]")
+        console.print("[yellow]Engagement already complete.[/yellow]")
         raise typer.Exit(0) from exc
     _save_engagement(eng)
     console.print(f"✅ Advanced → [cyan]{nxt.slug}[/cyan] ({nxt.name}) · zone={nxt.zone.value}")
@@ -372,8 +375,9 @@ def engage_list() -> None:
 
         eng = Engagement(EngagementContext.load(p))
         st = eng.status()
-        table.add_row(st["engagement_id"], st["customer"], st["profile"],
-                      st["current_phase"], st["current_zone"])
+        table.add_row(
+            st["engagement_id"], st["customer"], st["profile"], st["current_phase"], st["current_zone"]
+        )
     console.print(table)
 
 
@@ -399,7 +403,9 @@ def gate_list(
 @gate_app.command("check")
 def gate_check(
     engagement_id: str = typer.Argument(...),
-    gate_slug: Optional[str] = typer.Option(None, "--gate", "-g", help="Specific gate slug; omit = current phase's gate"),
+    gate_slug: str | None = typer.Option(
+        None, "--gate", "-g", help="Specific gate slug; omit = current phase's gate"
+    ),
 ) -> None:
     """Evaluate a gate against an engagement."""
     eng = _load_engagement(engagement_id)
@@ -420,8 +426,8 @@ def gate_check(
 @app.command()
 def handoff(
     engagement_id: str = typer.Argument(...),
-    eval_report: Optional[str] = typer.Option(None, "--eval-report"),
-    training: Optional[str] = typer.Option(None, "--training-material"),
+    eval_report: str | None = typer.Option(None, "--eval-report"),
+    training: str | None = typer.Option(None, "--training-material"),
     accept: bool = typer.Option(False, "--accept", help="Mark customer accepted"),
 ) -> None:
     """[Zone D] Assemble the handoff / knowledge-transfer package."""
@@ -480,8 +486,13 @@ def profiles() -> None:
     for col in ("slug", "name", "industrial", "connectors", "kpi_count"):
         table.add_column(col)
     for slug, p in all_profiles().items():
-        table.add_row(slug, p.name, "🏭" if p.is_industrial else "🏢",
-                      ", ".join(p.primary_connectors), str(len(p.kpi_catalogue)))
+        table.add_row(
+            slug,
+            p.name,
+            "🏭" if p.is_industrial else "🏢",
+            ", ".join(p.primary_connectors),
+            str(len(p.kpi_catalogue)),
+        )
     console.print(table)
 
 
@@ -497,7 +508,7 @@ def web(
         import uvicorn  # type: ignore
     except ImportError:
         console.print("[red]Web UI needs the 'web' extra:[/red] pip install 'fde-scope[web]'")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     console.print(f"🚀 Launching [cyan]http://{host}:{port}[/cyan]")
     uvicorn.run(
         "fde_scope.web.app:app",

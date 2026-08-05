@@ -15,7 +15,6 @@ Three isolation layers (the FDE's data-leakage defense):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
@@ -84,8 +83,7 @@ def build_engine(blueprint: PermissionBlueprint):
         )
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "Tenant deployment needs the optional 'agentscope' extra: "
-            "pip install 'fde-scope[agentscope]'"
+            "Tenant deployment needs the optional 'agentscope' extra: pip install 'fde-scope[agentscope]'"
         ) from exc
 
     engine = PermissionEngine(PermissionContext())

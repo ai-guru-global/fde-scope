@@ -19,11 +19,11 @@ AgentScope 2.0 API reality (see docs/agentscope_api_mapping.md):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fde_scope.config import TenantConfig
 
-from .permission_builder import PermissionBlueprint, build_engine, default_blueprint
+from .permission_builder import build_engine, default_blueprint
 from .sandbox_config import SandboxSpec, build_workspace
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ class TenantDeployer:
     def deploy(
         self,
         tenant: TenantConfig,
-        corpus_report: "CorpusReport | None" = None,
+        corpus_report: CorpusReport | None = None,
         dry_run: bool = False,
     ) -> DeployedAgent:
         """Assemble (and in real mode, start) a tenant agent.
@@ -136,7 +136,6 @@ class TenantDeployer:
         workspace + permission + HITL), real types.
         """
         from agentscope.agent import Agent, ReActConfig  # type: ignore
-        from agentscope.message import SystemMsg  # type: ignore
 
         sys_prompt = self._build_prompt(tenant)
         # ReActConfig replaces the implicit reasoning loop of the fictional

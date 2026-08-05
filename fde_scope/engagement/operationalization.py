@@ -53,12 +53,27 @@ def render_runbook(ctx: EngagementContext, agent_name: str = "tenant_agent") -> 
 def build_slo_template() -> list[dict]:
     """Default agent SLOs (SparkCo / Nobl9 consensus patterns)."""
     return [
-        {"name": "availability", "target": "99.5%", "error_budget": "1.75h / 14d",
-         "alert_route": "primary-oncall", "window": "14d"},
-        {"name": "reply_latency_p95", "target": "<8s", "error_budget": "",
-         "alert_route": "primary-oncall", "window": "14d"},
-        {"name": "bad_case_rate", "target": "<10%", "error_budget": "",
-         "alert_route": "fde-oncall", "window": "28d"},
+        {
+            "name": "availability",
+            "target": "99.5%",
+            "error_budget": "1.75h / 14d",
+            "alert_route": "primary-oncall",
+            "window": "14d",
+        },
+        {
+            "name": "reply_latency_p95",
+            "target": "<8s",
+            "error_budget": "",
+            "alert_route": "primary-oncall",
+            "window": "14d",
+        },
+        {
+            "name": "bad_case_rate",
+            "target": "<10%",
+            "error_budget": "",
+            "alert_route": "fde-oncall",
+            "window": "28d",
+        },
     ]
 
 

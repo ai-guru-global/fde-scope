@@ -58,7 +58,7 @@ class DataConnector(ABC):
 
     # -- registry helpers --------------------------------------------------------
     @classmethod
-    def registry(cls) -> dict[str, type["DataConnector"]]:
+    def registry(cls) -> dict[str, type[DataConnector]]:
         """Return the connector registry, populated lazily.
 
         Importing concrete connectors is deferred so a missing optional dep

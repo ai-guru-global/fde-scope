@@ -17,14 +17,14 @@ from pydantic import BaseModel, Field
 
 from .bad_case_miner import BadCaseMiner, BadCaseReport
 from .metrics import (
-    EvalCase,
     METRICS,
+    EvalCase,
     ReplyFn,
+    handle_time_ratio,
     score_adoption,
     score_escalation,
     score_first_contact,
     score_intent_accuracy,
-    handle_time_ratio,
 )
 
 
@@ -62,7 +62,7 @@ class FDEBenchmark:
     # -- aggregation ------------------------------------------------------------
     def _aggregate(self, cases: list[EvalCase]) -> dict[str, float]:
         if not cases:
-            return {k: 0.0 for k in METRICS}
+            return dict.fromkeys(METRICS, 0.0)
 
         n = len(cases)
         intent = sum(score_intent_accuracy(c) for c in cases) / n
@@ -71,9 +71,8 @@ class FDEBenchmark:
         fcr = sum(score_first_contact(c) for c in cases) / n
         avg_handle = sum(c.handle_time_seconds for c in cases) / n
         avg_ratio = sum(handle_time_ratio(c) for c in cases) / n
-        avg_csat = (
-            sum(c.csat for c in cases if c.csat is not None) /
-            max(sum(1 for c in cases if c.csat is not None), 1)
+        avg_csat = sum(c.csat for c in cases if c.csat is not None) / max(
+            sum(1 for c in cases if c.csat is not None), 1
         )
 
         return {

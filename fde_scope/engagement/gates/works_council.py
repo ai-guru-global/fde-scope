@@ -31,9 +31,7 @@ class WorksCouncilGate(Gate):
 
         approval = ctx.assets.get("works_council_approval")
         if not approval:
-            blockers.append(
-                "works council 已在场，但未记录共决审批（BetrVG §87）—— deployment 可被吊销"
-            )
+            blockers.append("works council 已在场，但未记录共决审批（BetrVG §87）—— deployment 可被吊销")
         else:
             if approval.get("status") == "denied":
                 blockers.append(f"works council 否决: {approval.get('reason', '无说明')}")

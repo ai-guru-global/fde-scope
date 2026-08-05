@@ -9,7 +9,6 @@ without AgentScope installed.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -73,7 +72,7 @@ class CorpusConfig(BaseModel):
     profile: str = "ticket"
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "CorpusConfig":
+    def from_yaml(cls, path: str | Path) -> CorpusConfig:
         """Load a CorpusConfig from a YAML file.
 
         Missing keys fall back to the model defaults, so a minimal config
@@ -109,15 +108,15 @@ class TenantConfig(BaseModel):
     id: str
     name: str
     model: str = "qwen-max"
-    corpus_path: Optional[str] = None
-    ticket_api: Optional[str] = None
+    corpus_path: str | None = None
+    ticket_api: str | None = None
     resource_quota: str = "2cpu-4gb"
     profile: str = "ticket"  # ticket | manufacturing
     approval_policy: ApprovalPolicy = Field(default_factory=ApprovalPolicy)
     dashboard_config: dict = Field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "TenantConfig":
+    def from_yaml(cls, path: str | Path) -> TenantConfig:
         import yaml
 
         with open(path, encoding="utf-8") as fh:

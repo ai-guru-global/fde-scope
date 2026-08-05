@@ -16,11 +16,10 @@ import random
 from typing import TYPE_CHECKING
 
 from .agents import QualityGate
-from .coverage_analyzer import CoverageAnalyzer
-from .types import CategoryGap, CorpusItem, CoverageReport, Provenance
+from .types import CategoryGap, CorpusItem, Provenance
 
 if TYPE_CHECKING:
-    from fde_scope.config import CorpusConfig
+    pass
 
 
 # Tiny paraphrase dictionary — enough to produce genuinely varied samples in
@@ -34,13 +33,24 @@ _PARAPHRASES: dict[str, list[str]] = {
 }
 
 _OPENERS = [
-    "你好，", "您好，", "Hi, ", "麻烦一下，", "请问一下，",
-    "", "您好，咨询一下：", "客服你好，",
+    "你好，",
+    "您好，",
+    "Hi, ",
+    "麻烦一下，",
+    "请问一下，",
+    "",
+    "您好，咨询一下：",
+    "客服你好，",
 ]
 
 _CLOSERS = [
-    "麻烦尽快处理。", "希望能帮忙解决。", "thanks.", "感谢！",
-    "请问怎么处理？", "", "等您回复。",
+    "麻烦尽快处理。",
+    "希望能帮忙解决。",
+    "thanks.",
+    "感谢！",
+    "请问怎么处理？",
+    "",
+    "等您回复。",
 ]
 
 
@@ -103,9 +113,7 @@ class CorpusSynthesizer:
                 content=text,
                 category=category,
                 channel=self._rng.choice(["email", "chat", "phone"]) if seeds else "synthetic",
-                quality_score=self.quality_gate._score(
-                    CorpusItem(id="x", content=text, category=category)
-                ),
+                quality_score=self.quality_gate._score(CorpusItem(id="x", content=text, category=category)),
                 provenance=Provenance.SYNTHETIC,
                 trace=[f"synthesize:{self.strategies[0]}"],
             )

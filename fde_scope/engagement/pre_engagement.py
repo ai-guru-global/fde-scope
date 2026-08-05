@@ -45,9 +45,7 @@ class SuccessCriteriaGate(Gate):
             blockers.append("成功标准未定义——无法判定 done（无限 pilot 反模式）")
         sponsors = [s for s in ctx.stakeholders if s.is_sponsor]
         if len(sponsors) < 2:
-            blockers.append(
-                f"仅有 {len(sponsors)} 个 sponsor——要求 ≥2（防 Sponsor Collapse）"
-            )
+            blockers.append(f"仅有 {len(sponsors)} 个 sponsor——要求 ≥2（防 Sponsor Collapse）")
         if not any(s.success_metric for s in sponsors):
             warnings.append("sponsor 未填写可度量的 success_metric")
         return GateResult(slug=self.slug, passed=not blockers, blockers=blockers, warnings=warnings)

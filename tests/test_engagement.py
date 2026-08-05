@@ -8,15 +8,13 @@ from fde_scope.engagement import (
     AdvanceBlocked,
     Engagement,
     EngagementContext,
-    SafetyPosture,
-    SiteInfo,
     Stakeholder,
     phases_for_profile,
 )
 
 
 def _ctx(profile="ticket", **kw) -> EngagementContext:
-    base = dict(id="e1", customer="Acme", profile=profile)
+    base = {"id": "e1", "customer": "Acme", "profile": profile}
     base.update(kw)
     return EngagementContext(**base)
 

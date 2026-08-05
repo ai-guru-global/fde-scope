@@ -26,16 +26,44 @@ from fde_scope.profiles import get_profile
 def station_kpi_jsonl(tmp_path: Path) -> Path:
     """A tiny MES station-KPI export (the quickstart shape)."""
     records = [
-        {"station": "WELD-01", "availability": 0.90, "performance": 0.88, "quality": 0.96,
-         "uptime_hours": 168, "failures": 3, "repair_hours": 9,
-         "good_units": 1840, "started_units": 1920, "defects": 80, "opportunities_per_unit": 4,
-         "grasp_successes": 0, "grasp_attempts": 0,
-         "tasks_succeeded": 850, "tasks_attempted": 900, "interventions": 12, "cycles": 1800},
-        {"station": "COBOT-01", "availability": 0.87, "performance": 0.86, "quality": 0.94,
-         "uptime_hours": 155, "failures": 5, "repair_hours": 15,
-         "good_units": 1620, "started_units": 1720, "defects": 100, "opportunities_per_unit": 5,
-         "grasp_successes": 1500, "grasp_attempts": 1900,
-         "tasks_succeeded": 1700, "tasks_attempted": 1850, "interventions": 25, "cycles": 1700},
+        {
+            "station": "WELD-01",
+            "availability": 0.90,
+            "performance": 0.88,
+            "quality": 0.96,
+            "uptime_hours": 168,
+            "failures": 3,
+            "repair_hours": 9,
+            "good_units": 1840,
+            "started_units": 1920,
+            "defects": 80,
+            "opportunities_per_unit": 4,
+            "grasp_successes": 0,
+            "grasp_attempts": 0,
+            "tasks_succeeded": 850,
+            "tasks_attempted": 900,
+            "interventions": 12,
+            "cycles": 1800,
+        },
+        {
+            "station": "COBOT-01",
+            "availability": 0.87,
+            "performance": 0.86,
+            "quality": 0.94,
+            "uptime_hours": 155,
+            "failures": 5,
+            "repair_hours": 15,
+            "good_units": 1620,
+            "started_units": 1720,
+            "defects": 100,
+            "opportunities_per_unit": 5,
+            "grasp_successes": 1500,
+            "grasp_attempts": 1900,
+            "tasks_succeeded": 1700,
+            "tasks_attempted": 1850,
+            "interventions": 25,
+            "cycles": 1700,
+        },
     ]
     p = tmp_path / "mes_export.jsonl"
     p.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records), encoding="utf-8")
@@ -74,7 +102,9 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     # Phase 4: success_criteria gate — satisfy dual-sponsor + criteria
     eng.ctx.success_criteria = ["grasp_rate >= 0.85", "intervention_rate <= 0.015"]
     eng.ctx.stakeholders = [
-        Stakeholder(name="Prod Director", role="VP Manufacturing", is_sponsor=True, success_metric="OEE +5pp"),
+        Stakeholder(
+            name="Prod Director", role="VP Manufacturing", is_sponsor=True, success_metric="OEE +5pp"
+        ),
         Stakeholder(name="IT Director", role="VP IT", is_sponsor=True, success_metric="uptime 99.5%"),
     ]
     assert eng.evaluate_gate("success_criteria").passed
@@ -82,7 +112,7 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
 
     # ---- Zone B: Build ---------------------------------------------------
     # connect → corpus → prototype → validate → deploy
-    for expected in ("corpus", "prototype_real_data", "validate", "deploy"):
+    for _expected in ("corpus", "prototype_real_data", "validate", "deploy"):
         if eng.phase.slug == "deploy":
             break
         # advance through no-gate build phases until deploy
@@ -93,10 +123,14 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     from fde_scope.config import CorpusConfig
     from fde_scope.corpus import CorpusForge
 
-    rows = json.loads(json.dumps([  # deep copy sample_rows via the csv connector
-        {"id": "x", "content": "机器人抓取失败，请检查夹爪压力。", "category": "抓取故障"},
-        {"id": "y", "content": "焊接工位节拍不达标。", "category": "节拍异常"},
-    ]))
+    rows = json.loads(
+        json.dumps(
+            [  # deep copy sample_rows via the csv connector
+                {"id": "x", "content": "机器人抓取失败，请检查夹爪压力。", "category": "抓取故障"},
+                {"id": "y", "content": "焊接工位节拍不达标。", "category": "节拍异常"},
+            ]
+        )
+    )
     report = CorpusForge(CorpusConfig(min_samples_per_category=10, synth_per_gap=2)).forge_rows(rows)
     assert report.total >= 2
 
@@ -106,9 +140,12 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     eng.ctx.assets["sat"] = {"passed": True, "signed_off_by": "client-ops"}
     # functional safety for the cobot cell
     eng.ctx.safety = SafetyPosture(
-        required_plr="d", achieved_pl="d",
-        iso10218_assessed=True, hazard_analysis_done=True,
-        eu_ai_act_high_risk=False, ce_marking_done=True,
+        required_plr="d",
+        achieved_pl="d",
+        iso10218_assessed=True,
+        hazard_analysis_done=True,
+        eu_ai_act_high_risk=False,
+        ce_marking_done=True,
     )
     assert eng.evaluate_gate("fat_sat").passed
     assert eng.evaluate_gate("functional_safety").passed
@@ -141,7 +178,8 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
 
     # works_council gate (site has works_council_represented=True)
     eng.ctx.assets["works_council_approval"] = {
-        "status": "approved", "signed_off_by": "works-council-chair",
+        "status": "approved",
+        "signed_off_by": "works-council-chair",
     }
     assert eng.evaluate_gate("works_council").passed
     eng.advance()  # → flywheel_productization

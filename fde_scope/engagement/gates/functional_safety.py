@@ -38,18 +38,14 @@ class FunctionalSafetyGate(Gate):
         # ISO 13849 PL
         if s.required_plr and s.achieved_pl:
             if _pl_rank(s.achieved_pl) < _pl_rank(s.required_plr):
-                blockers.append(
-                    f"ISO 13849: 达成 PL={s.achieved_pl} 低于要求 PLr={s.required_plr}"
-                )
+                blockers.append(f"ISO 13849: 达成 PL={s.achieved_pl} 低于要求 PLr={s.required_plr}")
         elif s.required_plr and not s.achieved_pl:
             warnings.append(f"ISO 13849: 已定义 PLr={s.required_plr} 但未记录达成 PL")
 
         # IEC 61508 SIL
         if s.sil_required and s.sil_achieved is not None:
             if s.sil_achieved < s.sil_required:
-                blockers.append(
-                    f"IEC 61508: SIL 不足 (要求 {s.sil_required}, 达成 {s.sil_achieved})"
-                )
+                blockers.append(f"IEC 61508: SIL 不足 (要求 {s.sil_required}, 达成 {s.sil_achieved})")
         elif s.sil_required and s.sil_achieved is None:
             warnings.append(f"IEC 61508: 已定义 SIL 要求={s.sil_required} 但未记录达成值")
 

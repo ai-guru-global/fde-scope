@@ -27,7 +27,7 @@ class OpcUaConnector(DataConnector):
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
-        self.endpoint = source            # e.g. opc.tcp://10.0.0.5:4840
+        self.endpoint = source  # e.g. opc.tcp://10.0.0.5:4840
         self.security = options.get("security", "None")
         self.node_ids: list[str] = options.get("node_ids", [])  # tags to read
 

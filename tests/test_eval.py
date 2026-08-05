@@ -3,30 +3,45 @@
 from __future__ import annotations
 
 from fde_scope.eval import (
+    METRICS,
     BadCaseMiner,
     EvalCase,
     FDEBenchmark,
-    METRICS,
     MockReplyFn,
 )
 
 
 def _cases() -> list[EvalCase]:
     return [
-        EvalCase(id="1", input="退款", category="退款", expected_category="退款",
-                 handle_time_seconds=30, csat=5.0),
-        EvalCase(id="2", input="物流", category="物流", expected_category="物流",
-                 handle_time_seconds=40, csat=4.0),
-        EvalCase(id="3", input="登录问题", category="账号", expected_category="支付",  # mismatch
-                 handle_time_seconds=60, escalated=True, csat=2.0),
+        EvalCase(
+            id="1", input="退款", category="退款", expected_category="退款", handle_time_seconds=30, csat=5.0
+        ),
+        EvalCase(
+            id="2", input="物流", category="物流", expected_category="物流", handle_time_seconds=40, csat=4.0
+        ),
+        EvalCase(
+            id="3",
+            input="登录问题",
+            category="账号",
+            expected_category="支付",  # mismatch
+            handle_time_seconds=60,
+            escalated=True,
+            csat=2.0,
+        ),
     ]
 
 
 def test_metrics_catalogue_complete() -> None:
     expected = {
-        "corpus_coverage", "corpus_quality_avg", "corpus_diversity",
-        "intent_accuracy", "reply_adoption_rate", "escalation_rate",
-        "first_contact_resolve", "avg_handle_time", "customer_satisfaction",
+        "corpus_coverage",
+        "corpus_quality_avg",
+        "corpus_diversity",
+        "intent_accuracy",
+        "reply_adoption_rate",
+        "escalation_rate",
+        "first_contact_resolve",
+        "avg_handle_time",
+        "customer_satisfaction",
         "cost_per_ticket",
     }
     assert expected <= set(METRICS)
@@ -43,10 +58,12 @@ def test_benchmark_runs_with_mock_reply() -> None:
 def test_bad_case_miner_finds_mismatch() -> None:
     # craft cases: one passes, one mismatches intent
     cases = [
-        EvalCase(id="ok", input="x", category="退款", expected_category="退款",
-                 agent_reply="已为您处理：退款"),
-        EvalCase(id="bad", input="y", category="账号", expected_category="支付",
-                 agent_reply="已为您处理：账号"),  # '支付' not in reply
+        EvalCase(
+            id="ok", input="x", category="退款", expected_category="退款", agent_reply="已为您处理：退款"
+        ),
+        EvalCase(
+            id="bad", input="y", category="账号", expected_category="支付", agent_reply="已为您处理：账号"
+        ),  # '支付' not in reply
     ]
     report = BadCaseMiner().mine(cases)
     assert report.total_failures == 1

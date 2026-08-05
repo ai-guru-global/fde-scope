@@ -26,7 +26,7 @@ class MqttSparkplugConnector(DataConnector):
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
-        self.broker = source             # e.g. tcp://broker.local:1883
+        self.broker = source  # e.g. tcp://broker.local:1883
         self.topic_filter = options.get("topic", "spBv1.0/#")
         self.sparkplug = options.get("sparkplug", True)
 
@@ -34,9 +34,7 @@ class MqttSparkplugConnector(DataConnector):
         try:
             import paho.mqtt.client  # type: ignore  # noqa: F401
         except ImportError as exc:  # pragma: no cover
-            raise ImportError(
-                "MqttSparkplugConnector needs paho-mqtt: pip install paho-mqtt"
-            ) from exc
+            raise ImportError("MqttSparkplugConnector needs paho-mqtt: pip install paho-mqtt") from exc
 
     def discover_schema(self) -> Schema:
         return Schema(

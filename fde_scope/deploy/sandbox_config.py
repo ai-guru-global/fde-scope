@@ -24,9 +24,9 @@ class SandboxSpec:
     """The FDE's intent for a tenant sandbox (framework-neutral)."""
 
     tenant_id: str
-    backend: str = "docker"                 # docker | e2b | k8s | local
+    backend: str = "docker"  # docker | e2b | k8s | local
     base_image: str = "fde-scope-agent:latest"
-    resource_quota: str = "2cpu-4gb"        # advisory; honored by backend if able
+    resource_quota: str = "2cpu-4gb"  # advisory; honored by backend if able
     extra_pip: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     instructions: str = ""
@@ -48,7 +48,7 @@ class SandboxSpec:
         }
 
     @classmethod
-    def from_quota_string(cls, tenant_id: str, quota: str = "2cpu-4gb") -> "SandboxSpec":
+    def from_quota_string(cls, tenant_id: str, quota: str = "2cpu-4gb") -> SandboxSpec:
         """Parse an advisory ``"Ncpu-Mgb"`` quota into a spec (cosmetic only)."""
         spec = cls(tenant_id=tenant_id, resource_quota=quota)
         return spec
@@ -64,8 +64,7 @@ def build_workspace(spec: SandboxSpec):
         from agentscope.workspace import DockerWorkspace, LocalWorkspace  # type: ignore
     except ImportError as exc:  # pragma: no cover
         raise ImportError(
-            "Tenant deployment needs the optional 'agentscope' extra: "
-            "pip install 'fde-scope[agentscope]'"
+            "Tenant deployment needs the optional 'agentscope' extra: pip install 'fde-scope[agentscope]'"
         ) from exc
 
     if spec.backend == "docker":

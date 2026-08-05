@@ -14,10 +14,10 @@ flywheel is testable without a live agent.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .collectors import Collector, CorpusStore
-from .event_mapping import MAPPINGS, strategy_for
+from .event_mapping import strategy_for
 
 
 @dataclass

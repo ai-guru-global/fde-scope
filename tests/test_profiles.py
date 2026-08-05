@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fde_scope.engagement import EngagementContext
 from fde_scope.engagement.handoff import build_handoff_package, render_handoff_summary
-from fde_scope.profiles import all_profiles, get_profile
 from fde_scope.eval.manufacturing_metrics import (
     collision_intervention_rate,
     dpmo,
@@ -15,6 +14,7 @@ from fde_scope.eval.manufacturing_metrics import (
     oee,
     task_completion_rate,
 )
+from fde_scope.profiles import all_profiles, get_profile
 
 
 # -- profiles ----------------------------------------------------------------
@@ -79,13 +79,24 @@ def test_collision_rate() -> None:
 def test_manufacturing_profile_aggregates_samples() -> None:
     p = get_profile("manufacturing")
     samples = [
-        {"availability": 0.90, "performance": 0.95, "quality": 0.99,
-         "uptime_hours": 100, "failures": 2, "repair_hours": 4,
-         "good_units": 95, "started_units": 100, "defects": 5,
-         "opportunities_per_unit": 1,
-         "grasp_successes": 80, "grasp_attempts": 100,
-         "tasks_succeeded": 90, "tasks_attempted": 100,
-         "interventions": 3, "cycles": 1000},
+        {
+            "availability": 0.90,
+            "performance": 0.95,
+            "quality": 0.99,
+            "uptime_hours": 100,
+            "failures": 2,
+            "repair_hours": 4,
+            "good_units": 95,
+            "started_units": 100,
+            "defects": 5,
+            "opportunities_per_unit": 1,
+            "grasp_successes": 80,
+            "grasp_attempts": 100,
+            "tasks_succeeded": 90,
+            "tasks_attempted": 100,
+            "interventions": 3,
+            "cycles": 1000,
+        },
     ]
     kpis = p.compute_kpis(samples)
     assert 0 < kpis["oee"] < 1
@@ -107,8 +118,7 @@ def test_ticket_profile_aggregates() -> None:
 # -- handoff -----------------------------------------------------------------
 def test_handoff_package_builds_and_renders() -> None:
     ctx = EngagementContext(id="m1", customer="BMW", profile="manufacturing")
-    pkg = build_handoff_package(ctx, runbook_path="r.md", eval_report_path="e.html",
-                                customer_accepted=True)
+    pkg = build_handoff_package(ctx, runbook_path="r.md", eval_report_path="e.html", customer_accepted=True)
     assert pkg["customer_accepted"] is True
     assert pkg["runbook"] == "r.md"
     summary = render_handoff_summary(ctx)

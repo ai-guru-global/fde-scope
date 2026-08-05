@@ -131,9 +131,9 @@ def _default_gate_registry() -> dict[str, Gate]:
     from .gates.functional_safety import FunctionalSafetyGate
     from .gates.shift_handover import ShiftHandoverGate
     from .gates.works_council import WorksCouncilGate
-    from .pre_engagement import SiteSurveyGate, SuccessCriteriaGate
     from .handoff import HandoffSignoffGate
     from .operationalization import SLOGate
+    from .pre_engagement import SiteSurveyGate, SuccessCriteriaGate
 
     gates: list[Gate] = [
         SiteSurveyGate(),

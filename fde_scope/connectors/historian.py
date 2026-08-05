@@ -25,9 +25,9 @@ class HistorianConnector(DataConnector):
 
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
-        self.base_url = source.rstrip("/")    # PI Web API / Influx endpoint
+        self.base_url = source.rstrip("/")  # PI Web API / Influx endpoint
         self.tags: list[str] = options.get("tags", [])
-        self.start = options.get("start")     # ISO8601
+        self.start = options.get("start")  # ISO8601
         self.end = options.get("end")
 
     def _ensure_driver(self) -> None:
