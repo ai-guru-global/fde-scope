@@ -12,7 +12,6 @@ Design note: this base is deliberately framework-agnostic. It yields plain
 ``dict`` rows, which the corpus engine consumes directly. None of this layer
 imports AgentScope.
 """
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
