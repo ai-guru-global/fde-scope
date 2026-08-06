@@ -16,6 +16,7 @@ imports AgentScope.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from builtins import type as _type  # noqa: F401  — see registry()/register() below
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
@@ -63,7 +64,7 @@ class DataConnector(ABC):
 
     # -- registry helpers --------------------------------------------------------
     @classmethod
-    def registry(cls) -> dict[str, type]:
+    def registry(cls) -> dict[str, _type]:
         """Return the connector registry, populated lazily.
 
         Importing concrete connectors is deferred so a missing optional dep
@@ -74,7 +75,7 @@ class DataConnector(ABC):
         return _registry.get_registry()
 
 
-def register(connector_cls: type) -> type:
+def register(connector_cls: _type) -> _type:
     """Decorator: register a connector under its ``type`` slug."""
     from . import _registry
 
