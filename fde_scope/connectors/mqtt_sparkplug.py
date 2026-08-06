@@ -72,7 +72,7 @@ class MqttSparkplugConnector(DataConnector):
     # -- driver lazy import -----------------------------------------------------
     def _ensure_driver(self) -> None:
         try:
-            import paho.mqtt.client  # type: ignore  # noqa: F401
+            import paho.mqtt.client  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
                 "MqttSparkplugConnector live mode needs paho-mqtt: pip install paho-mqtt"
@@ -127,6 +127,7 @@ class MqttSparkplugConnector(DataConnector):
 
     # -- JSONL replay path ------------------------------------------------------
     def _iter_jsonl(self) -> Iterator[dict[str, Any]]:
+        assert self._jsonl_path is not None  # callers gate on _jsonl_path is not None
         with open(self._jsonl_path, encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
@@ -174,7 +175,7 @@ class MqttSparkplugConnector(DataConnector):
     def _collect_live(self, n: int) -> list[dict[str, Any]]:  # pragma: no cover — needs broker
         """Connect, subscribe, collect up to ``n`` messages, disconnect."""
         self._ensure_driver()
-        import paho.mqtt.client as mqtt  # type: ignore
+        import paho.mqtt.client as mqtt
 
         out: list[dict[str, Any]] = []
         parsed = urlparse(self.broker)
@@ -214,7 +215,7 @@ class MqttSparkplugConnector(DataConnector):
         self._ensure_driver()
         import queue
 
-        import paho.mqtt.client as mqtt  # type: ignore
+        import paho.mqtt.client as mqtt
 
         q: queue.Queue = queue.Queue()
         parsed = urlparse(self.broker)

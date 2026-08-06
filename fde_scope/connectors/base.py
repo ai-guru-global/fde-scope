@@ -63,7 +63,7 @@ class DataConnector(ABC):
 
     # -- registry helpers --------------------------------------------------------
     @classmethod
-    def registry(cls) -> dict[str, type[DataConnector]]:
+    def registry(cls) -> dict[str, type]:
         """Return the connector registry, populated lazily.
 
         Importing concrete connectors is deferred so a missing optional dep
@@ -74,7 +74,7 @@ class DataConnector(ABC):
         return _registry.get_registry()
 
 
-def register(connector_cls: type[DataConnector]) -> type[DataConnector]:
+def register(connector_cls: type) -> type:
     """Decorator: register a connector under its ``type`` slug."""
     from . import _registry
 
