@@ -19,17 +19,28 @@ from fde_scope.connectors.mqtt_sparkplug import MqttSparkplugConnector
 def mqtt_capture(tmp_path: Path) -> Path:
     """A small JSONL capture of Sparkplug B-style messages."""
     msgs = [
-        {"topic": "spBv1.0/plant1/DBIRTH/edge01/cobot-01",
-         "payload": {"metric": "joint_temp", "value": 72.5},
-         "qos": 0, "retain": False, "timestamp": "2026-08-05T10:00:00Z"},
-        {"topic": "spBv1.0/plant1/DDATA/edge01/cobot-01",
-         "payload": {"metrics": [{"name": "grip_force", "value": 35}]},
-         "qos": 1, "retain": False, "timestamp": "2026-08-05T10:00:01Z"},
-        {"topic": "factory/sensors/temp",
-         "payload": '{"metric": "ambient", "value": 24}',
-         "qos": 0, "retain": False, "timestamp": "2026-08-05T10:00:02Z"},
-        {"topic": "spBv1.0/plant1/NDEATH/edge01",
-         "payload": "raw-bytes-here", "qos": 0, "retain": True},
+        {
+            "topic": "spBv1.0/plant1/DBIRTH/edge01/cobot-01",
+            "payload": {"metric": "joint_temp", "value": 72.5},
+            "qos": 0,
+            "retain": False,
+            "timestamp": "2026-08-05T10:00:00Z",
+        },
+        {
+            "topic": "spBv1.0/plant1/DDATA/edge01/cobot-01",
+            "payload": {"metrics": [{"name": "grip_force", "value": 35}]},
+            "qos": 1,
+            "retain": False,
+            "timestamp": "2026-08-05T10:00:01Z",
+        },
+        {
+            "topic": "factory/sensors/temp",
+            "payload": '{"metric": "ambient", "value": 24}',
+            "qos": 0,
+            "retain": False,
+            "timestamp": "2026-08-05T10:00:02Z",
+        },
+        {"topic": "spBv1.0/plant1/NDEATH/edge01", "payload": "raw-bytes-here", "qos": 0, "retain": True},
     ]
     p = tmp_path / "capture.jsonl"
     p.write_text("\n".join(json.dumps(m, ensure_ascii=False) for m in msgs), encoding="utf-8")

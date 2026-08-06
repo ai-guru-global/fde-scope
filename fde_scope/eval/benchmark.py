@@ -50,7 +50,7 @@ class FDEBenchmark:
         self,
         reply_fn: ReplyFn,
         eval_cases: list[EvalCase],
-        corpus_report: "CorpusReport | None" = None,
+        corpus_report: CorpusReport | None = None,
     ) -> EvalReport:
         # Materialize agent replies (the only place an LLM would be called).
         scored: list[EvalCase] = []

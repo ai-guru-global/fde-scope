@@ -168,10 +168,7 @@ class MqttSparkplugConnector(DataConnector):
                 yield Batch(batch, source=str(self._jsonl_path))
             return
         if self.broker:
-            for b in self._stream_live(batch_size):
-                yield b
-        return
-        yield  # pragma: no cover
+            yield from self._stream_live(batch_size)
 
     # -- live broker path (paho-mqtt) ------------------------------------------
     def _collect_live(self, n: int) -> list[dict[str, Any]]:  # pragma: no cover — needs broker
@@ -186,12 +183,16 @@ class MqttSparkplugConnector(DataConnector):
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
         def on_message(_c, _d, msg):  # noqa: ANN001
-            out.append(self._normalize({
-                "topic": msg.topic,
-                "payload": msg.payload.decode("utf-8", errors="replace"),
-                "qos": msg.qos,
-                "retain": msg.retain,
-            }))
+            out.append(
+                self._normalize(
+                    {
+                        "topic": msg.topic,
+                        "payload": msg.payload.decode("utf-8", errors="replace"),
+                        "qos": msg.qos,
+                        "retain": msg.retain,
+                    }
+                )
+            )
 
         client.on_message = on_message
         client.connect(host, port, 60)
@@ -211,20 +212,25 @@ class MqttSparkplugConnector(DataConnector):
     def _stream_live(self, batch_size: int) -> Iterator[Batch]:  # pragma: no cover — needs broker
         """Long-lived subscription; yields batches as they fill."""
         self._ensure_driver()
-        import paho.mqtt.client as mqtt  # type: ignore
         import queue
+
+        import paho.mqtt.client as mqtt  # type: ignore
 
         q: queue.Queue = queue.Queue()
         parsed = urlparse(self.broker)
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
         def on_message(_c, _d, msg):  # noqa: ANN001
-            q.put(self._normalize({
-                "topic": msg.topic,
-                "payload": msg.payload.decode("utf-8", errors="replace"),
-                "qos": msg.qos,
-                "retain": msg.retain,
-            }))
+            q.put(
+                self._normalize(
+                    {
+                        "topic": msg.topic,
+                        "payload": msg.payload.decode("utf-8", errors="replace"),
+                        "qos": msg.qos,
+                        "retain": msg.retain,
+                    }
+                )
+            )
 
         client.on_message = on_message
         client.connect(parsed.hostname or "localhost", parsed.port or 1883, 60)

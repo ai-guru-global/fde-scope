@@ -60,7 +60,9 @@ def test_benchmark_backfills_corpus_metrics_from_forge_report(sample_rows: list[
     from fde_scope.config import CorpusConfig
     from fde_scope.corpus import CorpusForge
 
-    forge_report = CorpusForge(CorpusConfig(min_samples_per_category=5, synth_per_gap=2)).forge_rows(sample_rows)
+    forge_report = CorpusForge(CorpusConfig(min_samples_per_category=5, synth_per_gap=2)).forge_rows(
+        sample_rows
+    )
     eval_report = FDEBenchmark().run(MockReplyFn(accuracy=1.0), _cases(), corpus_report=forge_report)
 
     # coverage = fraction of categories meeting target (0-1); with a tiny sample

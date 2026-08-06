@@ -12,9 +12,11 @@ import pytest
 
 agentscope = pytest.importorskip("agentscope")  # skip the whole module if not installed
 
-from fde_scope.config import TenantConfig
-from fde_scope.deploy import TenantDeployer
-from fde_scope.deploy.sandbox_config import SandboxSpec, build_workspace
+# Imports come after the optional-skip guard so this module stays importable
+# even when agentscope isn't installed (pytest.importorskip raises Skip first).
+from fde_scope.config import TenantConfig  # noqa: E402
+from fde_scope.deploy import TenantDeployer  # noqa: E402
+from fde_scope.deploy.sandbox_config import SandboxSpec  # noqa: E402
 
 
 def test_sandbox_spec_docker_kwargs_match_real_api() -> None:
