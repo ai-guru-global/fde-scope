@@ -39,8 +39,13 @@ class Phase:
     name: str
     zone: Zone
     industrial: bool = False  # True = only for manufacturing/robotics profiles
-    gate: str | None = None  # gate slug that must pass before leaving this phase
+    gates: tuple[str, ...] = ()  # gate slugs that must pass before leaving this phase
     description: str = ""
+
+    @property
+    def gate(self) -> str | None:
+        """The primary (first) gate slug, or None — kept for single-gate callers."""
+        return self.gates[0] if self.gates else None
 
 
 # The canonical 18-phase sequence (Zone A: 1-4, Zone B: 5-10,
