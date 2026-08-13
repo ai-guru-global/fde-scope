@@ -244,6 +244,66 @@ def test_discover_schema_empty_database(fake_mysql_module: None) -> None:
     assert schema.row_count == 0
 
 
+def test_discover_schema_all_empty_tables_returns_zero(fake_mysql_module: None) -> None:
+    """Tables that all count successfully to 0 must report row_count == 0,
+    consistent with the empty-database case (not None)."""
+    show = [{"Tables_in_warehouse": "tickets"}]
+    desc_tickets = [{"Field": "id", "Type": "int", "Null": "NO"}]
+    count_tickets = [{"n": 0}]
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock(
+        [show, desc_tickets, count_tickets]
+    )
+
+    conn = MySQLConnector("mysql://u:p@h:3306/warehouse")
+    schema = conn.discover_schema()
+    assert schema.detected_categories == ["tickets"]
+    assert schema.row_count == 0
+
+
+def test_discover_schema_count_failure_returns_none(fake_mysql_module: None) -> None:
+    """row_count is None only when a COUNT actually fails."""
+    show = [{"Tables_in_warehouse": "tickets"}]
+    desc_tickets = [{"Field": "id", "Type": "int", "Null": "NO"}]
+    # Empty result-set for COUNT -> fetchone() returns None -> count fails.
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock(
+        [show, desc_tickets, []]
+    )
+
+    conn = MySQLConnector("mysql://u:p@h:3306/warehouse")
+    schema = conn.discover_schema()
+    assert schema.row_count is None
+
+
+def test_table_filter_escapes_regex_metacharacters(fake_mysql_module: None) -> None:
+    """A literal "+" in the filter must not act as a regex quantifier:
+    "a+b" matches the table "a+b", never "ab"."""
+    show = [{"Tables_in_warehouse": "ab"}, {"Tables_in_warehouse": "a+b"}]
+    desc = [{"Field": "id", "Type": "int", "Null": "NO"}]
+    count = [{"n": 1}]
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock(
+        [show, desc, count]
+    )
+
+    conn = MySQLConnector("mysql://u:p@h:3306/warehouse", table="a+b")
+    schema = conn.discover_schema()
+    assert schema.detected_categories == ["a+b"]
+
+
+def test_table_filter_like_wildcards_still_work(fake_mysql_module: None) -> None:
+    """``%`` and ``_`` keep their SQL LIKE meaning after the escaping fix."""
+    show = [
+        {"Tables_in_warehouse": "ticket_a"},
+        {"Tables_in_warehouse": "ticket_b"},
+        {"Tables_in_warehouse": "orders"},
+    ]
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock([show])
+
+    conn = MySQLConnector("mysql://u:p@h:3306/warehouse", table="ticket_%")
+    # _list_tables is exercised directly: no further queries needed.
+    fake_conn = sys.modules["mysql.connector"].connect.return_value
+    assert conn._list_tables(fake_conn) == ["ticket_a", "ticket_b"]
+
+
 # ---------------------------------------------------------------------------
 # extract_sample
 # ---------------------------------------------------------------------------
@@ -262,6 +322,12 @@ def test_extract_sample_returns_dicts(fake_mysql_module: None) -> None:
         {"id": 1, "body": "refund please"},
         {"id": 2, "body": "where is my order"},
     ]
+
+
+def test_extract_sample_rejects_nonpositive_n(fake_mysql_module: None) -> None:
+    conn = MySQLConnector("mysql://u:p@h:3306/warehouse")
+    with pytest.raises(ValueError, match="n >= 1"):
+        conn.extract_sample(0)
 
 
 # ---------------------------------------------------------------------------
@@ -304,6 +370,12 @@ def test_stream_respects_row_cap(fake_mysql_module: None) -> None:
     conn = MySQLConnector("mysql://u:p@h:3306/wh", row_cap=3)
     batches = list(conn.stream(batch_size=10))
     assert sum(len(b) for b in batches) == 3
+
+
+def test_stream_rejects_nonpositive_batch_size(fake_mysql_module: None) -> None:
+    conn = MySQLConnector("mysql://u:p@h:3306/wh")
+    with pytest.raises(ValueError, match="batch_size >= 1"):
+        list(conn.stream(batch_size=0))
 
 
 # ---------------------------------------------------------------------------

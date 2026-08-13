@@ -31,17 +31,28 @@ def mttr(total_repair_hours: float, repairs: int) -> float:
 
 
 def first_pass_yield(good_units: int, started_units: int) -> float:
-    """FPY — fraction of units passing first time, no rework/scrap."""
+    """FPY — fraction of units passing first time, no rework/scrap.
+
+    Raises ValueError when good_units exceeds started_units — a yield above
+    100% means bad input data, not a great shift.
+    """
+    if good_units > started_units:
+        raise ValueError(f"good_units ({good_units}) cannot exceed started_units ({started_units})")
     return good_units / max(started_units, 1)
 
 
 def dpmo(defects: int, units: int, opportunities_per_unit: float) -> float:
     """Defects Per Million Opportunities (Six Sigma). Lower is better.
 
-    3.4 DPMO = Six Sigma (99.99966% yield).
+    3.4 DPMO = Six Sigma (99.99966% yield). Legitimate fractional
+    opportunity counts (e.g. 0.5) are honored as-is; a zero denominator (no
+    units or no opportunities) means there is nothing to measure, so the
+    result is 0.0 rather than a meaningless inflated number.
     """
-    opps = max(units, 1) * max(opportunities_per_unit, 1.0)
-    return (defects / opps) * 1_000_000
+    opportunities = units * opportunities_per_unit
+    if opportunities <= 0:
+        return 0.0
+    return (defects / opportunities) * 1_000_000
 
 
 def grasp_success_rate(successes: int, attempts: int) -> float:

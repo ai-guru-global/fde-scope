@@ -36,6 +36,11 @@ class FunctionalSafetyGate(Gate):
         warnings: list[str] = []
 
         # ISO 13849 PL
+        # 非空但无法识别的 PL 字符串不能静默按 rank 0 处理——必须告警，
+        # 否则 "PL_D" 之类的写法会让比较失去意义（甚至永远通过）。
+        for label, value in (("PLr", s.required_plr), ("PL", s.achieved_pl)):
+            if value and value.lower() not in _PL_RANK:
+                warnings.append(f"ISO 13849: 无法识别的 {label} 值 {value!r}，未参与等级比较")
         if s.required_plr and s.achieved_pl:
             if _pl_rank(s.achieved_pl) < _pl_rank(s.required_plr):
                 blockers.append(f"ISO 13849: 达成 PL={s.achieved_pl} 低于要求 PLr={s.required_plr}")

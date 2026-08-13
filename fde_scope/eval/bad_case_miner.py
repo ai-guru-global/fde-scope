@@ -80,6 +80,8 @@ class BadCaseMiner:
             return "not_adopted"
         if case.escalated:
             return "escalated"
+        if not case.resolved_first_contact:
+            return "not_resolved_first_contact"
         return ""
 
     def _recommendation(self, top_category: str, count: int) -> str:

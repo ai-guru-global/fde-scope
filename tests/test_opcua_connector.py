@@ -52,7 +52,7 @@ class _FakeDataValue:
 
 @dataclass
 class _FakeVariantType:
-    """Mirror asyncua.ua.VariantType. The connector only uses str() of it."""
+    """Mirror asyncua.ua.VariantType. The connector only uses its ``name``."""
 
     name: str = ""
 
@@ -84,13 +84,13 @@ class _FakeNode:
     async def get_children(self) -> list[_FakeNode]:
         return list(self._children)
 
-    async def get_node_class(self) -> int:
+    async def read_node_class(self) -> int:
         return _NODE_CLASS.Variable if self._is_variable else 1  # 1 = Object
 
-    async def get_display_name(self) -> types.SimpleNamespace:
+    async def read_display_name(self) -> types.SimpleNamespace:
         return types.SimpleNamespace(Text=self._display_name)
 
-    async def get_data_type_as_variant_type(self) -> _FakeVariantType | None:
+    async def read_data_type_as_variant_type(self) -> _FakeVariantType | None:
         return _make_variant_type(self._data_type) if self._data_type else None
 
     async def read_data_value(self) -> _FakeDataValue:
@@ -264,16 +264,8 @@ def _wire_reads(tree: _FakeNode) -> None:
 def test_discover_schema_lists_all_variables(fake_asyncua_module: _FakeAsyncUAModule) -> None:
     tree = _build_tree()
 
-    # The connector calls Client() once; pick up the last client and
-    # attach the tree to it.
-    def attach_on_connect(coro):
-        fake_asyncua_module._clients[-1]._tree = tree
-        return tree
-
-    # We can't await — fake Client handles connect synchronously in
-    # practice, so we just attach the tree to the freshly-constructed
-    # Client before the connector's async loop runs.
-    # Simpler: monkey-patch Client to attach immediately.
+    # The connector calls Client() once; monkey-patch Client to attach the
+    # tree to the freshly-constructed client before the async loop runs.
     real_Client = fake_asyncua_module.Client
 
     def Client_with_tree(*, url: str) -> _FakeAsyncUAClient:  # noqa: N802
@@ -426,6 +418,34 @@ def test_stream_yields_batches_with_source_tag(
 def test_stream_empty_when_no_node_ids_and_no_cache() -> None:
     conn = OpcUaConnector("opc.tcp://test:4840")
     assert list(conn.stream()) == []
+
+
+def test_stream_rejects_invalid_batch_size() -> None:
+    """batch_size < 1 must fail loudly (range step-0 crash / silent no-op)."""
+    conn = OpcUaConnector("opc.tcp://test:4840", node_ids=["i=201"])
+    for bad in (0, -1):
+        with pytest.raises(ValueError, match="batch_size"):
+            list(conn.stream(batch_size=bad))
+
+
+# ---------------------------------------------------------------------------
+# Fake-vs-real API surface guard
+# ---------------------------------------------------------------------------
+def test_fake_node_method_names_exist_on_real_asyncua_node() -> None:
+    """Guard against the fake drifting from the real asyncua.Node API.
+
+    Skipped when asyncua isn't installed (CI without the [opcua] extra).
+    """
+    asyncua = pytest.importorskip("asyncua")
+    # Every method _FakeNode mirrors must exist on the real Node class.
+    for name in (
+        "get_children",
+        "read_node_class",
+        "read_display_name",
+        "read_data_type_as_variant_type",
+        "read_data_value",
+    ):
+        assert hasattr(asyncua.Node, name), f"asyncua.Node.{name} missing — fake drifted from driver"
 
 
 # ---------------------------------------------------------------------------

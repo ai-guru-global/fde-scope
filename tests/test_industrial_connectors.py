@@ -100,3 +100,16 @@ def test_manufacturing_profile_advertises_all_industrial_connectors() -> None:
     prof = get_profile("manufacturing")
     for slug in prof.primary_connectors:
         assert get(slug) is not None
+
+
+def test_mes_stream_rejects_invalid_batch_size(tmp_path) -> None:  # noqa: ANN001
+    """batch_size < 1 must fail loudly instead of degrading to one-row batches."""
+    import json
+
+    p = tmp_path / "mes.jsonl"
+    p.write_text(json.dumps({"work_order_id": "WO-1"}), encoding="utf-8")
+    Mes = get("mes")
+    c = Mes(str(p))
+    for bad in (0, -1):
+        with pytest.raises(ValueError, match="batch_size"):
+            list(c.stream(batch_size=bad))

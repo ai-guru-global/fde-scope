@@ -32,8 +32,11 @@ class ZammadConnector(DataConnector):
 
     def discover_schema(self) -> Schema:
         # TODO: GET {base_url}/api/v1/tickets?per_page=1 to infer fields.
-        # Until the live integration lands, we expose Zammad's documented
-        # ticket object shape so downstream code has a stable contract.
+        # Until the live integration lands, we expose the normalized FDE
+        # contract — not Zammad's native ticket object (which uses
+        # group_id/state_id/article ids). The real implementation must map
+        # Zammad fields onto this shape: group -> category, state -> state,
+        # first article body -> content.
         return Schema(
             source=self.base_url,
             row_count=None,

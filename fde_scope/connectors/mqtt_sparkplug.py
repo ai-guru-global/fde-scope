@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Iterator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -79,51 +80,76 @@ class MqttSparkplugConnector(DataConnector):
             ) from exc
 
     # -- payload parsing --------------------------------------------------------
-    def _parse_payload(self, raw: Any) -> tuple[str, Any]:
-        """Return (metric_name, value) from a message payload.
+    def _parse_payload(self, raw: Any) -> list[tuple[str, Any]]:
+        """Return one (metric_name, value) pair per metric in the payload.
 
-        Handles: dict with ``metric``/``metrics``, JSON string, raw scalar.
-        Sparkplug B protobuf is roadmap; we honor JSON payloads (the common
+        Sparkplug B payloads carry a *list* of metrics — every metric gets
+        its own pair so none are silently dropped. Handles: dict with
+        ``metric``/``metrics``, JSON string, raw scalar. Sparkplug B
+        protobuf is roadmap; we honor JSON payloads (the common
         broker-side test format) and degrade gracefully otherwise.
         """
         if isinstance(raw, str):
             try:
                 raw = json.loads(raw)
             except json.JSONDecodeError:
-                return "raw", raw
+                return [("raw", raw)]
         if isinstance(raw, dict):
             if "metric" in raw:
-                return str(raw["metric"]), raw.get("value")
+                return [(str(raw["metric"]), raw.get("value"))]
             if "metrics" in raw and isinstance(raw["metrics"], list) and raw["metrics"]:
-                m = raw["metrics"][0]
-                if isinstance(m, dict):
-                    return str(m.get("name", "metric")), m.get("value")
-            return "payload", raw
-        return "raw", raw
+                pairs = [
+                    (str(m.get("name", "metric")), m.get("value"))
+                    for m in raw["metrics"]
+                    if isinstance(m, dict)
+                ]
+                if pairs:
+                    return pairs
+            return [("payload", raw)]
+        return [("raw", raw)]
 
     def _decode_topic(self, topic: str) -> tuple[str, str]:
-        """Extract (device_id, message_type) from a Sparkplug B topic."""
+        """Extract (device_id, message_type) from a Sparkplug B topic.
+
+        Layouts handled:
+          - device-level (5 parts): spBv1.0/{group}/{DBIRTH|DDATA|DDEATH}/{edge}/{device}
+          - node-level (4 parts):   spBv1.0/{group}/{NBIRTH|NDATA|NDEATH}/{edge_node}
+          - host state:             spBv1.0/{group}/STATE[/{host_id}]
+        """
         parts = topic.split("/")
-        if len(parts) >= 5 and parts[0] == "spBv1.0":
+        if len(parts) >= 3 and parts[0] == "spBv1.0":
             msg_type = parts[2]
-            device = parts[-1] if msg_type.startswith("D") else parts[-2]
-            return device, msg_type
+            if msg_type == "STATE":
+                return (parts[3] if len(parts) >= 4 else parts[1]), msg_type
+            if len(parts) == 4 and msg_type.startswith("N"):
+                return parts[3], msg_type
+            if len(parts) >= 5:
+                device = parts[-1] if msg_type.startswith("D") else parts[-2]
+                return device, msg_type
         return topic, "unknown"
 
-    def _normalize(self, msg: dict[str, Any]) -> dict[str, Any]:
-        """Flatten one captured/live message into the row schema."""
+    def _normalize(self, msg: dict[str, Any]) -> list[dict[str, Any]]:
+        """Flatten one captured/live message into rows — one per metric.
+
+        ``timestamp``: replay passes the capture's timestamp string through
+        untouched; the live path stamps the receive time itself.
+        """
         topic = str(msg.get("topic", ""))
         device_id, _ = self._decode_topic(topic) if self.sparkplug else (topic, "")
-        metric_name, value = self._parse_payload(msg.get("payload"))
-        return {
-            "topic": topic,
-            "metric_name": metric_name,
-            "value": value,
-            "timestamp": msg.get("timestamp"),
-            "device_id": device_id,
-            "qos": msg.get("qos", 0),
-            "retain": bool(msg.get("retain", False)),
-        }
+        rows = []
+        for metric_name, value in self._parse_payload(msg.get("payload")):
+            rows.append(
+                {
+                    "topic": topic,
+                    "metric_name": metric_name,
+                    "value": value,
+                    "timestamp": msg.get("timestamp"),
+                    "device_id": device_id,
+                    "qos": msg.get("qos", 0),
+                    "retain": bool(msg.get("retain", False)),
+                }
+            )
+        return rows
 
     # -- JSONL replay path ------------------------------------------------------
     def _iter_jsonl(self) -> Iterator[dict[str, Any]]:
@@ -132,7 +158,7 @@ class MqttSparkplugConnector(DataConnector):
             for line in fh:
                 line = line.strip()
                 if line:
-                    yield self._normalize(json.loads(line))
+                    yield from self._normalize(json.loads(line))
 
     # -- the three-step contract -----------------------------------------------
     def discover_schema(self) -> Schema:
@@ -158,6 +184,8 @@ class MqttSparkplugConnector(DataConnector):
         return []
 
     def stream(self, batch_size: int = 500) -> Iterator[Batch]:
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {batch_size}")
         if self._jsonl_path is not None and self._jsonl_path.exists():
             batch: list[dict[str, Any]] = []
             for rec in self._iter_jsonl():
@@ -172,23 +200,37 @@ class MqttSparkplugConnector(DataConnector):
             yield from self._stream_live(batch_size)
 
     # -- live broker path (paho-mqtt) ------------------------------------------
+    def _connection_params(self) -> tuple[str, int, bool]:
+        """Resolve (host, port, use_tls) from the broker URL.
+
+        ``mqtts://`` / ``ssl://`` default to port 8883 and require TLS;
+        plain ``mqtt://`` / ``tcp://`` default to 1883.
+        """
+        parsed = urlparse(self.broker or "")
+        use_tls = parsed.scheme in ("mqtts", "ssl")
+        host = parsed.hostname or "localhost"
+        port = parsed.port or (8883 if use_tls else 1883)
+        return host, port, use_tls
+
     def _collect_live(self, n: int) -> list[dict[str, Any]]:  # pragma: no cover — needs broker
         """Connect, subscribe, collect up to ``n`` messages, disconnect."""
         self._ensure_driver()
         import paho.mqtt.client as mqtt
 
         out: list[dict[str, Any]] = []
-        parsed = urlparse(self.broker)
-        host = parsed.hostname or "localhost"
-        port = parsed.port or 1883
+        host, port, use_tls = self._connection_params()
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        if use_tls:
+            client.tls_set()
 
         def on_message(_c, _d, msg):  # noqa: ANN001
-            out.append(
+            out.extend(
                 self._normalize(
                     {
                         "topic": msg.topic,
                         "payload": msg.payload.decode("utf-8", errors="replace"),
+                        # No wire timestamp in plain MQTT — stamp receive time.
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                         "qos": msg.qos,
                         "retain": msg.retain,
                     }
@@ -218,23 +260,26 @@ class MqttSparkplugConnector(DataConnector):
         import paho.mqtt.client as mqtt
 
         q: queue.Queue = queue.Queue()
-        parsed = urlparse(self.broker)
+        host, port, use_tls = self._connection_params()
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        if use_tls:
+            client.tls_set()
 
         def on_message(_c, _d, msg):  # noqa: ANN001
-            q.put(
-                self._normalize(
-                    {
-                        "topic": msg.topic,
-                        "payload": msg.payload.decode("utf-8", errors="replace"),
-                        "qos": msg.qos,
-                        "retain": msg.retain,
-                    }
-                )
-            )
+            for row in self._normalize(
+                {
+                    "topic": msg.topic,
+                    "payload": msg.payload.decode("utf-8", errors="replace"),
+                    # No wire timestamp in plain MQTT — stamp receive time.
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "qos": msg.qos,
+                    "retain": msg.retain,
+                }
+            ):
+                q.put(row)
 
         client.on_message = on_message
-        client.connect(parsed.hostname or "localhost", parsed.port or 1883, 60)
+        client.connect(host, port, 60)
         client.subscribe(self.topic_filter)
         client.loop_start()
         batch: list[dict[str, Any]] = []

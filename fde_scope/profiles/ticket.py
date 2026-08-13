@@ -23,17 +23,30 @@ class TicketProfile(Profile):
         register(self)
 
     def compute_kpis(self, samples: list[dict]) -> dict[str, float]:
-        """Recompute ticket KPIs from per-ticket records (idempotent)."""
+        """Recompute ticket KPIs from per-ticket records (idempotent).
+
+        A sample missing a metric's field is excluded from that metric's
+        denominator — it counts as neither pass nor fail, so sparse records
+        can't inflate (or deflate) a rate. A metric with no usable samples
+        reports the neutral value 0.0.
+        """
         if not samples:
             return dict.fromkeys(self.kpi_catalogue, 0.0)
-        n = len(samples)
-        acc = sum(1 for s in samples if s.get("intent_correct", True)) / n
-        adopted = sum(1 for s in samples if s.get("adopted", True)) / n
-        escalated = sum(1 for s in samples if s.get("escalated", False)) / n
-        handle = sum(s.get("handle_time_seconds", 0) for s in samples) / n
         return {
-            "intent_accuracy": acc,
-            "reply_adoption_rate": adopted,
-            "escalation_rate": escalated,
-            "avg_handle_time": handle,
+            "intent_accuracy": _rate(samples, "intent_correct"),
+            "reply_adoption_rate": _rate(samples, "adopted"),
+            "escalation_rate": _rate(samples, "escalated"),
+            "avg_handle_time": _mean(samples, "handle_time_seconds"),
         }
+
+
+def _rate(samples: list[dict], key: str) -> float:
+    """Fraction of true-ish values among samples that actually carry ``key``."""
+    vals = [s[key] for s in samples if key in s]
+    return sum(1 for v in vals if v) / len(vals) if vals else 0.0
+
+
+def _mean(samples: list[dict], key: str) -> float:
+    """Mean of ``key`` over samples that carry it; 0.0 when none do."""
+    vals = [s[key] for s in samples if key in s]
+    return sum(vals) / len(vals) if vals else 0.0

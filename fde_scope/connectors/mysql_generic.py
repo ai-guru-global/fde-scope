@@ -167,8 +167,14 @@ class MySQLConnector(DataConnector):
         all_tables = [next(iter(r.values())) for r in rows]
         if self._table_filter is None:
             return all_tables
-        # Translate SQL LIKE wildcards so users can pass e.g. "ticket_%".
-        pattern = re.compile(self._table_filter.replace("%", ".*").replace("_", "."))
+        # Translate SQL LIKE wildcards (% → any run, _ → single char);
+        # every other character is escaped so regex metachars like "+"
+        # stay literal ("a+b" must not match "ab").
+        regex = "".join(
+            ".*" if ch == "%" else "." if ch == "_" else re.escape(ch)
+            for ch in self._table_filter
+        )
+        pattern = re.compile(regex)
         return [t for t in all_tables if pattern.fullmatch(t)]
 
     def _describe_table(self, cursor, table: str) -> list[SchemaField]:
@@ -216,6 +222,7 @@ class MySQLConnector(DataConnector):
             all_fields: list[SchemaField] = []
             detected_categories: list[str] = []
             total_rows = 0
+            count_failed = False
             for table in tables:
                 all_fields.extend(self._describe_table(cursor, table))
                 # Tag every table in `detected_categories` so the FDE can pick
@@ -223,12 +230,16 @@ class MySQLConnector(DataConnector):
                 if table not in detected_categories:
                     detected_categories.append(table)
                 n = self._count_rows(cursor, table)
-                if n is not None:
+                if n is None:
+                    count_failed = True
+                else:
                     total_rows += n
+            # row_count is None only when a COUNT failed; a database whose
+            # tables all count successfully reports the real total (incl. 0).
             return Schema(
                 source=self.source,
                 fields=all_fields,
-                row_count=total_rows or None,
+                row_count=None if count_failed else total_rows,
                 detected_categories=detected_categories,
             )
         finally:
@@ -236,6 +247,8 @@ class MySQLConnector(DataConnector):
 
     def extract_sample(self, n: int = 100) -> list[dict[str, Any]]:
         """Pull at most ``n`` rows per table for eyeball inspection."""
+        if n < 1:
+            raise ValueError(f"extract_sample requires n >= 1 (got {n})")
         self._ensure_driver()
         conn = self._connect()
         try:
@@ -259,6 +272,8 @@ class MySQLConnector(DataConnector):
         Honors ``self._row_cap`` if set, so a misbehaving ``SELECT * FROM
         multi_billion_row_table`` can't OOM the FDE's laptop.
         """
+        if batch_size < 1:
+            raise ValueError(f"stream requires batch_size >= 1 (got {batch_size})")
         self._ensure_driver()
         conn = self._connect()
         try:

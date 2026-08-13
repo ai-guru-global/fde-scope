@@ -15,11 +15,13 @@ FastAPI; JSON endpoints back the interactive bits. The app imports lazily so
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
+from pydantic import TypeAdapter, ValidationError
 
 from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
@@ -35,8 +37,20 @@ app = FastAPI(title="FDE Scope", version="0.1.0")
 # ---------------------------------------------------------------------------
 # persistence helpers
 # ---------------------------------------------------------------------------
+_STR_LIST = TypeAdapter(list[str])
+
+
+def _slugify(value: str) -> str:
+    """Whitelist-sanitize a value for use in an engagement id / file name."""
+    return re.sub(r"[^a-z0-9-]", "-", value.lower().replace(" ", "-"))
+
+
 def _eng_path(eid: str) -> Path:
-    return _ENGAGEMENTS_DIR / f"{eid}.json"
+    path = (_ENGAGEMENTS_DIR / f"{eid}.json").resolve()
+    base = _ENGAGEMENTS_DIR.resolve()
+    if not path.is_relative_to(base):
+        raise HTTPException(status_code=400, detail=f"invalid engagement id: {eid!r}")
+    return path
 
 
 def _load(eid: str) -> Engagement:
@@ -56,7 +70,10 @@ def _all_engagements() -> list[Engagement]:
         return []
     out = []
     for p in sorted(_ENGAGEMENTS_DIR.glob("*.json")):
-        out.append(Engagement(EngagementContext.load(p)))
+        try:
+            out.append(Engagement(EngagementContext.load(p)))
+        except ValueError:
+            continue  # skip a corrupt file instead of 500ing the whole list
     return out
 
 
@@ -85,7 +102,10 @@ def profiles() -> dict:
 def phases(profile: str = "ticket") -> dict:
     from ..engagement.phases import phases_for_profile
 
-    is_industrial = get_profile(profile).is_industrial
+    try:
+        is_industrial = get_profile(profile).is_industrial
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown profile: {profile!r}") from None
     seq = phases_for_profile(is_industrial)
     return {"phases": [p.__dict__ for p in seq], "is_industrial": is_industrial}
 
@@ -97,7 +117,7 @@ def list_engagements() -> list[dict]:
 
 @app.post("/api/engagements")
 def create_engagement(customer: str = Form(...), profile: str = Form("ticket")) -> dict:
-    eid = f"eng-{customer.lower().replace(' ', '-')}-{profile}-{uuid.uuid4().hex[:6]}"
+    eid = f"eng-{_slugify(customer)}-{_slugify(profile)}-{uuid.uuid4().hex[:6]}"
     ctx = EngagementContext(id=eid, customer=customer, profile=profile)
     eng = Engagement(ctx)
     _save(eng)
@@ -133,6 +153,8 @@ def advance_engagement(eid: str, force: bool = False) -> dict:
     except AdvanceBlocked as exc:
         _save(eng)
         return {"advanced": False, "result": exc.result.__dict__}
+    except StopIteration:
+        return {"advanced": False, "reason": "complete"}
     _save(eng)
     return {"advanced": True, "status": eng.status()}
 
@@ -140,7 +162,10 @@ def advance_engagement(eid: str, force: bool = False) -> dict:
 @app.post("/api/engagements/{eid}/gate/{slug}")
 def evaluate_gate(eid: str, slug: str) -> dict:
     eng = _load(eid)
-    result = eng.evaluate_gate(slug)
+    try:
+        result = eng.evaluate_gate(slug)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown gate: {slug!r}") from None
     _save(eng)
     return {"slug": slug, "passed": result.passed, "blockers": result.blockers, "warnings": result.warnings}
 
@@ -150,20 +175,23 @@ def update_context(eid: str, body: dict | None = None) -> dict:
     """Patch an engagement context (site / safety / slo / stakeholders / assets)."""
     eng = _load(eid)
     body = body or {}
-    if "site" in body:
-        eng.ctx.site = type(eng.ctx.site).model_validate(body["site"])
-    if "safety" in body:
-        eng.ctx.safety = type(eng.ctx.safety).model_validate(body["safety"])
-    if "success_criteria" in body:
-        eng.ctx.success_criteria = body["success_criteria"]
-    if "stakeholders" in body:
-        from ..engagement.context import Stakeholder
+    try:
+        if "site" in body:
+            eng.ctx.site = type(eng.ctx.site).model_validate(body["site"])
+        if "safety" in body:
+            eng.ctx.safety = type(eng.ctx.safety).model_validate(body["safety"])
+        if "success_criteria" in body:
+            eng.ctx.success_criteria = _STR_LIST.validate_python(body["success_criteria"])
+        if "stakeholders" in body:
+            from ..engagement.context import Stakeholder
 
-        eng.ctx.stakeholders = [Stakeholder.model_validate(s) for s in body["stakeholders"]]
-    if "slos" in body:
-        from ..engagement.context import SLOSpec
+            eng.ctx.stakeholders = [Stakeholder.model_validate(s) for s in body["stakeholders"]]
+        if "slos" in body:
+            from ..engagement.context import SLOSpec
 
-        eng.ctx.slos = [SLOSpec.model_validate(s) for s in body["slos"]]
+            eng.ctx.slos = [SLOSpec.model_validate(s) for s in body["slos"]]
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from None
     if "assets" in body:
         eng.ctx.assets.update(body["assets"])
     _save(eng)
@@ -180,8 +208,13 @@ async def forge_corpus(
     from ..config import CorpusConfig
     from ..corpus import CorpusForge, save_html
 
-    content = (await file.read()).decode("utf-8")
-    tmp = Path(f".fde_scope/uploads/{file.filename}")
+    try:
+        content = (await file.read()).decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
+    # never trust the client-supplied name: basename only, uuid fallback
+    safe_name = Path(file.filename or "").name or f"{uuid.uuid4().hex}.csv"
+    tmp = Path(f".fde_scope/uploads/{safe_name}")
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(content, encoding="utf-8")
 
@@ -212,9 +245,17 @@ async def compute_kpis(
     profile: str = Form("manufacturing"),
     file: UploadFile = File(...),
 ) -> dict:
-    content = (await file.read()).decode("utf-8")
-    samples = [json.loads(line) for line in content.splitlines() if line.strip()]
-    prof = get_profile(profile)
+    try:
+        content = (await file.read()).decode("utf-8")
+        samples = [json.loads(line) for line in content.splitlines() if line.strip()]
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="file is not valid JSONL") from None
+    try:
+        prof = get_profile(profile)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown profile: {profile!r}") from None
     return {"profile": profile, "kpis": prof.compute_kpis(samples), "sample_count": len(samples)}
 
 
@@ -598,7 +639,7 @@ function renderDetail(s, phases, gates) {
     return `<div class="phase ${cls}">
       <span class="idx">${p.index}</span><span>${p.name}</span>
       ${p.industrial?'<span class="pill ind">🏭</span>':''}
-      ${p.gate?`<span class="pill" title="gate: ${p.gate}">🚦</span>`:''}
+      ${p.gates&&p.gates.length?`<span class="pill" title="gates: ${p.gates.join(', ')}">🚦</span>`:''}
       <span class="zone-tag">${zoneLabel(p.zone)}</span></div>`;
   }).join('');
 

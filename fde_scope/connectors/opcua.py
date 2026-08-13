@@ -168,19 +168,21 @@ class OpcUaConnector(DataConnector):
             return out
         for child in children:
             try:
-                node_class = await child.get_node_class()
+                # ``read_*`` names: asyncua 2.x removed the old ``get_*``
+                # variants; ``read_*`` exists on both 1.x and 2.x.
+                node_class = await child.read_node_class()
             except Exception:  # noqa: BLE001
                 continue
             # OPC UA NodeClass 2 == Variable
             if node_class == 2:
                 try:
                     node_id = child.nodeid.to_string()
-                    display_name = (await child.get_display_name()).Text
+                    display_name = (await child.read_display_name()).Text
                 except Exception:  # noqa: BLE001
                     continue
                 data_type: str | None = None
                 try:
-                    dt = await child.get_data_type_as_variant_type()
+                    dt = await child.read_data_type_as_variant_type()
                     # ``dt`` is an asyncua.ua.VariantType enum. Use its
                     # ``name`` (e.g. "Float", "Int32") rather than str(dt)
                     # because the enum's str() is implementation-defined
@@ -327,6 +329,8 @@ class OpcUaConnector(DataConnector):
         (the FDE workbench reads on demand; the runtime layer wires
         subscriptions via the flywheel).
         """
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {batch_size}")
         ids = self.node_ids or [n["node_id"] for n in self._cached_nodes]
         if not ids:
             return

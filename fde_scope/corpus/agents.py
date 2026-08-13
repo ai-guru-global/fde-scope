@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from difflib import SequenceMatcher
 from typing import TYPE_CHECKING
 
 from .types import CorpusItem
@@ -103,8 +102,6 @@ class Deduplication:
             is_near_dup = False
             if tokens:
                 for prev in kept_tokens:
-                    # SequenceMatcher gives a smoother ratio; Jaccard is cheaper
-                    # and good enough at the default 0.92 threshold.
                     if self._similar(tokens, prev):
                         is_near_dup = True
                         break
@@ -120,13 +117,16 @@ class Deduplication:
         # Fast path: tiny token sets rarely collide; skip the ratio calc.
         if len(a) <= 2 and len(b) <= 2:
             return False
-        ratio = SequenceMatcher(None, " ".join(sorted(a)), " ".join(sorted(b))).ratio()
-        return ratio >= self.threshold
+        return self._jaccard(a, b) >= self.threshold
 
 
 # ---------------------------------------------------------------------------
 # Stage 3: Quality gate
 # ---------------------------------------------------------------------------
+# Matches PIIScrub's default masking output, e.g. "[REDACTED]([PHONE])".
+_REDACTION_RE = re.compile(r"\[REDACTED\]\([^)]*\)")
+
+
 class QualityGate:
     """Score each item 1-5 on simple, transparent rules; drop below threshold.
 
@@ -165,6 +165,12 @@ class QualityGate:
         # issue-signal keywords
         if any(kw in content.lower() for kw in ("?", "麻烦", "问题", "退款", "无法", "help", "error")):
             score += 1.0
+        # pure redaction residue — content reduced to nothing but masking
+        # placeholders (matches PIIScrub's default "[REDACTED](label)" shape)
+        # carries no signal; push it below any sane gate threshold.
+        residue = _REDACTION_RE.sub("", content)
+        if not re.search(r"\w", residue):
+            score -= 2.0
         return min(score, 5.0)
 
     def __call__(self, items: list[CorpusItem]) -> list[CorpusItem]:

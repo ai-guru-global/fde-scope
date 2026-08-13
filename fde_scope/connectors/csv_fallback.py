@@ -76,25 +76,35 @@ class CSVConnector(DataConnector):
 
     def _iter_rows(self) -> Iterator[dict[str, Any]]:
         for file in self._iter_files():
-            with open(file, newline="", encoding="utf-8") as fh:
+            # utf-8-sig strips a BOM so it can't pollute the first column name.
+            with open(file, newline="", encoding="utf-8-sig") as fh:
                 reader = csv.DictReader(fh, delimiter=self._delimiter)
                 for row in reader:
-                    yield {k: (v if v != "" else None) for k, v in row.items()}
+                    # Drop the None key: DictReader parks surplus fields
+                    # (more values than headers) there; they are not a column.
+                    yield {k: (v if v != "" else None) for k, v in row.items() if k is not None}
 
     # -- the three-step contract -----------------------------------------------
     def discover_schema(self) -> Schema:
-        """Peek at the header + first rows to build a schema without loading all."""
+        """Peek at the headers + first rows to build a schema without loading all."""
+        # Union of column names across all files, in first-appearance order,
+        # so a column that only exists in a later file still lands in the schema.
+        header: list[str] = []
+        for file in self._iter_files():
+            with open(file, newline="", encoding="utf-8-sig") as fh:
+                reader = csv.DictReader(fh, delimiter=self._delimiter)
+                for name in reader.fieldnames or []:
+                    if name not in header:
+                        header.append(name)
+
+        if not header:
+            return Schema(source=str(self.source), fields=[], row_count=0)
+
         sample: list[dict[str, Any]] = []
-        header: list[str] | None = None
         for row in self._iter_rows():
-            if header is None:
-                header = list(row.keys())
             sample.append(row)
             if len(sample) >= 50:
                 break
-
-        if header is None:
-            return Schema(source=str(self.source), fields=[], row_count=0)
 
         fields: list[SchemaField] = []
         for name in header:
@@ -122,6 +132,8 @@ class CSVConnector(DataConnector):
         )
 
     def extract_sample(self, n: int = 100) -> list[dict[str, Any]]:
+        if n < 1:
+            raise ValueError(f"extract_sample requires n >= 1 (got {n})")
         out: list[dict[str, Any]] = []
         for row in self._iter_rows():
             out.append(row)
@@ -130,6 +142,8 @@ class CSVConnector(DataConnector):
         return out
 
     def stream(self, batch_size: int = 500) -> Iterator[Batch]:
+        if batch_size < 1:
+            raise ValueError(f"stream requires batch_size >= 1 (got {batch_size})")
         batch: list[dict[str, Any]] = []
         for row in self._iter_rows():
             batch.append(row)
@@ -141,12 +155,17 @@ class CSVConnector(DataConnector):
 
     # -- helpers ----------------------------------------------------------------
     def _count_rows(self) -> int:
-        """Count data rows across all files (excludes header)."""
+        """Count data records across all files (excludes header).
+
+        Uses ``csv.reader`` so a quoted field containing an embedded newline
+        still counts as one record, matching what ``stream()`` emits.
+        """
         total = 0
         for file in self._iter_files():
-            with open(file, encoding="utf-8") as fh:
+            with open(file, newline="", encoding="utf-8-sig") as fh:
+                reader = csv.reader(fh, delimiter=self._delimiter)
                 # sum(1 ...) skips the header via islice-style consumption
-                total += max(sum(1 for _ in fh) - 1, 0)
+                total += max(sum(1 for _ in reader) - 1, 0)
         return total
 
 

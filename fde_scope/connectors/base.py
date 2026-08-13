@@ -37,6 +37,7 @@ class DataConnector(ABC):
     #: short slug used by the CLI (``--type csv``) and the registry.
     #: Subclasses override this to identify themselves. ``ClassVar`` keeps
     #: mypy happy despite shadowing the ``type`` builtin inside the class body.
+    #: ``register()`` rejects subclasses that forget to override it.
     type: ClassVar[str] = "base"
     #: Deprecated alias kept solely so out-of-tree subclasses written against
     #: the old name still register. Prefer ``type``.
@@ -76,13 +77,24 @@ class DataConnector(ABC):
 
 
 def register(connector_cls: _type) -> _type:
-    """Decorator: register a connector under its ``type`` slug."""
+    """Decorator: register a connector under its ``type`` slug.
+
+    The slug must be defined on the class itself. A subclass that forgets to
+    override ``type`` would otherwise inherit the base default (``"base"``)
+    and silently overwrite every other misconfigured connector in the
+    registry, so we reject it instead.
+    """
     from . import _registry
 
-    slug = getattr(connector_cls, "type", None) or getattr(connector_cls, "connector_type", None)
-    if not slug:
+    if "type" not in connector_cls.__dict__ and "connector_type" not in connector_cls.__dict__:
         raise AttributeError(
-            f"{connector_cls.__name__} must define a `type` class attribute to be registered"
+            f"{connector_cls.__name__} must define its own `type` class attribute "
+            "to be registered"
+        )
+    slug = connector_cls.type if "type" in connector_cls.__dict__ else connector_cls.connector_type
+    if slug == "base":
+        raise ValueError(
+            f"{connector_cls.__name__} may not register under the reserved slug 'base'"
         )
     _registry.register(slug, connector_cls)
     return connector_cls

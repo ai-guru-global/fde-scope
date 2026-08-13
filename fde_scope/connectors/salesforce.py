@@ -26,7 +26,9 @@ class SalesforceConnector(DataConnector):
     def __init__(self, source: str, **options: Any) -> None:
         super().__init__(source, **options)
         self.instance_url = source.rstrip("/")
-        self.access_token = options.get("access_token", "")
+        # Accept the CLI's uniform `api_key` option as a fallback so the
+        # token is not silently dropped (mirrors the Zammad connector).
+        self.access_token = options.get("access_token") or options.get("api_key", "")
         self.api_version = options.get("api_version", "59.0")
 
     def discover_schema(self) -> Schema:

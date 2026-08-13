@@ -115,6 +115,40 @@ def test_ticket_profile_aggregates() -> None:
     assert kpis["escalation_rate"] == 0.5
 
 
+def test_ticket_profile_missing_fields_leave_denominator() -> None:
+    """Sparse samples must not inflate rates: missing fields are excluded."""
+    p = get_profile("ticket")
+    # A completely empty record contributes to no metric.
+    kpis = p.compute_kpis([{}])
+    assert kpis["intent_accuracy"] == 0.0
+    assert kpis["reply_adoption_rate"] == 0.0
+    assert kpis["escalation_rate"] == 0.0
+    assert kpis["avg_handle_time"] == 0.0
+
+    # Per-metric denominators only count samples carrying that field.
+    mixed = [{"intent_correct": True}, {"adopted": False}, {"handle_time_seconds": 90}]
+    kpis = p.compute_kpis(mixed)
+    assert kpis["intent_accuracy"] == 1.0  # 1/1, not 1/3
+    assert kpis["reply_adoption_rate"] == 0.0  # 0/1
+    assert kpis["avg_handle_time"] == 90.0  # 90/1, not 30.0
+
+
+def test_manufacturing_dpmo_pools_only_opportunity_samples() -> None:
+    """DPMO = sum(defects) / sum(units × opps) over samples reporting opps."""
+    p = get_profile("manufacturing")
+    samples = [
+        {"started_units": 100, "defects": 5, "opportunities_per_unit": 2},
+        # No opportunities_per_unit: its units/defects must not dilute DPMO.
+        {"started_units": 1000, "defects": 500},
+    ]
+    kpis = p.compute_kpis(samples)
+    assert kpis["dpmo"] == 5 / (100 * 2) * 1_000_000  # 25 000
+
+    # No sample reports opportunities → neutral 0.0 (no division by zero).
+    kpis = p.compute_kpis([{"started_units": 100, "defects": 5}])
+    assert kpis["dpmo"] == 0.0
+
+
 # -- handoff -----------------------------------------------------------------
 def test_handoff_package_builds_and_renders() -> None:
     ctx = EngagementContext(id="m1", customer="BMW", profile="manufacturing")

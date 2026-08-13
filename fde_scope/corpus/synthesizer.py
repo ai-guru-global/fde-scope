@@ -76,8 +76,9 @@ class CorpusSynthesizer:
     ) -> list[CorpusItem]:
         """Synthesize enough items to close each gap, gated by quality.
 
-        ``per_gap_cap`` overrides each gap's ``shortfall`` (useful to bound
-        synthesis cost in v0).
+        ``per_gap_cap`` bounds each gap's ``shortfall`` (useful to cap
+        synthesis cost in v0) — it never synthesizes *more* than the gap
+        actually needs.
         """
         if not gaps:
             return []
@@ -85,7 +86,7 @@ class CorpusSynthesizer:
         synthetic: list[CorpusItem] = []
         for gap in gaps:
             seeds = [i for i in real_items if i.category == gap.category]
-            to_make = per_gap_cap if per_gap_cap is not None else gap.shortfall
+            to_make = min(per_gap_cap, gap.shortfall) if per_gap_cap is not None else gap.shortfall
             made = self._synthesize_category(gap.category, seeds, to_make)
             synthetic.extend(made)
         return synthetic
@@ -102,12 +103,20 @@ class CorpusSynthesizer:
             return out
         # If we have seed items, mutate them; otherwise emit templated items.
         base_texts = [s.content for s in seeds] if seeds else [self._template(category)]
+        # The v0 mutation space is small, so the same text can come up again.
+        # Synthetic items bypass the forge's dedup stage — dedupe here instead
+        # (seed texts included, since a mutation can be a no-op).
+        seen = {s.content for s in seeds}
         attempts = 0
         max_attempts = count * 5 + 10
         while len(out) < count and attempts < max_attempts:
             attempts += 1
             base = self._rng.choice(base_texts)
-            text = self._mutate(base, strategy=self._rng.choice(self.strategies))
+            strategy = self._rng.choice(self.strategies)
+            text = self._mutate(base, strategy=strategy)
+            if text in seen:
+                continue
+            seen.add(text)
             item = CorpusItem(
                 id=f"syn-{category}-{len(out):04d}",
                 content=text,
@@ -115,7 +124,7 @@ class CorpusSynthesizer:
                 channel=self._rng.choice(["email", "chat", "phone"]) if seeds else "synthetic",
                 quality_score=self.quality_gate._score(CorpusItem(id="x", content=text, category=category)),
                 provenance=Provenance.SYNTHETIC,
-                trace=[f"synthesize:{self.strategies[0]}"],
+                trace=[f"synthesize:{strategy}"],
             )
             # Only admit items that clear a lowered gate; v0 is permissive.
             if item.quality_score >= self.quality_gate.min_score:

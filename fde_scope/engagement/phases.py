@@ -65,7 +65,7 @@ PHASES: list[Phase] = [
         "现场勘察 / Gemba walk",
         Zone.PRE_ENGAGEMENT,
         industrial=True,
-        gate="site_survey",
+        gates=("site_survey",),
         description="物理环境、OT 网络、资产清单、安全约束。工业现场独有。",
     ),
     Phase(
@@ -80,7 +80,7 @@ PHASES: list[Phase] = [
         "success_criteria",
         "成功标准契约化",
         Zone.PRE_ENGAGEMENT,
-        gate="success_criteria",
+        gates=("success_criteria",),
         description="可度量结果 + 书面 done 定义（≤14d 集成、≤90d 上线、≤120d 交接）。",
     ),
     # --- Zone B: Build ---------------------------------------------------------
@@ -89,6 +89,9 @@ PHASES: list[Phase] = [
         "connect",
         "数据接入",
         Zone.BUILD,
+        # air-gap 约束在数据接入阶段就必须定论（不能 phone home 的架构影响连接器选型）。
+        # 该 gate 是 industrial_only，ticket profile 下自动不适用。
+        gates=("air_gap",),
         description="连接器把客户数据接进来（OPC UA / MQTT / CSV / Zammad…）。",
     ),
     Phase(6, "corpus", "语料锻造", Zone.BUILD, description="清洗 → 覆盖度 → 合成补盲 → 报告。"),
@@ -106,7 +109,8 @@ PHASES: list[Phase] = [
         "部署上线",
         Zone.BUILD,
         industrial=True,
-        gate="fat_sat",
+        # 上线前必须同时过 FAT/SAT、功能安全（ISO 13849/61508/10218）与 CE/EU-AI-Act 合规。
+        gates=("fat_sat", "functional_safety", "conformity"),
         description="工业现场：FAT→发货→SAT→commissioning。SaaS 直接上线。",
     ),
     Phase(10, "eval", "评估交付", Zone.BUILD, description="用评估框架证明价值；bad cases 是持续调优抓手。"),
@@ -116,7 +120,9 @@ PHASES: list[Phase] = [
         "slo_sla",
         "SLO/SLA + on-call",
         Zone.OPERATIONALIZATION,
-        gate="slo",
+        # slo 定义 on-call 轮值；shift_handover 保证多班次现场的 24/7 交接不断档——
+        # 两者同属"运营覆盖"判定，挂在同一阶段（shift_handover 为 industrial_only）。
+        gates=("slo", "shift_handover"),
         description="错误预算、告警路由、升级路径、含 FDE 的 on-call 轮值。",
     ),
     Phase(
@@ -135,7 +141,7 @@ PHASES: list[Phase] = [
         "变更管理 + 终用户培训",
         Zone.OPERATIONALIZATION,
         industrial=True,
-        gate="works_council",
+        gates=("works_council",),
         description="工业现场含工会/works-council 共决。",
     ),
     Phase(
@@ -161,7 +167,7 @@ PHASES: list[Phase] = [
         "disengage",
         "退场",
         Zone.HANDOFF,
-        gate="handoff_signoff",
+        gates=("handoff_signoff",),
         description="上线后 ≤120d 转交。无限 pilot 是反模式。",
     ),
 ]

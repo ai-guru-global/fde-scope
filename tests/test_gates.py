@@ -43,6 +43,14 @@ def test_functional_safety_warns_on_missing_sil_achievement() -> None:
     assert any("SIL" in w for w in result.warnings)
 
 
+def test_functional_safety_warns_on_unrecognized_pl() -> None:
+    # "PL_D" is not a valid PL token — it must not be silently ranked 0
+    eng = _eng(safety=SafetyPosture(required_plr="PL_D", achieved_pl="d", hazard_analysis_done=True))
+    result = eng.evaluate_gate("functional_safety")
+    assert result.passed  # warning, not blocker
+    assert any("无法识别" in w and "PL_D" in w for w in result.warnings)
+
+
 # -- gates don't apply to ticket profile -------------------------------------
 def test_industrial_gates_skip_for_ticket() -> None:
     eng = _eng(profile="ticket")
@@ -131,6 +139,33 @@ def test_handoff_gate_blocks_without_package() -> None:
     eng = _eng()
     result = eng.evaluate_gate("handoff_signoff")
     assert not result.passed
+
+
+def test_handoff_gate_blocks_until_customer_accepts() -> None:
+    # docstring contract: "Block disengagement until the handoff package is accepted"
+    eng = _eng()
+    eng.ctx.assets["handoff_package"] = {
+        "runbook": "r.md",
+        "eval_report": "e.html",
+        "slo_definition": [{"name": "availability"}],
+        "training_material": "t.md",
+        "customer_accepted": False,
+    }
+    result = eng.evaluate_gate("handoff_signoff")
+    assert not result.passed
+    assert any("接受" in b for b in result.blockers)
+
+    eng.ctx.assets["handoff_package"]["customer_accepted"] = True
+    assert eng.evaluate_gate("handoff_signoff").passed
+
+
+# -- SLO template --------------------------------------------------------------
+def test_slo_template_error_budget_arithmetic() -> None:
+    # 99.5% availability over 14d → 14 × 24h × 0.5% = 1.68h error budget
+    from fde_scope.engagement.operationalization import build_slo_template
+
+    availability = next(s for s in build_slo_template() if s["name"] == "availability")
+    assert availability["error_budget"] == "1.68h / 14d"
 
 
 def test_all_gates_registered() -> None:

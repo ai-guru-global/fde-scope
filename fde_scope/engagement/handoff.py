@@ -30,7 +30,7 @@ class HandoffSignoffGate(Gate):
             if missing:
                 blockers.append(f"移交包缺失: {missing}")
             if not pkg.get("customer_accepted"):
-                warnings.append("客户尚未书面接受移交")
+                blockers.append("客户尚未书面接受移交——不得退场")
         return GateResult(slug=self.slug, passed=not blockers, blockers=blockers, warnings=warnings)
 
 

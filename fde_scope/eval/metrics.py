@@ -6,7 +6,7 @@ These metrics span three dimensions an FDE reports on:
     - business: did deploying the agent actually move the needle?
 
 Each metric is computed by a deterministic function over an
-:class:`EvalResult` so the whole eval is runnable without an LLM. The agent
+:class:`EvalCase` so the whole eval is runnable without an LLM. The agent
 dimension defaults to rule-based heuristics (e.g. keyword overlap for intent
 accuracy) that a real LLM call would replace behind the same interface.
 """
@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 # Human-readable metric catalogue — surfaced in reports and the CLI.
 METRICS: dict[str, str] = {
     # corpus dimension
-    "corpus_coverage": "意图覆盖率（%）",
+    "corpus_coverage": "意图覆盖率（0-1）",
     "corpus_quality_avg": "平均质量分（1-5）",
     "corpus_diversity": "语义多样性指数",
     # agent dimension

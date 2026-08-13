@@ -36,3 +36,30 @@ def test_synthesizer_fills_gaps() -> None:
 def test_synthesizer_no_gaps_returns_empty() -> None:
     synth = CorpusSynthesizer()
     assert synth.fill_gaps([], []) == []
+
+
+def test_synthesizer_never_exceeds_gap_shortfall() -> None:
+    """per_gap_cap bounds the shortfall — a 2-item gap must not get 50 items."""
+    seeds = [CorpusItem(id="s1", content="申请退款，商品质量问题需要处理一下谢谢", category="退款")]
+    gaps = [CategoryGap(category="退款", current_count=3, target_count=5)]  # shortfall 2
+    out = CorpusSynthesizer().fill_gaps(seeds, gaps, per_gap_cap=50)
+    assert 0 < len(out) <= 2
+
+
+def test_synthesizer_output_is_deduplicated() -> None:
+    """Synthetic items bypass the forge's dedup stage, so the synthesizer
+    must not emit duplicates itself (they could leak across train/test)."""
+    seeds = [CorpusItem(id="s1", content="申请退款，商品质量问题需要处理一下谢谢", category="退款")]
+    gaps = [CategoryGap(category="退款", current_count=1, target_count=30)]
+    out = CorpusSynthesizer().fill_gaps(seeds, gaps, per_gap_cap=20)
+    contents = [i.content for i in out]
+    assert len(contents) == len(set(contents))
+
+
+def test_synthesizer_trace_records_actual_strategy() -> None:
+    seeds = [CorpusItem(id="s1", content="申请退款，商品质量问题需要处理一下谢谢", category="退款")]
+    gaps = [CategoryGap(category="退款", current_count=1, target_count=5)]
+    synth = CorpusSynthesizer(strategies=["emotion_escalation"])
+    out = synth.fill_gaps(seeds, gaps, per_gap_cap=3)
+    assert len(out) == 3
+    assert all(i.trace == ["synthesize:emotion_escalation"] for i in out)

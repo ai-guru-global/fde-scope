@@ -78,7 +78,8 @@ class TenantDeployer:
         the deployment plan without Docker or a model.
         """
         spec = SandboxSpec.from_quota_string(tenant.id, tenant.resource_quota)
-        blueprint = default_blueprint(tenant.id)
+        # The approval policy decides which tool calls escalate to ASK (HITL).
+        blueprint = default_blueprint(tenant.id, mode=tenant.approval_policy.mode)
         collection = f"corpus_{tenant.id}"
 
         manifest = {

@@ -15,9 +15,31 @@ flywheel is testable without a live agent.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from uuid import uuid4
 
 from .collectors import Collector, CorpusStore
 from .event_mapping import strategy_for
+
+
+def payload_from_event(event: object) -> dict:
+    """Build a collector-ready payload from a live 2.0 event object.
+
+    Collectors read ``id``/``ticket``/``input`` keys (see
+    :meth:`Collector._item_from_payload`); a raw ``{"event": event}`` payload
+    would yield empty content and the shared ``fw-<quality>`` fallback ID.
+    Here the event's own ``id`` is used when present, otherwise a uuid
+    guarantees uniqueness, and the first non-empty text-ish attribute becomes
+    the sample content. The raw event is kept under ``event`` for provenance.
+    """
+    payload: dict = {"event": event}
+    event_id = getattr(event, "id", None)
+    payload["id"] = str(event_id) if event_id else f"fw-{uuid4().hex[:12]}"
+    for attr in ("ticket", "input", "content", "message"):
+        value = getattr(event, attr, None)
+        if value:
+            payload["input"] = str(value)
+            break
+    return payload
 
 
 @dataclass
@@ -58,20 +80,21 @@ class DataFlywheel:
     def attach_to_stream(self, agent) -> None:  # pragma: no cover — runtime path
         """Subscribe to a real agent's ``reply_stream()`` event generator.
 
-        Iterates the async event stream, maps each typed 2.0 event to a
-        concept via :data:`MAPPINGS`, and dispatches. Requires the optional
-        agentscope extra.
+        Iterates the async event stream, resolves each typed 2.0 event to a
+        concept via :func:`mapping_for_event` (which disambiguates shared
+        event classes by payload attributes), and dispatches a payload built
+        by :func:`payload_from_event`. Requires the optional agentscope extra.
         """
         import asyncio
 
-        from fde_scope.flywheel.event_mapping import MAPPINGS
+        from fde_scope.flywheel.event_mapping import mapping_for_event
 
         async def _drain() -> None:
             async for event in agent.reply_stream():
-                for mapping in MAPPINGS:
-                    if type(event).__name__ == mapping.real_event_class:
-                        self.handle_concept_event(mapping.concept, {"event": event})
-                        break
+                mapping = mapping_for_event(event)
+                if mapping is None:
+                    continue
+                self.handle_concept_event(mapping.concept, payload_from_event(event))
 
         asyncio.ensure_future(_drain())  # noqa: RUF006
 

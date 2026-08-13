@@ -9,9 +9,10 @@ from fde_scope.corpus import (
     PIIScrub,
     QualityGate,
     SchemaNormalizer,
+    render_html,
     score_item,
 )
-from fde_scope.corpus.types import CorpusItem, Provenance
+from fde_scope.corpus.types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Provenance
 
 
 def test_pii_scrub_masks_phone_and_email() -> None:
@@ -87,6 +88,60 @@ def test_synthetic_items_marked_provenance(sample_rows: list[dict]) -> None:
     cfg = CorpusConfig(min_samples_per_category=10, synth_per_gap=2)
     forge = CorpusForge(cfg)
     report = forge.forge_rows(sample_rows)
-    synth = [i for i in report.train.items + report.test.items if i.provenance == Provenance.SYNTHETIC]
-    # at least some synthetic items exist and all carry the synthetic provenance
+    synth = [
+        i
+        for i in report.train.items + report.eval.items + report.test.items
+        if i.provenance == Provenance.SYNTHETIC
+    ]
+    # synthesis actually happened, and every synthetic item across all splits
+    # (including eval) carries the synthetic provenance
+    assert len(synth) >= 1
+    assert len(synth) == report.synthetic
     assert all(i.provenance == Provenance.SYNTHETIC for i in synth)
+
+
+def test_report_html_escapes_injected_category() -> None:
+    """Category names are customer-controlled strings — they must not inject markup."""
+    evil = '<script>alert("xss")</script>'
+    report = CorpusReport(
+        total=0,
+        real=0,
+        synthetic=0,
+        coverage=CoverageReport(category_counts={evil: 1}, target_per_category=5),
+        train=CorpusSplit(name="train", items=[]),
+        eval=CorpusSplit(name="eval", items=[]),
+        test=CorpusSplit(name="test", items=[]),
+    )
+    html = render_html(report)
+    assert evil not in html
+    assert "&lt;script&gt;" in html
+
+
+def test_dedup_near_duplicates_use_token_jaccard() -> None:
+    dedup = Deduplication(threshold=0.5)
+    items = [
+        CorpusItem(id="1", content="one two three four five", category="c"),
+        # token Jaccard 4/6 ≈ 0.67 ≥ 0.5 → near-dup, dropped
+        CorpusItem(id="2", content="one two three four six", category="c"),
+        # token Jaccard 0.0 → kept (character-level ratios must not kill it)
+        CorpusItem(id="3", content="seven eight nine ten eleven", category="c"),
+    ]
+    out = dedup(items)
+    assert [i.id for i in out] == ["1", "3"]
+    assert dedup.dropped_count == 1
+
+
+def test_quality_gate_drops_pure_redaction_residue() -> None:
+    gate = QualityGate(min_score=3.0)
+    item = CorpusItem(id="r", content="[REDACTED]([PHONE]) [REDACTED]([EMAIL])", category="退款")
+    assert gate([item]) == []
+    assert gate.dropped_count == 1
+
+
+def test_forge_reuse_resets_stage_counters(sample_rows: list[dict]) -> None:
+    forge = CorpusForge(CorpusConfig(min_samples_per_category=5, synth_per_gap=3))
+    first = forge.forge_rows(sample_rows)
+    second = forge.forge_rows(sample_rows)
+    assert first.dropped >= 1
+    assert second.dropped == first.dropped
+    assert second.pii_entities_masked == first.pii_entities_masked

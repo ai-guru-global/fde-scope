@@ -53,6 +53,12 @@ class ManufacturingProfile(Profile):
         started_units, defect_opportunities (FPY/DPMO), grasp_successes,
         grasp_attempts, tasks_succeeded, tasks_attempted, interventions,
         cycles.
+
+        DPMO is computed as sum(defects) / sum(started_units ×
+        opportunities_per_unit) over only the samples that report
+        ``opportunities_per_unit`` — samples without it contribute neither
+        units nor defects, so they can't dilute the rate. 0.0 when no
+        sample reports opportunities.
         """
         if not samples:
             return dict.fromkeys(self.kpi_catalogue, 0.0)
@@ -64,7 +70,11 @@ class ManufacturingProfile(Profile):
             "mtbf": mtbf(agg["total_uptime_hours"], agg["total_failures"]),
             "mttr": mttr(agg["total_repair_hours"], agg["total_failures"]),
             "first_pass_yield": first_pass_yield(agg["good_units"], agg["started_units"]),
-            "dpmo": dpmo(agg["defects"], agg["started_units"], agg["opportunities_per_unit"]),
+            "dpmo": (
+                dpmo(agg["dpmo_defects"], agg["dpmo_opportunities"], 1)
+                if agg["dpmo_opportunities"] > 0
+                else 0.0
+            ),
             "grasp_success_rate": grasp_success_rate(agg["grasp_successes"], agg["grasp_attempts"]),
             "task_completion_rate": task_completion_rate(agg["tasks_succeeded"], agg["tasks_attempted"]),
             "collision_intervention_rate": collision_intervention_rate(agg["interventions"], agg["cycles"]),
@@ -81,6 +91,10 @@ def _sum(samples: list[dict], key: str) -> float:
 
 
 def _aggregate(samples: list[dict]) -> dict:
+    # DPMO pools only the samples that report opportunities_per_unit: both
+    # their defects and their unit×opportunity denominator. Samples missing
+    # the field are excluded from DPMO entirely.
+    dpmo_samples = [s for s in samples if s.get("opportunities_per_unit")]
     return {
         "availability": _mean(samples, "availability"),
         "performance": _mean(samples, "performance"),
@@ -90,8 +104,10 @@ def _aggregate(samples: list[dict]) -> dict:
         "total_repair_hours": _sum(samples, "repair_hours"),
         "good_units": _sum(samples, "good_units"),
         "started_units": _sum(samples, "started_units"),
-        "defects": _sum(samples, "defects"),
-        "opportunities_per_unit": _mean(samples, "opportunities_per_unit") or 1.0,
+        "dpmo_defects": _sum(dpmo_samples, "defects"),
+        "dpmo_opportunities": sum(
+            (s.get("started_units", 0) or 0) * s["opportunities_per_unit"] for s in dpmo_samples
+        ),
         "grasp_successes": _sum(samples, "grasp_successes"),
         "grasp_attempts": _sum(samples, "grasp_attempts"),
         "tasks_succeeded": _sum(samples, "tasks_succeeded"),

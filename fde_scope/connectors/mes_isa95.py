@@ -114,6 +114,8 @@ class MesConnector(DataConnector):
         return []
 
     def stream(self, batch_size: int = 500) -> Iterator[Batch]:
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {batch_size}")
         if self._is_jsonl:
             batch: list[dict[str, Any]] = []
             for rec in self._iter_jsonl():

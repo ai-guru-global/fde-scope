@@ -119,8 +119,9 @@ def corpus(
             console.print(f"   • {g.category}: {g.current_count} (need ≥{g.target_count})")
 
     save_html(report, out)
-    save_report_json(report, "reports/corpus_report.json")
-    console.print(f"📊 Report → [green]{out}[/green]")
+    json_out = str(Path(out).parent / "corpus_report.json")
+    save_report_json(report, json_out)
+    console.print(f"📊 Report → [green]{out}[/green] (+ {json_out})")
 
 
 def _load_rows(path: str) -> list[dict]:
@@ -159,8 +160,17 @@ def deploy(
     from .deploy import TenantDeployer
 
     cfg = TenantConfig(id=tenant, name=name, model=model, corpus_path=corpus)
+    corpus_report = None
+    if corpus:
+        from .corpus import CorpusReport
+
+        try:
+            corpus_report = CorpusReport.model_validate_json(Path(corpus).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            console.print(f"[red]Cannot load corpus report:[/red] {corpus} ({exc})")
+            raise typer.Exit(2) from exc
     deployer = TenantDeployer()
-    deployed = deployer.deploy(cfg, dry_run=dry_run)
+    deployed = deployer.deploy(cfg, corpus_report=corpus_report, dry_run=dry_run)
 
     console.print(f"🔄 Sandbox: [bold]{deployed.manifest['sandbox']['backend']}[/bold]")
     console.print(f"🔄 Corpus collection: [bold]{deployed.corpus_collection}[/bold]")
@@ -179,7 +189,7 @@ def deploy(
 # ---------------------------------------------------------------------------
 @app.command()
 def eval(
-    agent: str = typer.Option("mock", "--agent", "-a", help="Agent ID ('mock' uses the rule-based reply fn)"),
+    agent: str = typer.Option("mock", "--agent", "-a", help="Agent ID (only 'mock' is supported; real-agent eval is not wired up)"),
     test_set: str = typer.Option(..., "--test-set", help="Path to eval cases (JSON/JSONL)"),
     accuracy: float = typer.Option(0.9, "--accuracy", help="Mock agent accuracy (0-1)"),
 ) -> None:
@@ -188,7 +198,13 @@ def eval(
     from .eval import FDEBenchmark, MockReplyFn
 
     cases = _load_eval_cases(test_set)
-    reply_fn = MockReplyFn(accuracy=accuracy) if agent == "mock" else MockReplyFn(accuracy=accuracy)
+    if agent != "mock":
+        console.print(
+            f"[red]Real-agent eval is not wired up yet[/red] — got agent={agent!r}. "
+            "Only '--agent mock' (rule-based reply fn) is supported."
+        )
+        raise typer.Exit(2)
+    reply_fn = MockReplyFn(accuracy=accuracy)
     report = FDEBenchmark().run(reply_fn, cases)
 
     table = Table(title="Metrics")
@@ -285,12 +301,19 @@ def engage_init(
     customer: str = typer.Option(..., "--customer", "-c"),
     profile: str = typer.Option("ticket", "--profile", "-p", help="ticket | manufacturing"),
     engagement_id: str | None = typer.Option(None, "--id", help="Explicit engagement id"),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing engagement with the same id"),
 ) -> None:
     """Start a new FDE engagement."""
     _banner(f"engage init · {profile}")
     from .engagement import Engagement, EngagementContext
 
     eid = engagement_id or f"eng-{customer.lower().replace(' ', '-')}-{profile}"
+    if _engagement_path(eid).exists() and not force:
+        console.print(
+            f"[red]Engagement already exists:[/red] {eid}\n"
+            "Re-run with --force to overwrite it (losing its progress)."
+        )
+        raise typer.Exit(2)
     ctx = EngagementContext(id=eid, customer=customer, profile=profile)
     eng = Engagement(ctx)
     _save_engagement(eng)
@@ -355,7 +378,14 @@ def engage_rollback(
 ) -> None:
     """Roll the engagement back to an earlier phase."""
     eng = _load_engagement(engagement_id)
-    target = eng.rollback(to_phase)
+    try:
+        target = eng.rollback(to_phase)
+    except KeyError:
+        console.print(f"[red]Unknown phase:[/red] {to_phase}")
+        raise typer.Exit(2) from None
+    except ValueError as exc:
+        console.print(f"[red]Invalid rollback:[/red] {exc}")
+        raise typer.Exit(2) from None
     _save_engagement(eng)
     console.print(f"⏪ Rolled back → [cyan]{target.slug}[/cyan] ({target.name})")
 

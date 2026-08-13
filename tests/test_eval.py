@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from fde_scope.eval import (
     METRICS,
     BadCaseMiner,
@@ -9,6 +11,7 @@ from fde_scope.eval import (
     FDEBenchmark,
     MockReplyFn,
 )
+from fde_scope.eval.manufacturing_metrics import dpmo, first_pass_yield
 
 
 def _cases() -> list[EvalCase]:
@@ -102,3 +105,68 @@ def test_eval_report_renders_recommendation() -> None:
     report = FDEBenchmark().run(MockReplyFn(accuracy=0.0), _cases())
     # low accuracy → at least one bad case → recommendation present
     assert isinstance(report.bad_cases.recommendation, str)
+
+
+def test_benchmark_csat_neutral_without_responses() -> None:
+    """Regression: all-csat=None used to report 0.0 (the worst possible CSAT)
+    while no-signal adoption reported 1.0 — opposite directions for 'no data'."""
+    cases = [EvalCase(id=str(i), input="x", category="c", csat=None) for i in range(3)]
+    report = FDEBenchmark().run(MockReplyFn(accuracy=1.0), cases)
+    # neutral midpoint of the 1-5 scale, and distinguishable as "no data"
+    assert report.metrics["customer_satisfaction"] == 3.0
+    assert report.extra["csat_responses"] == 0
+
+
+def test_benchmark_skips_unfilled_handle_time() -> None:
+    """Regression: cases with no recorded duration (0 = unfilled) dragged
+    cost_per_ticket towards 0, faking a huge cost win."""
+    timed = EvalCase(id="t", input="x", category="c", handle_time_seconds=60)
+    untimed = EvalCase(id="u", input="y", category="c")  # handle_time_seconds = 0.0
+    report = FDEBenchmark().run(MockReplyFn(accuracy=1.0), [timed, untimed])
+    # ratio aggregated over the single timed case only: 60/480
+    assert report.metrics["cost_per_ticket"] == pytest.approx(60 / 480)
+    assert report.metrics["avg_handle_time"] == 60.0
+    assert report.extra["handle_time_recorded"] == 1
+
+    # no durations at all → parity with the human baseline, not 0
+    report_none = FDEBenchmark().run(MockReplyFn(accuracy=1.0), [untimed])
+    assert report_none.metrics["cost_per_ticket"] == 1.0
+    assert report_none.extra["handle_time_recorded"] == 0
+
+
+def test_bad_case_miner_finds_first_contact_failure() -> None:
+    """Regression: resolved_first_contact=False dents the FCR metric but used
+    to be invisible to the miner."""
+    cases = [
+        EvalCase(id="fcr-bad", input="x", category="退款", resolved_first_contact=False),
+    ]
+    report = BadCaseMiner().mine(cases)
+    assert report.total_failures == 1
+    assert report.cases[0].reason == "not_resolved_first_contact"
+
+
+def test_dpmo_honors_fractional_opportunities() -> None:
+    """Regression: opportunities_per_unit was clamped with max(..., 1.0),
+    silently rewriting a legitimate 0.5 to 1."""
+    assert dpmo(3, 10, 0.5) == pytest.approx(3 / 5 * 1_000_000)
+    # the six-sigma anchor still holds
+    assert dpmo(34, 1_000_000, 1) == 34.0
+
+
+def test_dpmo_zero_denominator_is_zero_not_inflated() -> None:
+    """Regression: units=0 used to return defects×1e6 — a meaningless big number."""
+    assert dpmo(5, 0, 2.0) == 0.0
+    assert dpmo(5, 10, 0) == 0.0
+
+
+def test_first_pass_yield_rejects_impossible_input() -> None:
+    """good > started is a data error (yield > 100%), not a great shift."""
+    assert first_pass_yield(95, 100) == 0.95
+    with pytest.raises(ValueError, match="good_units"):
+        first_pass_yield(101, 100)
+
+
+def test_corpus_coverage_label_matches_fraction_value() -> None:
+    """Regression: label said (%) while the value is a 0-1 fraction, so the
+    CLI rendered 0.667 looking like 0.667%."""
+    assert "%" not in METRICS["corpus_coverage"]

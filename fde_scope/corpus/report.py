@@ -19,9 +19,11 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
 def _env() -> Environment:
+    # The templates are named *.html.j2 / *.md.j2, so suffix-based autoescape
+    # selection would miss them entirely — force it on for every template.
     return Environment(
         loader=FileSystemLoader(str(_TEMPLATES_DIR)),
-        autoescape=select_autoescape(["html", "xml"]),
+        autoescape=select_autoescape(default_for_string=True, default=True),
         trim_blocks=True,
         lstrip_blocks=True,
     )

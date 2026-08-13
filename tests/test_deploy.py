@@ -27,6 +27,32 @@ def test_default_blueprint_has_isolation_rules() -> None:
     assert "exec_shell" in deny_tools
 
 
+def test_default_blueprint_scales_ask_with_approval_mode() -> None:
+    """ApprovalPolicy.mode moves the ASK boundary: autonomous < balanced < conservative."""
+    auto = default_blueprint("acme", mode="autonomous")
+    balanced = default_blueprint("acme", mode="balanced")
+    conservative = default_blueprint("acme", mode="conservative")
+    assert auto.ask == []
+    assert len(balanced.ask) < len(conservative.ask)
+    # allow/deny are identical across modes — only the ASK bucket moves
+    assert auto.allow == balanced.allow == conservative.allow
+    assert auto.deny == balanced.deny == conservative.deny
+
+
+def test_deploy_manifest_reflects_approval_policy_mode() -> None:
+    """deploy() must wire the tenant's approval policy into the blueprint."""
+    deployer = TenantDeployer(agentscope_extra=False)
+    auto = deployer.deploy(
+        TenantConfig(id="t1", name="T1", approval_policy={"mode": "autonomous"}), dry_run=True
+    )
+    conservative = deployer.deploy(
+        TenantConfig(id="t2", name="T2", approval_policy={"mode": "conservative"}), dry_run=True
+    )
+    assert auto.manifest["permissions"]["ask"] == []
+    assert len(conservative.manifest["permissions"]["ask"]) > 0
+    assert auto.manifest["permissions"]["deny"] == conservative.manifest["permissions"]["deny"]
+
+
 def test_deployer_dry_run_returns_manifest_only() -> None:
     deployer = TenantDeployer(agentscope_extra=False)
     tenant = TenantConfig(id="acme", name="Acme", model="qwen-max")

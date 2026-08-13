@@ -59,6 +59,14 @@ class FDEBenchmark:
             scored.append(case.model_copy(update={"agent_reply": reply}))
 
         metrics = self._aggregate(scored)
+        # Sample counts for the no-data-sensitive metrics, so a report reader
+        # can tell a real score apart from a neutral placeholder (0 responses
+        # → customer_satisfaction is the neutral midpoint, 0 timed cases →
+        # cost_per_ticket is baseline parity).
+        extras = {
+            "csat_responses": sum(1 for c in scored if c.csat is not None),
+            "handle_time_recorded": sum(1 for c in scored if c.handle_time_seconds > 0),
+        }
         # Backfill the corpus dimension from the forge report when the caller
         # supplies one, so the eval isn't stuck reporting 0.0 for coverage.
         if corpus_report is not None:
@@ -72,6 +80,7 @@ class FDEBenchmark:
             metric_labels=dict(METRICS),
             bad_cases=bad,
             case_count=len(scored),
+            extra=extras,
         )
 
     # -- aggregation ------------------------------------------------------------
@@ -84,11 +93,19 @@ class FDEBenchmark:
         adoption = sum(score_adoption(c) for c in cases) / n
         escalation = sum(score_escalation(c) for c in cases) / n
         fcr = sum(score_first_contact(c) for c in cases) / n
-        avg_handle = sum(c.handle_time_seconds for c in cases) / n
-        avg_ratio = sum(handle_time_ratio(c) for c in cases) / n
-        avg_csat = sum(c.csat for c in cases if c.csat is not None) / max(
-            sum(1 for c in cases if c.csat is not None), 1
-        )
+
+        # No-data metrics must not masquerade as a best/worst score:
+        # - CSAT: average only real responses; with none, report the neutral
+        #   midpoint of the 1-5 scale (mirrors score_adoption's "no signal →
+        #   not a failure" stance). Distinguishable via extra["csat_responses"].
+        # - handle time: cases with no recorded duration (0 = unfilled) are
+        #   skipped so they can't drag cost_per_ticket towards 0; with no
+        #   durations at all, report parity with the human baseline (1.0).
+        csat_scores = [c.csat for c in cases if c.csat is not None]
+        avg_csat = sum(csat_scores) / len(csat_scores) if csat_scores else 3.0
+        timed = [c for c in cases if c.handle_time_seconds > 0]
+        avg_handle = sum(c.handle_time_seconds for c in timed) / len(timed) if timed else 0.0
+        avg_ratio = sum(handle_time_ratio(c) for c in timed) / len(timed) if timed else 1.0
 
         return {
             # corpus dimension left to the caller (forge report) to fill in

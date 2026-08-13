@@ -52,6 +52,12 @@ class CorpusForge:
         return self._forge(rows)
 
     def _forge(self, rows: list[dict]) -> CorpusReport:
+        # Stages are long-lived; zero their counters so a reused forge reports
+        # per-run numbers instead of accumulating across forge calls.
+        self.scrubber.masked_count = 0
+        self.deduper.dropped_count = 0
+        self.gate.dropped_count = 0
+
         # Step 0: normalize raw rows into CorpusItems
         items = self.normalizer(rows)
         if not items:

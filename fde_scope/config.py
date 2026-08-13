@@ -49,7 +49,7 @@ class CorpusConfig(BaseModel):
         0.92,
         ge=0.0,
         le=1.0,
-        description="Jaccard similarity at or above which two items are treated as duplicates.",
+        description="Token-set Jaccard similarity at or above which two items are treated as duplicates.",
     )
     quality_min_score: float = Field(
         3.0,

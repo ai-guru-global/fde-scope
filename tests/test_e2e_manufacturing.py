@@ -115,8 +115,8 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     for _expected in ("corpus", "prototype_real_data", "validate", "deploy"):
         if eng.phase.slug == "deploy":
             break
-        # advance through no-gate build phases until deploy
-        if eng.phase.gate is None:
+        # advance through build phases whose gates (if any) pass until deploy
+        if eng.can_advance():
             eng.advance()
 
     # Forge a corpus from the ticket sample (the corpus engine is profile-agnostic)
@@ -164,8 +164,12 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     assert eng.advance().slug == "slo_sla"  # entered Zone C
 
     # ---- Zone C: Operationalization --------------------------------------
-    # slo_sla gate
+    # slo_sla gates: slo + shift_handover (3-shift site needs handover integration)
     eng.ctx.slos = [SLOSpec(name="grasp_success", target=">=0.85", alert_route="fde-oncall")]
+    eng.ctx.assets["shift_handover"] = {
+        "digital_log_integrated": True,
+        "per_shift_runbook": True,
+    }
     assert eng.evaluate_gate("slo").passed
     eng.advance()  # → runbook
 

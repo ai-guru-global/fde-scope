@@ -56,13 +56,34 @@ class PermissionBlueprint:
         return "\n".join(lines)
 
 
-def default_blueprint(tenant_id: str) -> PermissionBlueprint:
-    """The conservative default an FDE ships on day one."""
+# ASK-rule presets per ApprovalPolicy.mode. The policy's only effect on the
+# deployed agent is *which* tool calls land in the ASK (HITL) bucket.
+_ASK_BALANCED: list[tuple[str, str | None]] = [("refund_high_value", "amount > 1000")]
+_ASK_CONSERVATIVE_EXTRA: list[tuple[str, str | None]] = [
+    ("write_ticket", "external_customer"),
+    ("call_approved_tools", "high_cost"),
+]
+
+
+def default_blueprint(tenant_id: str, mode: str = "conservative") -> PermissionBlueprint:
+    """The default blueprint an FDE ships on day one, tuned by approval policy.
+
+    ``mode`` (``ApprovalPolicy.mode``) moves only the ASK boundary:
+    - ``autonomous``   — no ASK rules; nothing escalates to a human.
+    - ``balanced``     — only clearly high-risk actions ask.
+    - ``conservative`` — the balanced set plus routine external / high-cost actions.
+    Unknown modes fall back to the balanced set.
+    """
+    ask = list(_ASK_BALANCED)
+    if mode == "autonomous":
+        ask = []
+    elif mode == "conservative":
+        ask = ask + _ASK_CONSERVATIVE_EXTRA
     return PermissionBlueprint(
         tenant_id=tenant_id,
         allow=[("read_corpus", None), ("write_ticket", None), ("call_approved_tools", None)],
         deny=[("access_other_tenant", None), ("delete_any", None), ("exec_shell", None)],
-        ask=[("refund_high_value", "amount > 1000")],
+        ask=ask,
     )
 
 

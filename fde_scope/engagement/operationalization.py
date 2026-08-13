@@ -56,7 +56,7 @@ def build_slo_template() -> list[dict]:
         {
             "name": "availability",
             "target": "99.5%",
-            "error_budget": "1.75h / 14d",
+            "error_budget": "1.68h / 14d",  # 14d × 24h × (1 - 99.5%) = 1.68h
             "alert_route": "primary-oncall",
             "window": "14d",
         },

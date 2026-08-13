@@ -1,9 +1,11 @@
 """The engagement state machine — drives an FDE engagement through the SOP.
 
 The state machine advances an :class:`EngagementContext` phase by phase.
-Before leaving a phase whose ``gate`` is set, the gate must pass; otherwise
-the advance is refused and the blockers are returned. This is the single
-enforcement point that makes the SOP real.
+Before leaving a phase whose ``gates`` are set, every gate is re-evaluated
+unconditionally (a previously recorded pass is never trusted — the context
+may have changed since); if any gate fails, the advance is refused and the
+blockers are returned. This is the single enforcement point that makes the
+SOP real.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from datetime import datetime, timezone
 
 from .context import EngagementContext, GateRecord
 from .gates.base import Gate, GateResult
-from .phases import Phase, next_phase, phase_by_slug
+from .phases import Phase, next_phase, phase_by_slug, phases_for_profile
 
 
 class AdvanceBlocked(Exception):
@@ -41,10 +43,14 @@ class Engagement:
 
     # -- gate evaluation --------------------------------------------------------
     def evaluate_gate(self, slug: str) -> GateResult:
-        """Run a gate and record its outcome on the context."""
+        """Run a gate and record its outcome on the context.
+
+        Raises :class:`KeyError` for an unregistered slug — a typo'd gate
+        name must fail loudly, never "pass" silently.
+        """
         gate = self.gates.get(slug)
         if gate is None:
-            return GateResult(slug=slug, passed=True, warnings=[f"no gate registered for {slug!r}"])
+            raise KeyError(f"Unknown gate: {slug!r}")
         if not gate.applies(self.ctx):
             return GateResult(slug=slug, passed=True, notes=[f"gate {slug!r} not applicable to profile"])
         result = gate.check(self.ctx)
@@ -57,34 +63,33 @@ class Engagement:
         )
         return result
 
-    def evaluate_phase_gate(self) -> GateResult | None:
-        """Evaluate the gate (if any) attached to the current phase."""
-        gate_slug = self.phase.gate
-        if gate_slug is None:
-            return None
-        return self.evaluate_gate(gate_slug)
+    def evaluate_phase_gates(self) -> list[GateResult]:
+        """Evaluate every gate attached to the current phase (empty if none)."""
+        return [self.evaluate_gate(slug) for slug in self.phase.gates]
 
     # -- state transitions ------------------------------------------------------
     def can_advance(self) -> bool:
-        """True if the current phase's gate (if any) has passed."""
-        gate_slug = self.phase.gate
-        if gate_slug is None:
-            return True
-        return self.ctx.gate_passed(gate_slug)
+        """True if every gate of the current phase passes *right now*.
+
+        Gates are re-evaluated live (outcomes are recorded); a stale pass
+        record never counts, because the context may have changed since.
+        """
+        return all(r.passed for r in self.evaluate_phase_gates())
 
     def advance(self, force: bool = False) -> Phase:
-        """Advance to the next phase, enforcing the current phase's gate.
+        """Advance to the next phase, enforcing the current phase's gates.
 
-        With ``force=True`` the gate is re-evaluated but blockers don't block;
-        the result is still recorded. Use sparingly (override authority).
+        Every gate attached to the current phase is re-evaluated
+        unconditionally — a previously recorded pass does not exempt the
+        engagement from re-checking. With ``force=True`` the gates are
+        still evaluated and recorded but blockers don't block. Use
+        sparingly (override authority).
         """
         if self.is_complete:
             raise StopIteration("Engagement already at terminal phase (disengage).")
-        gate_slug = self.phase.gate
-        if gate_slug is not None and not self.ctx.gate_passed(gate_slug):
-            result = self.evaluate_gate(gate_slug)
-            if not result.passed and not force:
-                raise AdvanceBlocked(result)
+        failed = [r for r in self.evaluate_phase_gates() if not r.passed]
+        if failed and not force:
+            raise AdvanceBlocked(_merge_results(failed))
         nxt = next_phase(self.ctx.current_phase, self.ctx.is_industrial)
         if nxt is None:
             raise StopIteration("No next phase.")
@@ -92,8 +97,19 @@ class Engagement:
         return nxt
 
     def rollback(self, to_slug: str) -> Phase:
-        """Roll the engagement back to an earlier phase."""
+        """Roll the engagement back to an earlier phase.
+
+        The target must be visible to the engagement's profile — rolling a
+        non-industrial engagement back to an industrial-only phase would
+        strand the state machine on a phase it cannot advance from and make
+        ``is_complete`` report a false completion.
+        """
         target = phase_by_slug(to_slug)
+        visible = {p.slug for p in phases_for_profile(self.ctx.is_industrial)}
+        if to_slug not in visible:
+            raise ValueError(
+                f"Cannot rollback to {to_slug!r}: phase not visible to profile {self.ctx.profile!r}."
+            )
         current_index = self.phase.index
         if target.index > current_index:
             raise ValueError(f"Cannot rollback forward: {to_slug} is after {self.ctx.current_phase}.")
@@ -103,7 +119,7 @@ class Engagement:
     # -- snapshots --------------------------------------------------------------
     def status(self) -> dict:
         nxt = next_phase(self.ctx.current_phase, self.ctx.is_industrial)
-        gate_slug = self.phase.gate
+        gate_slugs = list(self.phase.gates)
         return {
             "engagement_id": self.ctx.id,
             "customer": self.ctx.customer,
@@ -112,8 +128,9 @@ class Engagement:
             "current_zone": self.ctx.current_zone.value,
             "next_phase": nxt.slug if nxt else None,
             "is_complete": self.is_complete,
-            "gate": gate_slug,
-            "gate_passed": self.ctx.gate_passed(gate_slug) if gate_slug else None,
+            "gate": gate_slugs[0] if gate_slugs else None,  # primary gate (single-gate callers)
+            "gates": gate_slugs,
+            "gate_passed": all(self.ctx.gate_passed(s) for s in gate_slugs) if gate_slugs else None,
             "visible_phase_count": len(self.ctx.visible_phases),
             "gate_records": {k: v.model_dump() for k, v in self.ctx.gate_records.items()},
         }
@@ -121,6 +138,14 @@ class Engagement:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _merge_results(results: list[GateResult]) -> GateResult:
+    """Fold several gate results into one (for a multi-gate AdvanceBlocked)."""
+    merged = results[0]
+    for r in results[1:]:
+        merged = merged.merge(r)
+    return merged
 
 
 # Late import to avoid circular deps; the registry is built on first use.

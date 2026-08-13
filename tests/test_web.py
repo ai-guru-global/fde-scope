@@ -8,7 +8,10 @@ pytestmark = pytest.mark.filterwarnings("ignore")
 
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
+    # run the app out of a tmp dir so engagements/uploads/reports don't
+    # pollute the repo working tree
+    monkeypatch.chdir(tmp_path)
     from fastapi.testclient import TestClient
 
     from fde_scope.web.app import app
@@ -149,3 +152,128 @@ def test_kpi_endpoint_manufacturing(client) -> None:
     assert r.status_code == 200
     kpis = r.json()["kpis"]
     assert "oee" in kpis and kpis["oee"] > 0
+
+
+# ---------------------------------------------------------------------------
+# security + error-handling regression tests
+# ---------------------------------------------------------------------------
+def test_create_engagement_sanitizes_customer_in_eid(client, tmp_path) -> None:
+    """A path-traversal customer name must not escape the engagements dir."""
+    r = client.post("/api/engagements", data={"customer": "a/../../../escaped", "profile": "ticket"})
+    assert r.status_code == 200
+    eid = r.json()["engagement_id"]
+    assert "/" not in eid and ".." not in eid
+    # the file landed inside .fde_scope/engagements, not outside it
+    eng_dir = tmp_path / ".fde_scope" / "engagements"
+    assert (eng_dir / f"{eid}.json").exists()
+    assert not (tmp_path / "escaped.json").exists()
+
+
+def test_eng_path_rejects_traversal_eid(client) -> None:
+    """_eng_path refuses ids that resolve outside the engagements dir."""
+    from fastapi import HTTPException
+
+    from fde_scope.web.app import _eng_path
+
+    with pytest.raises(HTTPException) as exc_info:
+        _eng_path("../../outside")
+    assert exc_info.value.status_code == 400
+
+
+def test_forge_sanitizes_upload_filename(client, tmp_path, sample_csv_bytes: bytes) -> None:
+    """An upload named ../../x.csv must not escape the uploads dir."""
+    r = client.post(
+        "/api/forge",
+        files={"file": ("../../x.csv", sample_csv_bytes, "text/csv")},
+        data={"min_samples": "5", "synth_per_gap": "2"},
+    )
+    assert r.status_code == 200
+    assert (tmp_path / ".fde_scope" / "uploads" / "x.csv").exists()
+    assert not (tmp_path / "x.csv").exists()
+
+
+def test_update_context_rejects_string_success_criteria(client) -> None:
+    """success_criteria must be a list of strings; a bare string is 422 and
+    must not corrupt the persisted engagement."""
+    r = client.post("/api/engagements", data={"customer": "CritCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.post(f"/api/engagements/{eid}/context", json={"success_criteria": "not-a-list"})
+    assert r.status_code == 422
+    # the engagement is still intact and loadable afterwards
+    r = client.get(f"/api/engagements/{eid}")
+    assert r.status_code == 200
+
+
+def test_list_engagements_skips_corrupt_file(client, tmp_path) -> None:
+    """One corrupt engagement file must not 500 the whole listing."""
+    r = client.post("/api/engagements", data={"customer": "GoodCo", "profile": "ticket"})
+    assert r.status_code == 200
+    bad = tmp_path / ".fde_scope" / "engagements" / "eng-corrupt.json"
+    bad.write_text("{not valid json", encoding="utf-8")
+    r = client.get("/api/engagements")
+    assert r.status_code == 200
+    assert len(r.json()) == 1
+
+
+def test_advance_completed_engagement_returns_reason(client) -> None:
+    """Advancing a terminal engagement returns advanced=False, not a 500."""
+    r = client.post("/api/engagements", data={"customer": "DoneCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    from fde_scope.engagement import Engagement, EngagementContext
+    from fde_scope.web.app import _eng_path
+
+    eng = Engagement(EngagementContext.load(_eng_path(eid)))
+    eng.ctx.current_phase = "disengage"
+    eng.ctx.save(_eng_path(eid))
+
+    r = client.post(f"/api/engagements/{eid}/advance")
+    assert r.status_code == 200
+    assert r.json() == {"advanced": False, "reason": "complete"}
+
+
+def test_phases_unknown_profile_404(client) -> None:
+    r = client.get("/api/phases?profile=nope")
+    assert r.status_code == 404
+
+
+def test_kpi_unknown_profile_404(client) -> None:
+    r = client.post(
+        "/api/kpi",
+        files={"file": ("s.jsonl", b'{"a": 1}\n', "application/jsonl")},
+        data={"profile": "nope"},
+    )
+    assert r.status_code == 404
+
+
+def test_kpi_invalid_jsonl_422(client) -> None:
+    r = client.post(
+        "/api/kpi",
+        files={"file": ("s.jsonl", b"{not json}\n", "application/jsonl")},
+        data={"profile": "ticket"},
+    )
+    assert r.status_code == 422
+
+
+def test_kpi_non_utf8_422(client) -> None:
+    r = client.post(
+        "/api/kpi",
+        files={"file": ("s.jsonl", b"\xff\xfe\x00bad", "application/jsonl")},
+        data={"profile": "ticket"},
+    )
+    assert r.status_code == 422
+
+
+def test_forge_non_utf8_422(client) -> None:
+    r = client.post(
+        "/api/forge",
+        files={"file": ("t.csv", b"\xff\xfe\x00bad", "text/csv")},
+        data={"min_samples": "5", "synth_per_gap": "2"},
+    )
+    assert r.status_code == 422
+
+
+def test_evaluate_unknown_gate_404(client) -> None:
+    r = client.post("/api/engagements", data={"customer": "Gate404Co", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.post(f"/api/engagements/{eid}/gate/no_such_gate")
+    assert r.status_code == 404

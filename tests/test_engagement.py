@@ -11,6 +11,7 @@ from fde_scope.engagement import (
     Stakeholder,
     phases_for_profile,
 )
+from fde_scope.engagement.phases import phase_by_slug
 
 
 def _ctx(profile="ticket", **kw) -> EngagementContext:
@@ -106,3 +107,85 @@ def test_status_snapshot() -> None:
     assert st["current_phase"] == "qualification"
     assert st["visible_phase_count"] == 18
     assert st["is_complete"] is False
+
+
+# -- gates are re-evaluated live (no permanent pass cache) --------------------
+def _satisfied_success_criteria(eng: Engagement) -> None:
+    eng.ctx.current_phase = "success_criteria"
+    eng.ctx.success_criteria = ["intent_accuracy >= 0.9"]
+    eng.ctx.stakeholders = [
+        Stakeholder(name="A", role="VP", is_sponsor=True, success_metric="acc"),
+        Stakeholder(name="B", role="Director", is_sponsor=True, success_metric="csat"),
+    ]
+
+
+def test_advance_reevaluates_gate_after_context_changes() -> None:
+    eng = Engagement(_ctx())
+    _satisfied_success_criteria(eng)
+    assert eng.evaluate_gate("success_criteria").passed  # pass record now exists
+    # context breaks *after* the pass — advance must re-evaluate and refuse
+    eng.ctx.success_criteria = []
+    with pytest.raises(AdvanceBlocked):
+        eng.advance()
+    assert eng.ctx.current_phase == "success_criteria"  # did not move
+
+
+def test_can_advance_is_live_not_cached() -> None:
+    eng = Engagement(_ctx())
+    _satisfied_success_criteria(eng)
+    assert eng.can_advance() is True
+    eng.ctx.stakeholders = []  # sponsors gone → gate must fail again
+    assert eng.can_advance() is False
+
+
+# -- multi-gate phases (bug: 4 industrial gates were registered but unwired) ---
+def test_industrial_gates_attached_to_phases() -> None:
+    assert phase_by_slug("connect").gates == ("air_gap",)
+    assert phase_by_slug("deploy").gates == ("fat_sat", "functional_safety", "conformity")
+    assert phase_by_slug("slo_sla").gates == ("slo", "shift_handover")
+    # primary-gate back-compat property
+    assert phase_by_slug("deploy").gate == "fat_sat"
+    assert phase_by_slug("qualification").gate is None
+
+
+def test_multi_gate_phase_blocks_on_any_failure() -> None:
+    eng = Engagement(_ctx(profile="manufacturing"))
+    eng.ctx.current_phase = "deploy"
+    # FAT/SAT satisfied, but no hazard analysis → functional_safety must block
+    eng.ctx.assets["fat"] = {"passed": True, "signed_off_by": "integrator"}
+    eng.ctx.assets["sat"] = {"passed": True, "signed_off_by": "client"}
+    with pytest.raises(AdvanceBlocked) as exc:
+        eng.advance()
+    assert any("危险分析" in b for b in exc.value.result.blockers)
+    # the passing fat_sat gate was still evaluated and recorded
+    assert eng.ctx.gate_records["fat_sat"].passed is True
+
+
+def test_ticket_profile_not_blocked_by_industrial_gates() -> None:
+    # connect carries air_gap, but it is industrial_only → ticket advances freely
+    eng = Engagement(_ctx())
+    eng.ctx.current_phase = "connect"
+    assert eng.advance().slug == "corpus"
+
+
+# -- rollback must stay inside the profile's visible phases --------------------
+def test_rollback_to_invisible_phase_raises() -> None:
+    eng = Engagement(_ctx())  # ticket profile
+    eng.ctx.current_phase = "corpus"
+    with pytest.raises(ValueError, match="not visible"):
+        eng.rollback("site_survey")  # industrial-only phase
+
+
+def test_rollback_to_industrial_phase_ok_for_manufacturing() -> None:
+    eng = Engagement(_ctx(profile="manufacturing"))
+    eng.ctx.current_phase = "corpus"
+    eng.rollback("site_survey")
+    assert eng.ctx.current_phase == "site_survey"
+    assert eng.is_complete is False
+
+
+# -- unknown gate slugs fail loudly ---------------------------------------------
+def test_evaluate_gate_unknown_slug_raises() -> None:
+    eng = Engagement(_ctx())
+    with pytest.raises(KeyError):
+        eng.evaluate_gate("fatt_sat")  # typo must not "pass" silently

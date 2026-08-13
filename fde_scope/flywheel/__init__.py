@@ -14,6 +14,7 @@ from .engine import DataFlywheel, FlywheelStats
 from .event_mapping import (
     MAPPINGS,
     all_concepts,
+    mapping_for_event,
     real_event_for,
     strategy_for,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "MAPPINGS",
     "strategy_for",
     "real_event_for",
+    "mapping_for_event",
     "all_concepts",
     "RetrainScheduler",
     "RetrainJob",
