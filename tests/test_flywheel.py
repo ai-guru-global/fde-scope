@@ -146,9 +146,7 @@ def test_live_stream_path_collects_non_empty_unique_samples() -> None:
     """End-to-end over the live path's building blocks: payload_from_event →
     handle_concept_event produces usable corpus items."""
     wheel = DataFlywheel()
-    events = [
-        ToolResultEndEvent(content=f"tool call {i} failed", error="boom") for i in range(3)
-    ]
+    events = [ToolResultEndEvent(content=f"tool call {i} failed", error="boom") for i in range(3)]
     for e in events:
         mapping = mapping_for_event(e)
         assert mapping is not None

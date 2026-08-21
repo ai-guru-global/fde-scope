@@ -7,7 +7,7 @@ name = "fde-scope"
 version = "0.1.0"
 description = "FDE Scope — an AI Forward-Deployed Engineer toolkit: 72h from raw data to a deployed agent. Built on AgentScope 2.0."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "FDE Scope" }]
 keywords = ["fde", "forward-deployed-engineer", "agentscope", "agent", "corpus", "llm", "toolkit"]
@@ -16,7 +16,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -97,7 +96,7 @@ indent-style = "space"
 # mypy — static type-checker (advisory, not blocking on missing imports)
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 ignore_missing_imports = true     # agentscope / fastapi / pydantic all have stubs but
                                   # third-party industrial libs (asyncua, paho) often don't
 plugins = ["pydantic.mypy"]        # teach mypy how pydantic v2 Field defaults work

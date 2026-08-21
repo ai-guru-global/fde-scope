@@ -31,7 +31,19 @@ _ENGAGEMENTS_DIR = Path(".fde_scope/engagements")
 _REPORTS_DIR = Path("reports")
 _REPORTS_DIR.mkdir(exist_ok=True)
 
+#: Upload cap for /api/forge and /api/kpi (10 MiB). Read with a bounded
+#: read so an oversized body is refused before it is fully buffered.
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 app = FastAPI(title="FDE Scope", version="0.1.0")
+
+
+async def _read_limited(file: UploadFile, limit: int = MAX_UPLOAD_BYTES) -> bytes:
+    """Read an upload, refusing anything beyond ``limit`` bytes with 413."""
+    content = await file.read(limit + 1)
+    if len(content) > limit:
+        raise HTTPException(status_code=413, detail=f"file exceeds {limit} byte limit")
+    return content
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +138,8 @@ def create_engagement(customer: str = Form(...), profile: str = Form("ticket")) 
 
 @app.get("/api/engagements/{eid}")
 def get_engagement(eid: str) -> dict:
-    return _load(eid).status()
+    eng = _load(eid)
+    return {**eng.status(), "context": eng.ctx.model_dump()}
 
 
 @app.get("/api/engagements/{eid}/gates")
@@ -209,7 +222,7 @@ async def forge_corpus(
     from ..corpus import CorpusForge, save_html
 
     try:
-        content = (await file.read()).decode("utf-8")
+        content = (await _read_limited(file)).decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
     # never trust the client-supplied name: basename only, uuid fallback
@@ -246,7 +259,7 @@ async def compute_kpis(
     file: UploadFile = File(...),
 ) -> dict:
     try:
-        content = (await file.read()).decode("utf-8")
+        content = (await _read_limited(file)).decode("utf-8")
         samples = [json.loads(line) for line in content.splitlines() if line.strip()]
     except UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
@@ -367,7 +380,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <div class="stat"><div class="num">18</div><div class="lab">SOP 阶段（4 zones）</div></div>
   <div class="stat"><div class="num">10</div><div class="lab">可执行 gate</div></div>
   <div class="stat"><div class="num">9</div><div class="lab">数据连接器</div></div>
-  <div class="stat"><div class="num">151</div><div class="lab">测试全绿</div></div>
+  <div class="stat"><div class="num">228</div><div class="lab">测试全绿</div></div>
 </div>
 
 <div class="sec-title">🗺 完整 SOP · 18 阶段 · 4 Zones</div>
@@ -410,7 +423,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <div class="tile"><div class="icon">🗄</div><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><div class="icon">📡</div><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
   <div class="tile"><div class="icon">🏭</div><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">JSONL 可用</span></div>
-  <div class="tile"><div class="icon">⚙️</div><div class="name">OPC UA</div><div class="desc">PLC tag 读取</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">⚙️</div><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><div class="icon">🤖</div><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
   <div class="tile"><div class="icon">📈</div><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
   <div class="tile"><div class="icon">🎫</div><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
@@ -487,7 +500,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 
 <footer>
   FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
-  151 tests passed · 50 source files · 零配置可跑
+  228 tests passed · 61 source files · 零配置可跑
 </footer>
 
 </div>
@@ -599,14 +612,14 @@ async function refreshList() {
   const el = document.getElementById('eng-list');
   if (!list.length) { el.innerHTML = '<div class="empty" style="padding:14px">暂无</div>'; return; }
   el.innerHTML = list.map(s => `
-    <div class="card eng" onclick="selectEng('${s.engagement_id}')">
-      <div class="id">${s.customer}</div>
+    <div class="card eng" onclick="selectEng('${escapeHtml(s.engagement_id)}')">
+      <div class="id">${escapeHtml(s.customer)}</div>
       <div class="meta">
-        <span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${s.profile}</span>
-        ${s.current_phase} · ${s.current_zone}
+        <span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span>
+        ${escapeHtml(s.current_phase)} · ${escapeHtml(s.current_zone)}
         ${s.is_complete?' ✅':''}
       </div>
-      <div class="meta">id: ${s.engagement_id}</div>
+      <div class="meta">id: ${escapeHtml(s.engagement_id)}</div>
     </div>`).join('');
 }
 
@@ -637,20 +650,20 @@ function renderDetail(s, phases, gates) {
   const phaseHtml = phases.phases.map((p,i) => {
     const cls = i<curIdx?'done':(i===curIdx?'current':'');
     return `<div class="phase ${cls}">
-      <span class="idx">${p.index}</span><span>${p.name}</span>
+      <span class="idx">${p.index}</span><span>${escapeHtml(p.name)}</span>
       ${p.industrial?'<span class="pill ind">🏭</span>':''}
-      ${p.gates&&p.gates.length?`<span class="pill" title="gates: ${p.gates.join(', ')}">🚦</span>`:''}
-      <span class="zone-tag">${zoneLabel(p.zone)}</span></div>`;
+      ${p.gates&&p.gates.length?`<span class="pill" title="gates: ${escapeHtml(p.gates.join(', '))}">🚦</span>`:''}
+      <span class="zone-tag">${escapeHtml(zoneLabel(p.zone))}</span></div>`;
   }).join('');
 
   const gateHtml = Object.entries(gates).map(([slug,g])=>{
     const cls = g.passed?'pass':'fail';
-    const blocks = g.blockers.map(b=>`<li>🚫 ${b}</li>`).join('');
-    const warns = g.warnings.map(w=>`<li>⚠️ ${w}</li>`).join('');
-    return `<div class="gate ${cls}"><div class="h"><b>${g.name}</b>
+    const blocks = g.blockers.map(b=>`<li>🚫 ${escapeHtml(b)}</li>`).join('');
+    const warns = g.warnings.map(w=>`<li>⚠️ ${escapeHtml(w)}</li>`).join('');
+    return `<div class="gate ${cls}"><div class="h"><b>${escapeHtml(g.name)}</b>
       <span>${g.passed?'✅ PASS':'❌ BLOCKED'}</span></div>
       ${blocks?`<ul>${blocks}</ul>`:''}${warns?`<ul>${warns}</ul>`:''}
-      <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${slug}')">重新校验</button></div>`;
+      <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${escapeHtml(slug)}')">重新校验</button></div>`;
   }).join('') || '<div class="empty">无适用 gate（当前 profile）</div>';
 
   document.getElementById('main').innerHTML = `
@@ -665,10 +678,10 @@ function renderDetail(s, phases, gates) {
     <div id="t-overview">
       <div class="card">
         <h2>Engagement</h2>
-        <div class="row"><label>客户</label><b>${s.customer}</b></div>
-        <div class="row"><label>Profile</label><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${s.profile}</span></div>
-        <div class="row"><label>当前阶段</label><b style="color:var(--accent)">${s.current_phase}</b> (${zoneLabel(s.current_zone)})</div>
-        <div class="row"><label>下一阶段</label>${s.next_phase||'— (完成)'}</div>
+        <div class="row"><label>客户</label><b>${escapeHtml(s.customer)}</b></div>
+        <div class="row"><label>Profile</label><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span></div>
+        <div class="row"><label>当前阶段</label><b style="color:var(--accent)">${escapeHtml(s.current_phase)}</b> (${escapeHtml(zoneLabel(s.current_zone))})</div>
+        <div class="row"><label>下一阶段</label>${escapeHtml(s.next_phase||'— (完成)')}</div>
         <div class="row"><label>进度</label>${curIdx+1}/${phases.phases.length}</div>
         <div class="row" style="margin-top:10px">
           <button onclick="advance(false)">⏭ 推进到下一阶段</button>
@@ -678,7 +691,7 @@ function renderDetail(s, phases, gates) {
     </div>
     <div id="t-sop" class="hidden"><div class="card"><div class="phases">${phaseHtml}</div></div></div>
     <div id="t-gates" class="hidden">${gateHtml}</div>
-    <div id="t-context" class="hidden"><div class="card"><pre>${escapeHtml(JSON.stringify(s,null,2))}</pre></div></div>
+    <div id="t-context" class="hidden">${contextHtml(s.context)}</div>
     <div id="t-forge" class="hidden"><div class="card">
       <h2>语料锻造（CSV → CorpusReport）</h2>
       <input type="file" id="forge-file" accept=".csv">
@@ -706,7 +719,64 @@ function tab(name, el) {
   el.classList.add('active');
 }
 
-function escapeHtml(s){return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+function contextHtml(ctx) {
+  if (!ctx) return '<div class="empty">无 context 数据</div>';
+  const esc = escapeHtml;
+  const site = ctx.site||{}, safety = ctx.safety||{}, assets = ctx.assets||{};
+  // 现场 / Site
+  let siteHtml;
+  if (site.location) {
+    const net = (site.networks||[]).map(n=>`<li>${esc(n)}</li>`).join('');
+    siteHtml = `<div class="row"><label>地点</label><b>${esc(site.location)}</b></div>
+      <div class="row"><label>班次</label>${esc(site.shift_count)} · OT/IT 隔离 ${site.ot_it_separated?'✅':'❌'} · 气隙 ${site.air_gapped?'✅':'❌'}</div>
+      ${net?`<div class="row"><label>网络</label><ul style="margin:2px 0 0;padding-left:18px">${net}</ul></div>`:''}
+      <div class="row"><label>资产</label>${(site.assets||[]).length} 项 · 工会代表 ${site.works_council_represented?'✅':'—'}</div>
+      ${site.notes?`<div class="row"><label>备注</label>${esc(site.notes)}</div>`:''}`;
+  } else {
+    siteHtml = '<div class="empty">无现场数据（SaaS 项目）</div>';
+  }
+  // 干系人
+  const stkRows = (ctx.stakeholders||[]).map(x=>`<tr>
+    <td>${esc(x.name)}</td><td>${esc(x.role)}</td>
+    <td>${x.is_sponsor?'<span class="pill" style="color:var(--good)">SPONSOR</span>':''}</td>
+    <td>${esc(x.success_metric||'—')}</td></tr>`).join('');
+  // 成功标准
+  const crit = (ctx.success_criteria||[]).map(c=>`<li>${esc(c)}</li>`).join('')||'<li class="meta">未定义</li>';
+  // SLO
+  const sloRows = (ctx.slos||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.target)}</td><td>${esc(x.alert_route||'—')}</td><td>${esc(x.window)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="meta">未定义 SLO</td></tr>';
+  // 功能安全
+  const safetyHtml = ctx.profile==='manufacturing'
+    ? `<tr><td>ISO 13849</td><td>PLr ${esc(safety.required_plr||'—')} / PL ${esc(safety.achieved_pl||'—')}</td></tr>
+    <tr><td>IEC 61508</td><td>SIL ${esc(safety.sil_required||'—')} / ${esc(safety.sil_achieved??'—')}</td></tr>
+    <tr><td>ISO 10218 评估</td><td>${safety.iso10218_assessed?'✅':'❌'}</td></tr>
+    <tr><td>EU AI Act 高风险</td><td>${safety.eu_ai_act_high_risk?'✅':'—'} · CE ${safety.ce_marking_done?'✅':'❌'}</td></tr>
+    <tr><td>危险分析</td><td>${safety.hazard_analysis_done?'✅':'❌'}</td></tr>
+    ${safety.risk_assessment_notes?`<tr><td>评估备注</td><td>${esc(safety.risk_assessment_notes)}</td></tr>`:''}`
+    : '<tr><td colspan="2" class="meta">非工业 profile，无功能安全数据</td></tr>';
+  // 产物与交付
+  const evRows = Object.entries(assets.eval_metrics||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+  const links = [];
+  if (assets.runbook) links.push(`<a class="btn" href="/${esc(assets.runbook)}" target="_blank">📘 Runbook</a>`);
+  if (assets.corpus_report) links.push(`<a class="btn" href="/${esc(assets.corpus_report)}" target="_blank">📄 语料报告</a>`);
+  const mon = assets.monitoring||{};
+  const known = (assets.known_limitations||[]).map(k=>`<li>${esc(k)}</li>`).join('');
+  return `<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
+    <div class="card"><h2>干系人</h2><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div>
+    <div class="card"><h2>成功标准</h2><ul style="padding-left:18px">${crit}</ul></div>
+    <div class="card"><h2>SLO</h2><table><thead><tr><th>名称</th><th>目标</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div>
+    <div class="card"><h2>功能安全</h2><table><tbody>${safetyHtml}</tbody></table></div>
+    <div class="card"><h2>产物与交付</h2>
+      <div class="row"><label>语料</label>${esc(assets.corpus_summary||'—')}</div>
+      <div class="row"><label>模型</label>${esc(assets.model_name||'—')}</div>
+      ${evRows?`<table style="margin-top:8px"><thead><tr><th>评估指标</th><th>值</th></tr></thead><tbody>${evRows}</tbody></table>`:''}
+      <div class="row" style="margin-top:10px">${links.join(' ')||'—'}</div>
+      ${known?`<div class="row"><label>已知局限</label><ul style="padding-left:18px">${known}</ul></div>`:''}
+      <div class="row"><label>监控</label>漂移 ${mon.data_drift&&mon.data_drift.enabled?'✅ 每日':'❌ 未启用'} · 质量 ${mon.quality_drift&&mon.quality_drift.enabled?'✅ 每周':'❌ 未启用'}</div>
+    </div>`;
+}
 
 async function advance(force) {
   const r = await api(`/api/engagements/${current}/advance?force=${force}`,{method:'POST'});
@@ -735,7 +805,7 @@ async function forge() {
       <div class="kpi"><div class="k">synthetic</div><div class="v" style="color:var(--accent)">${r.synthetic}</div></div>
       <div class="kpi"><div class="k">PII masked</div><div class="v">${r.pii_masked}</div></div>
     </div>
-    <p>缺口: ${(r.gaps||[]).map(g=>g.category+'('+g.current_count+')').join(', ')||'无'}</p>
+    <p>缺口: ${(r.gaps||[]).map(g=>escapeHtml(g.category)+'('+g.current_count+')').join(', ')||'无'}</p>
     <a class="btn" href="${r.html_url}" target="_blank">📄 查看完整 HTML 报告</a>`;
 }
 
@@ -753,7 +823,7 @@ async function runKpi() {
 
 async function loadProfiles() {
   const p = await api('/api/profiles');
-  alert('Profiles:\\n' + Object.entries(p).map(([k,v])=>`\\n${k}: ${v.name} (${v.industrial?'工业':'SaaS'})`).join(''));
+  alert('Profiles:\\n' + Object.entries(p).map(([k,v])=>`\\n${escapeHtml(k)}: ${escapeHtml(v.name)} (${v.industrial?'工业':'SaaS'})`).join(''));
 }
 
 refreshList();

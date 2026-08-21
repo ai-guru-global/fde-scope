@@ -52,9 +52,7 @@ def test_sandbox_spec_docker_kwargs_match_real_api() -> None:
         assert required in kwargs
 
 
-def test_deployer_assembles_real_path(
-    fake_agentscope: None, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_deployer_assembles_real_path(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
     """Non-dry-run deploy must reach workspace/engine/agent assembly."""
     calls: list[str] = []
 

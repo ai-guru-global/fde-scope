@@ -277,3 +277,87 @@ def test_evaluate_unknown_gate_404(client) -> None:
     eid = r.json()["engagement_id"]
     r = client.post(f"/api/engagements/{eid}/gate/no_such_gate")
     assert r.status_code == 404
+
+
+def test_detail_includes_full_context(client) -> None:
+    """GET /api/engagements/{eid} must carry the full context for the
+    Context tab (stakeholders / site / safety / slos / assets), not just
+    the status summary."""
+    r = client.post("/api/engagements", data={"customer": "CtxCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.get(f"/api/engagements/{eid}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["context"]["customer"] == "CtxCo"
+    assert "stakeholders" in data["context"]
+    assert "success_criteria" in data["context"]
+    assert "assets" in data["context"]
+
+
+def test_console_has_context_tab_renderer(client) -> None:
+    """The Context tab must render friendly cards, not raw JSON, and stay
+    XSS-safe (no unescaped interpolation of user-supplied context)."""
+    html = client.get("/console").text
+    assert "function contextHtml(ctx)" in html
+    assert "contextHtml(s.context)" in html
+    # every user-supplied field rendered inside the tab goes through escapeHtml
+    for needle in (
+        "esc(site.location)",
+        "esc(x.name)",
+        "esc(x.role)",
+        "esc(x.success_metric||'—')",
+        "esc(c)",
+    ):
+        assert needle in html
+
+
+# ---------------------------------------------------------------------------
+# XSS / upload-limit regression tests
+# ---------------------------------------------------------------------------
+def test_console_escapes_user_supplied_fields(client) -> None:
+    """The console JS must escape every user-supplied field before innerHTML."""
+    payload = "<script>alert(1)</script>"
+    r = client.post("/api/engagements", data={"customer": payload, "profile": "ticket"})
+    assert r.status_code == 200
+    # the API preserves the raw value (escaping is a render-layer concern) …
+    assert r.json()["customer"] == payload
+
+    html = client.get("/console").text
+    # … and every user-controlled interpolation point in the console is escaped
+    for needle in (
+        "escapeHtml(s.customer)",
+        "escapeHtml(s.current_phase)",
+        "escapeHtml(s.current_zone)",
+        "escapeHtml(s.engagement_id)",
+        "escapeHtml(s.next_phase||'— (完成)')",
+        "escapeHtml(g.name)",
+        "escapeHtml(b)",
+        "escapeHtml(w)",
+    ):
+        assert needle in html, f"console must escape {needle!r}"
+
+
+def test_forge_oversized_upload_413(client, sample_csv_bytes: bytes) -> None:
+    """An upload beyond the size limit is refused with 413, not processed."""
+    from fde_scope.web.app import MAX_UPLOAD_BYTES
+
+    big = sample_csv_bytes + b"x" * (MAX_UPLOAD_BYTES + 1)
+    r = client.post(
+        "/api/forge",
+        files={"file": ("big.csv", big, "text/csv")},
+        data={"min_samples": "5", "synth_per_gap": "2"},
+    )
+    assert r.status_code == 413
+
+
+def test_kpi_oversized_upload_413(client) -> None:
+    """KPI uploads share the same size limit."""
+    from fde_scope.web.app import MAX_UPLOAD_BYTES
+
+    big = b"x" * (MAX_UPLOAD_BYTES + 1)
+    r = client.post(
+        "/api/kpi",
+        files={"file": ("big.jsonl", big, "application/jsonl")},
+        data={"profile": "manufacturing"},
+    )
+    assert r.status_code == 413

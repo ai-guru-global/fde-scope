@@ -16,7 +16,7 @@ imports AgentScope.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from builtins import type as _type  # noqa: F401  — see registry()/register() below
+from builtins import type as _type  # noqa: F401  — registry() 注解避开类内 type ClassVar 遮蔽
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
@@ -65,7 +65,7 @@ class DataConnector(ABC):
 
     # -- registry helpers --------------------------------------------------------
     @classmethod
-    def registry(cls) -> dict[str, _type]:
+    def registry(cls) -> dict[str, _type[DataConnector]]:
         """Return the connector registry, populated lazily.
 
         Importing concrete connectors is deferred so a missing optional dep
@@ -76,7 +76,7 @@ class DataConnector(ABC):
         return _registry.get_registry()
 
 
-def register(connector_cls: _type) -> _type:
+def register(connector_cls: type[DataConnector]) -> type[DataConnector]:
     """Decorator: register a connector under its ``type`` slug.
 
     The slug must be defined on the class itself. A subclass that forgets to
@@ -88,13 +88,10 @@ def register(connector_cls: _type) -> _type:
 
     if "type" not in connector_cls.__dict__ and "connector_type" not in connector_cls.__dict__:
         raise AttributeError(
-            f"{connector_cls.__name__} must define its own `type` class attribute "
-            "to be registered"
+            f"{connector_cls.__name__} must define its own `type` class attribute to be registered"
         )
     slug = connector_cls.type if "type" in connector_cls.__dict__ else connector_cls.connector_type
     if slug == "base":
-        raise ValueError(
-            f"{connector_cls.__name__} may not register under the reserved slug 'base'"
-        )
+        raise ValueError(f"{connector_cls.__name__} may not register under the reserved slug 'base'")
     _registry.register(slug, connector_cls)
     return connector_cls

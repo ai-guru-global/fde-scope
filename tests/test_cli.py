@@ -96,9 +96,7 @@ def test_deploy_with_corpus_report(tmp_path: Path, sample_csv: Path) -> None:
     corpus_json = tmp_path / "corpus_report.json"
     assert corpus_json.exists()
 
-    result = runner.invoke(
-        app, ["deploy", "--tenant", "acme", "--corpus", str(corpus_json), "--dry-run"]
-    )
+    result = runner.invoke(app, ["deploy", "--tenant", "acme", "--corpus", str(corpus_json), "--dry-run"])
     assert result.exit_code == 0, result.stdout
     assert '"corpus"' in result.stdout  # manifest carries the corpus summary
 

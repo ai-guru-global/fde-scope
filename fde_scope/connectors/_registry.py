@@ -8,7 +8,12 @@ breaks the connector that needs it, never the core.
 
 from __future__ import annotations
 
-_REGISTRY: dict[str, type] = {}
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .base import DataConnector
+
+_REGISTRY: dict[str, type[DataConnector]] = {}
 
 # type slug -> module path within fde_scope.connectors
 _MODULE_BY_TYPE: dict[str, str] = {
@@ -26,11 +31,11 @@ _MODULE_BY_TYPE: dict[str, str] = {
 }
 
 
-def register(slug: str, connector_cls: type) -> None:
+def register(slug: str, connector_cls: type[DataConnector]) -> None:
     _REGISTRY[slug] = connector_cls
 
 
-def get_registry() -> dict[str, type]:
+def get_registry() -> dict[str, type[DataConnector]]:
     """Return the populated registry, importing all built-in connectors."""
     load_all()
     return dict(_REGISTRY)

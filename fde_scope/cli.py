@@ -189,7 +189,9 @@ def deploy(
 # ---------------------------------------------------------------------------
 @app.command()
 def eval(
-    agent: str = typer.Option("mock", "--agent", "-a", help="Agent ID (only 'mock' is supported; real-agent eval is not wired up)"),
+    agent: str = typer.Option(
+        "mock", "--agent", "-a", help="Agent ID (only 'mock' is supported; real-agent eval is not wired up)"
+    ),
     test_set: str = typer.Option(..., "--test-set", help="Path to eval cases (JSON/JSONL)"),
     accuracy: float = typer.Option(0.9, "--accuracy", help="Mock agent accuracy (0-1)"),
 ) -> None:

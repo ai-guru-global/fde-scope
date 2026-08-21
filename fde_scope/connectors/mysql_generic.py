@@ -171,8 +171,7 @@ class MySQLConnector(DataConnector):
         # every other character is escaped so regex metachars like "+"
         # stay literal ("a+b" must not match "ab").
         regex = "".join(
-            ".*" if ch == "%" else "." if ch == "_" else re.escape(ch)
-            for ch in self._table_filter
+            ".*" if ch == "%" else "." if ch == "_" else re.escape(ch) for ch in self._table_filter
         )
         pattern = re.compile(regex)
         return [t for t in all_tables if pattern.fullmatch(t)]

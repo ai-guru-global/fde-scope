@@ -265,9 +265,7 @@ def test_discover_schema_count_failure_returns_none(fake_mysql_module: None) -> 
     show = [{"Tables_in_warehouse": "tickets"}]
     desc_tickets = [{"Field": "id", "Type": "int", "Null": "NO"}]
     # Empty result-set for COUNT -> fetchone() returns None -> count fails.
-    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock(
-        [show, desc_tickets, []]
-    )
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock([show, desc_tickets, []])
 
     conn = MySQLConnector("mysql://u:p@h:3306/warehouse")
     schema = conn.discover_schema()
@@ -280,9 +278,7 @@ def test_table_filter_escapes_regex_metacharacters(fake_mysql_module: None) -> N
     show = [{"Tables_in_warehouse": "ab"}, {"Tables_in_warehouse": "a+b"}]
     desc = [{"Field": "id", "Type": "int", "Null": "NO"}]
     count = [{"n": 1}]
-    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock(
-        [show, desc, count]
-    )
+    sys.modules["mysql.connector"].connect.return_value = _make_connection_mock([show, desc, count])
 
     conn = MySQLConnector("mysql://u:p@h:3306/warehouse", table="a+b")
     schema = conn.discover_schema()
