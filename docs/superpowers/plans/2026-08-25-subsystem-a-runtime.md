@@ -41,7 +41,7 @@
 **Interfaces:**
 - Produces: `AgentSpec`（Pydantic BaseModel：`name: str`、`role: str`、`system_prompt: str | None = None`、`model: str | None = None`、`toolkit: dict = Field(default_factory=dict)`）；`TenantConfig.agents: list[AgentSpec] | None = None`。Task 2/3/4 依赖。
 
-- [ ] **Step 1: 写失败测试**（追加到 `tests/test_deploy.py` 末尾）
+- [x] **Step 1: 写失败测试**（追加到 `tests/test_deploy.py` 末尾）
 
 ```python
 def test_agent_spec_defaults() -> None:
@@ -74,12 +74,12 @@ def test_tenant_config_from_yaml_reads_agents(tmp_path) -> None:
     assert [a.name for a in cfg.agents] == ["researcher", "coder"]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `pytest tests/test_deploy.py -q`
 Expected: FAIL（`AgentSpec` 不存在 → ImportError）
 
-- [ ] **Step 3: 最小实现**（`fde_scope/config.py`，`TenantConfig` 类定义前插入 `AgentSpec`；`TenantConfig` 增加 `agents` 字段）
+- [x] **Step 3: 最小实现**（`fde_scope/config.py`，`TenantConfig` 类定义前插入 `AgentSpec`；`TenantConfig` 增加 `agents` 字段）
 
 ```python
 class AgentSpec(BaseModel):
@@ -116,12 +116,12 @@ agents:
     model: qwen-max
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `pytest tests/test_deploy.py -q`
 Expected: PASS
 
-- [ ] **Step 5: 全量 + 提交**
+- [x] **Step 5: 全量 + 提交**
 
 ```bash
 pytest -q && git add fde_scope/config.py fde_scope/templates/tenant_config.yaml tests/test_deploy.py && git commit -m "feat(config): add AgentSpec and TenantConfig.agents for multi-agent topology"
@@ -139,7 +139,7 @@ pytest -q && git add fde_scope/config.py fde_scope/templates/tenant_config.yaml 
 - Consumes: Task 1 的 `AgentSpec`/`TenantConfig.agents`。
 - Produces: `DeployedAgent.agents: list[Any]`（真实组装出的 Agent 列表）+ `DeployedAgent.agent`（单 Agent 兼容：`agents[0]` 或 None）；`deploy()` 在 dry-run 与 real 两种模式都生成 `manifest["agents"]`（`[{name, role, model, system_prompt, toolkit}]`，system_prompt 截 120 字符）；`_assemble_agent(tenant, spec, collection)` 按 spec 组装（model = spec.model，None 保留）。Task 3/4 依赖 `deployed.agents` 与 manifest 结构。
 
-- [ ] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 末尾，复用 `fake_agentscope` fixture 与 FakeAgent）
+- [x] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 末尾，复用 `fake_agentscope` fixture 与 FakeAgent）
 
 ```python
 def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -194,12 +194,12 @@ def test_dry_run_manifest_has_agents_section() -> None:
     ]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `pytest tests/test_deploy_assembly.py -q`
 Expected: FAIL（`deployed.agents` 不存在 → AttributeError）
 
-- [ ] **Step 3: 最小实现**（`fde_scope/deploy/tenant_manager.py`）
+- [x] **Step 3: 最小实现**（`fde_scope/deploy/tenant_manager.py`）
 
 `DeployedAgent` 增加字段（`agent` 后）：
 
@@ -286,12 +286,12 @@ Expected: FAIL（`deployed.agents` 不存在 → AttributeError）
 
 需要 import `AgentSpec`（`from fde_scope.config import AgentSpec`，与 `TenantConfig` 同源）。
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `pytest tests/test_deploy_assembly.py tests/test_deploy.py -q`
 Expected: PASS（含旧断言：`name == "Acme_agent"`、`model is None`、`"Acme" in system_prompt` 仍成立——默认 spec role=tenant.name）
 
-- [ ] **Step 5: 全量 + 提交**
+- [x] **Step 5: 全量 + 提交**
 
 ```bash
 pytest -q && git add fde_scope/deploy/tenant_manager.py tests/test_deploy_assembly.py && git commit -m "feat(deploy): assemble multi-agent topology with model wiring"
@@ -309,7 +309,7 @@ pytest -q && git add fde_scope/deploy/tenant_manager.py tests/test_deploy_assemb
 - Consumes: Task 2 的 `deployed.agents`/manifest。
 - Produces: `TenantDeployer.build_subagent_templates(tenant, specs) -> list[Any]`（lazy import `agentscope.app.SubAgentTemplate`；每 spec 一个 `SubAgentTemplate(type=spec.name, description=spec.role, system_prompt_template=spec.system_prompt or 默认模板串)`）；real 组装时 `DeployedAgent.subagent_templates` + `manifest["subagent_templates"] = [{"type", "description"}]`。Task 4 的文档/CLI 依赖。
 
-- [ ] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 末尾）
+- [x] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 末尾）
 
 ```python
 class FakeSubAgentTemplate:
@@ -355,12 +355,12 @@ def test_build_subagent_templates_uses_2_0_blueprints(
     ]
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `pytest tests/test_deploy_assembly.py::test_build_subagent_templates_uses_2_0_blueprints -v`
 Expected: FAIL（`subagent_templates` 不存在 → AttributeError）
 
-- [ ] **Step 3: 最小实现**（`fde_scope/deploy/tenant_manager.py`）
+- [x] **Step 3: 最小实现**（`fde_scope/deploy/tenant_manager.py`）
 
 `DeployedAgent` 增加字段：
 
@@ -406,12 +406,12 @@ real 分支 return 加 `subagent_templates=templates`。新增方法（`_build_t
 
 注意默认模板串用 `{{member_name}}`（Python format 字面量转义后运行时输出 `{member_name}`）。
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `pytest tests/test_deploy_assembly.py -q`
 Expected: PASS
 
-- [ ] **Step 5: 全量 + 提交**
+- [x] **Step 5: 全量 + 提交**
 
 ```bash
 pytest -q && git add fde_scope/deploy/tenant_manager.py tests/test_deploy_assembly.py && git commit -m "feat(deploy): export SubAgentTemplate blueprints for 2.0 multi-agent"
@@ -430,7 +430,7 @@ pytest -q && git add fde_scope/deploy/tenant_manager.py tests/test_deploy_assemb
 - Consumes: Task 2/3 的 `DeployedAgent`。
 - Produces: `TenantDeployer.stop(deployed) -> dict`（2.0 无 `Agent.stop`——优雅停止 = 关闭 workspace/engine 的可关闭句柄（`close()`/`__aexit__`），标记 `manifest["started"]=False`，返回 `{"closed": [...]}`）；CLI `deploy --agent "name:role[:model]"`（可重复）。
 
-- [ ] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 与 `tests/test_cli.py` 末尾）
+- [x] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 与 `tests/test_cli.py` 末尾）
 
 ```python
 # tests/test_deploy_assembly.py 追加
@@ -480,12 +480,12 @@ def test_deploy_invalid_agent_spec_exits_2(tmp_path: Path, monkeypatch) -> None:
     assert r.exit_code == 2
 ```
 
-- [ ] **Step 2: 运行确认失败**
+- [x] **Step 2: 运行确认失败**
 
 Run: `pytest tests/test_deploy_assembly.py::test_stop_closes_handles_and_flags_manifest tests/test_cli.py::test_deploy_manifest_lists_agents tests/test_cli.py::test_deploy_invalid_agent_spec_exits_2 -v`
 Expected: FAIL（`stop` 不存在 / `--agent` 未知选项）
 
-- [ ] **Step 3: 最小实现**
+- [x] **Step 3: 最小实现**
 
 `fde_scope/deploy/tenant_manager.py` 新增方法（`build_subagent_templates` 后）：
 
@@ -541,12 +541,12 @@ Expected: FAIL（`stop` 不存在 / `--agent` 未知选项）
         console.print(f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'}")
 ```
 
-- [ ] **Step 4: 运行确认通过**
+- [x] **Step 4: 运行确认通过**
 
 Run: `pytest tests/test_deploy_assembly.py tests/test_cli.py::test_deploy_manifest_lists_agents tests/test_cli.py::test_deploy_invalid_agent_spec_exits_2 -q`
 Expected: PASS
 
-- [ ] **Step 5: 全量 + 提交**
+- [x] **Step 5: 全量 + 提交**
 
 ```bash
 pytest -q && git add fde_scope/deploy/tenant_manager.py fde_scope/cli.py tests/test_deploy_assembly.py tests/test_cli.py && git commit -m "feat(deploy): lifecycle stop() and CLI multi-agent specs"
@@ -559,7 +559,7 @@ pytest -q && git add fde_scope/deploy/tenant_manager.py fde_scope/cli.py tests/t
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: README 更新**
+- [x] **Step 1: README 更新**
 
 1. CLI reference `deploy` 行改为：`deploy    [Layer 3] Assemble (and optionally start) a multi-tenant agent (multi-agent via --agent)`
 2. `fde_scope/deploy/tenant_manager.py` 已含真实 API 对照说明；在 README 的 AgentScope 说明处（若存在）或 `## 🛠 CLI reference` 后新增小节：
@@ -580,7 +580,7 @@ workspace_manager）需要独立后端，本期交付蓝图导出 + 拓扑声明
 workspace/engine 句柄并标记 manifest。
 ```
 
-- [ ] **Step 2: 全量门禁**
+- [x] **Step 2: 全量门禁**
 
 ```bash
 ruff check fde_scope tests && ruff format --check fde_scope tests && mypy fde_scope && pytest -q
@@ -588,7 +588,7 @@ ruff check fde_scope tests && ruff format --check fde_scope tests && mypy fde_sc
 
 Expected: 全部通过。若有格式问题：`ruff check --fix fde_scope tests && ruff format fde_scope tests` 后重跑。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add README.md && git commit -m "docs: document multi-agent topology and lifecycle"
