@@ -1249,6 +1249,6 @@ def test_advance_blocked_suggests_skill(tmp_path, monkeypatch):
 
 ### 收尾（每步完成即做）
 
-- [ ] **Step: ruff + mypy 全量检查**：`ruff check fde_scope tests && ruff format --check fde_scope tests && mypy fde_scope` → 无错误
-- [ ] **Step: 更新 README**（CLI reference 增补 `skill` 组；新增"技能沉淀"小节，含使用示例）
-- [ ] **Step: 最终 commit**：`git add -A && git commit -m "docs: document skills subsystem"`
+- [x] **Step: ruff + mypy 全量检查**：`ruff check` 22 个错误清零（F821 注解 → TYPE_CHECKING；SIM105 → contextlib.suppress；B904 ×17 → `from None`）+ `ruff format` 8 文件重排 + `mypy` 2 错误清零（web export fmt 类型收窄）→ 全部通过
+- [x] **Step: 更新 README**（CLI reference 增补 `skill` 组；新增"💡 Skill 沉淀"小节，含三种入口/生命周期/导出示例；测试计数 296）
+- [x] **Step: 最终 commit**：`git add -A && git commit -m "docs: document skills subsystem"`（06447ed）

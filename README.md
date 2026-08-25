@@ -182,7 +182,7 @@ returns `(passed, blockers, warnings)` and blocks `advance` until clean
 ```
 connect   [Layer 1] Connect to a data source and preview schema + samples
 corpus    [Layer 2] Forge a raw sample into an auditable, gap-aware corpus
-deploy    [Layer 3] Assemble (and optionally start) a multi-tenant agent
+deploy    [Layer 3] Assemble (and optionally start) a multi-tenant agent (multi-agent via --agent)
 eval      [Layer 4] Run the FDE benchmark over a test set
 flywheel  [Layer 5] Start (or replay into) the data flywheel
 handoff   [Zone D]  Assemble the handoff / knowledge-transfer package
@@ -193,6 +193,22 @@ engage    [SOP] init / status / advance / rollback / journal / list
 gate      [SOP] list (per profile) / check (per engagement)
 skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
 ```
+
+---
+
+## 🤖 多 Agent 拓扑（AgentScope 2.0）
+
+`tenant_config.yaml` 的 `agents` 段（或 CLI `--agent name:role[:model]`）声明一个
+tenant 的多个 Agent。`fde-scope deploy` 为每个 spec 组装真实的
+`agentscope.agent.Agent`（模型从 `spec.model` wiring，缺失留运行时注入），
+manifest 携带完整 `agents` 段与 `subagent_templates`。
+
+多 Agent 交互走 AgentScope 2.0 官方机制：`agentscope.app.SubAgentTemplate`
+蓝图（`create_app(custom_subagent_templates=...)`），leader agent 通过
+`AgentCreate` / `TeamSay` 协调子 Agent。真实 app 服务（storage + message_bus +
+workspace_manager）需要独立后端，本期交付蓝图导出 + 拓扑声明（spec §4.3 降级条款），
+不虚构 API。生命周期：2.0 无 `Agent.stop`，`TenantDeployer.stop()` 关闭
+workspace/engine 句柄并标记 manifest。
 
 ---
 
