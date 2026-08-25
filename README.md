@@ -192,6 +192,7 @@ web       Launch the Web UI (workbench + skills + engagement console)
 engage    [SOP] init / status / advance / rollback / journal / list
 gate      [SOP] list (per profile) / check (per engagement)
 skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
+qwenpaw   [QwenPaw] Export / validate QwenPaw-compatible bundles (agents + skills + corpus)
 ```
 
 ---
@@ -209,6 +210,18 @@ manifest 携带完整 `agents` 段与 `subagent_templates`。
 workspace_manager）需要独立后端，本期交付蓝图导出 + 拓扑声明（spec §4.3 降级条款），
 不虚构 API。生命周期：2.0 无 `Agent.stop`，`TenantDeployer.stop()` 关闭
 workspace/engine 句柄并标记 manifest。
+
+---
+
+## 🐾 QwenPaw 集成
+
+`fde-scope qwenpaw export --tenant acme --agent "researcher:调研员" --out qwenpaw-out`
+把 tenant 的 agent 拓扑导出为 QwenPaw 兼容产物（`config.json` 的 `agents.profiles`
+多 Agent 声明 + `workspaces/{agent_id}/agent.json` + `AGENTS.md` persona +
+published 技能包 + corpus 说明），`qwenpaw validate --out ...` 按官方规则校验
+（必填字段 / agent id 规则 / SKILL.md frontmatter）。ACP 适配：`AcpEndpoint`
+基类把 FDE 能力暴露为 QwenPaw ACP runner（`delegate_external_agent`）。
+详见 [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md)。
 
 ---
 
