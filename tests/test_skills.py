@@ -209,3 +209,45 @@ def test_service_list_drafts_only(service):
 def test_service_get_missing_raises(service):
     with pytest.raises(KeyError):
         service.get("skill-nope")
+
+
+# ---------------------------------------------------------------------------
+# context capture (gate hint + operation capture)
+# ---------------------------------------------------------------------------
+
+
+def test_suggest_from_gate_block(service):
+    rec = service.suggest_from_gate_block("eng-x", "functional_safety", ["缺 hazard analysis", "PL/SIL 不足"])
+    assert rec.source == SkillSource.GATE_HINT
+    assert rec.gate_slug == "functional_safety"
+    assert rec.source_engagement == "eng-x"
+    assert "functional_safety" in rec.title
+    assert "hazard analysis" in rec.body_md
+    assert rec.status == SkillStatus.DRAFT
+    assert rec.category == SkillCategory.METHODOLOGY
+
+
+def test_suggest_from_gate_block_no_blockers(service):
+    rec = service.suggest_from_gate_block("eng-x", "fat_sat", [])
+    assert "无" in rec.body_md
+
+
+def test_capture_operation_maps_category(service):
+    r1 = service.capture_operation(action="advance", engagement_id="eng-x", phase_slug="deploy")
+    assert r1 is not None and r1.category == SkillCategory.IMPLEMENTATION
+    r2 = service.capture_operation(action="gate_pass", engagement_id="eng-x", phase_slug="deploy")
+    assert r2 is not None and r2.category == SkillCategory.METHODOLOGY
+    r3 = service.capture_operation(action="kpi", engagement_id="eng-x", phase_slug="flywheel")
+    assert r3 is not None and r3.category == SkillCategory.OPTIMIZATION
+    r4 = service.capture_operation(action="advance", engagement_id="eng-x")
+    assert r4 is not None and r4.phase_slug is None
+    # 未知 action 返回 None
+    assert service.capture_operation(action="bogus", engagement_id="eng-x") is None
+
+
+def test_capture_operation_sets_source_and_engagement(service):
+    rec = service.capture_operation(action="advance", engagement_id="eng-y", phase_slug="deploy")
+    assert rec is not None
+    assert rec.source == SkillSource.AUTO_CAPTURE
+    assert rec.source_engagement == "eng-y"
+    assert "eng-y" in rec.title
