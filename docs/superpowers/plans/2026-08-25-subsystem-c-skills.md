@@ -1060,7 +1060,7 @@ def skill_export(
 - Consumes: `SkillService`/`SkillStore`（Task 2-4）、`export_skill`（Task 5）
 - Produces: 路由见 spec §2.6（`GET /api/skills`、`POST /api/skills`、`GET/PATCH /api/skills/{sid}`、`POST /api/skills/{sid}/publish|archive|export`、`GET /api/skills/drafts`）；SkillStore 根使用与现有 Web 相同的 `.fde_scope` 基础（`Path(".fde_scope/skills")`）
 
-- [ ] **Step 1: 写失败测试**（`tests/test_web.py` 追加）
+- [x] **Step 1: 写失败测试**（`tests/test_web.py` 追加）
 
 ```python
 def test_skills_api_roundtrip(client, tmp_path, monkeypatch):
@@ -1088,8 +1088,8 @@ def test_skills_api_roundtrip(client, tmp_path, monkeypatch):
 
 （注意：现有 `tests/test_web.py` 的 client fixture 与 app 模块导入方式以现有文件为准，先读该文件确认 fixture 名称。）
 
-- [ ] **Step 2: 读现有 `tests/test_web.py` 确认 client fixture 用法**，运行确认失败：`pytest tests/test_web.py -k skills -v` → FAIL
-- [ ] **Step 3: 实现路由**（`web/app.py` 追加；Pydantic 请求体复用 `SkillDraft`/`SkillPatch`，响应 `SkillRecord.model_dump()`；错误统一 404/400）
+- [x] **Step 2: 读现有 `tests/test_web.py` 确认 client fixture 用法**（fixture 已自动 `monkeypatch.chdir(tmp_path)`），运行确认失败：`pytest tests/test_web.py -k skills -v` → FAIL（404）
+- [x] **Step 3: 实现路由**（`web/app.py` 追加；**修正两处**：① `_skill_service()` 用相对路径 `Path(".fde_scope/skills")`（与 `_ENGAGEMENTS_DIR` 同约定，绝对路径会破坏测试 chdir 隔离）；② `SkillDraft`/`SkillPatch` 需模块级导入（FastAPI 注册路由时即解析请求体类型注解，函数内 import 不生效）；export 的 `body.get("format")` 缺失时交 ValueError → 400）
 
 ```python
 # -- skills API --------------------------------------------------------------
@@ -1173,8 +1173,8 @@ def api_skill_export(sid: str, body: dict) -> dict:
             "files": [{"name": f.name, "content": f.content} for f in files]}
 ```
 
-- [ ] **Step 4: 运行确认通过**：`pytest tests/test_web.py -k skills -v` → PASS
-- [ ] **Step 5: Commit**：`git add fde_scope/web/app.py tests/test_web.py && git commit -m "feat(web): add skills API"`
+- [x] **Step 4: 运行确认通过**：`pytest tests/test_web.py -k skills -v` → PASS；全量 `pytest` → 293 passed, 3 skipped
+- [x] **Step 5: Commit**：`git add fde_scope/web/app.py tests/test_web.py && git commit -m "feat(web): add skills API"`
 
 ---
 

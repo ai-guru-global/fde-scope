@@ -361,3 +361,29 @@ def test_kpi_oversized_upload_413(client) -> None:
         data={"profile": "manufacturing"},
     )
     assert r.status_code == 413
+
+
+# ---------------------------------------------------------------------------
+# skills API
+# ---------------------------------------------------------------------------
+def test_skills_api_roundtrip(client, tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = client.post("/api/skills", json={
+        "title": "OPC UA 排查", "category": "implementation", "tags": ["opcua"],
+        "body_md": "# 步骤", "phase_slug": "deploy",
+    })
+    assert r.status_code == 200
+    sid = r.json()["id"]
+    assert r.json()["status"] == "draft"
+    assert client.post(f"/api/skills/{sid}/publish").status_code == 200
+    got = client.get(f"/api/skills/{sid}")
+    assert got.status_code == 200 and got.json()["status"] == "published"
+    lst = client.get("/api/skills?category=implementation")
+    assert lst.status_code == 200 and len(lst.json()) == 1
+    drafts = client.get("/api/skills/drafts")
+    assert drafts.status_code == 200 and len(drafts.json()) == 0  # 已发布
+    exp = client.post(f"/api/skills/{sid}/export", json={"format": "agentscope"})
+    assert exp.status_code == 200
+    assert exp.json()["files"][0]["name"].endswith("SKILL.md")
+    arch = client.post(f"/api/skills/{sid}/archive")
+    assert arch.status_code == 200 and arch.json()["status"] == "archived"

@@ -279,6 +279,97 @@ async def compute_kpis(
     return {"profile": profile, "kpis": prof.compute_kpis(samples), "sample_count": len(samples)}
 
 
+# ---------------------------------------------------------------------------
+# skills API（技能/方法论沉淀库）
+# ---------------------------------------------------------------------------
+# 模块级导入：FastAPI 路由注册时即解析请求体类型注解
+from ..skills.models import SkillDraft, SkillPatch  # noqa: E402
+
+
+def _skill_service():
+    from ..skills.service import SkillService
+    from ..skills.store import SkillStore
+
+    # 与 _ENGAGEMENTS_DIR 同约定：相对 cwd，测试经 chdir 隔离
+    return SkillService(SkillStore(Path(".fde_scope/skills")))
+
+
+@app.get("/api/skills")
+def api_skills(q: str | None = None, category: str | None = None, tag: str | None = None,
+               status: str = "published", profile: str | None = None,
+               gate: str | None = None, phase: str | None = None) -> list[dict]:
+    from ..skills.models import SkillCategory, SkillStatus
+
+    return [r.model_dump() for r in _skill_service().search(
+        q, category=SkillCategory(category) if category else None,
+        tags=[tag] if tag else None,
+        status=SkillStatus(status) if status else None,
+        profile=profile, gate_slug=gate, phase_slug=phase,
+    )]
+
+
+@app.post("/api/skills")
+def api_skills_create(draft: SkillDraft) -> dict:
+    return _skill_service().create(draft).model_dump()
+
+
+@app.get("/api/skills/drafts")
+def api_skills_drafts() -> list[dict]:
+    return [r.model_dump() for r in _skill_service().list_drafts()]
+
+
+@app.get("/api/skills/{sid}")
+def api_skill_get(sid: str) -> dict:
+    try:
+        return _skill_service().get(sid).model_dump()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="skill not found")
+
+
+@app.patch("/api/skills/{sid}")
+def api_skill_patch(sid: str, patch: SkillPatch) -> dict:
+    try:
+        return _skill_service().update(sid, patch).model_dump()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="skill not found")
+
+
+@app.post("/api/skills/{sid}/publish")
+def api_skill_publish(sid: str) -> dict:
+    try:
+        return _skill_service().publish(sid).model_dump()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="skill not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/skills/{sid}/archive")
+def api_skill_archive(sid: str) -> dict:
+    try:
+        return _skill_service().archive(sid).model_dump()
+    except KeyError:
+        raise HTTPException(status_code=404, detail="skill not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/skills/{sid}/export")
+def api_skill_export(sid: str, body: dict) -> dict:
+    from ..skills.exporters import export_skill
+
+    fmt = body.get("format")
+    try:
+        rec = _skill_service().get(sid)
+        files = export_skill(rec, fmt)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="skill not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"skill_id": sid, "format": fmt,
+            "files": [{"name": f.name, "content": f.content} for f in files]}
+
+
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")
