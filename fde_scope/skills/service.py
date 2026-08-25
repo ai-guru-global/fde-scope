@@ -7,7 +7,7 @@ tags 为"任一命中"；按 updated_at 倒序。过滤在内存中进行（文�
 
 from __future__ import annotations
 
-from .models import SkillCategory, SkillDraft, SkillPatch, SkillRecord, SkillStatus
+from .models import SkillCategory, SkillDraft, SkillPatch, SkillRecord, SkillSource, SkillStatus
 from .store import SkillStore
 
 
