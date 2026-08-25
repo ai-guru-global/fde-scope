@@ -41,5 +41,7 @@ synthetic counts, coverage gaps, PII masked, and the train/eval/test split.
 - The Corpus Engine is genuinely functional in rule-based v0: PII scrubbing,
   dedup, quality gate, coverage-gap detection, and targeted synthesis all
   produce real output.
+- LLM enhancement (MiMo Token Plan) is strictly optional and layered on top
+  via environment variables — see [`../docs/llm_integration.md`](../docs/llm_integration.md).
 - The **runtime layer** (deploy / flywheel) is assembled against the *real*
   AgentScope 2.0 API — see `docs/agentscope_api_mapping.md`.

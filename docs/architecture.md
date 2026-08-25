@@ -46,6 +46,11 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 │  │  OPC UA·MQTT-Sparkplug·ROS2·MES·Historian（工业）         │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
+
+> **横切模块 `fde_scope/llm.py`（MiMo Token Plan 客户端）**：可被 Layer 2（合成/
+> 评分）、Layer 4（MiMoReplyFn）、Zone C/D（runbook）与 Web Forge 注入的可选
+> LLM 能力；纯标准库实现，无 key 时全链路规则路径。详见
+> [`llm_integration.md`](llm_integration.md)。
 ```
 
 ## 核心设计决策
@@ -83,14 +88,24 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 - 仅 deploy / flywall 延迟导入 agentscope（optional extra）。
 - `pip install -e ".[dev]"` + `pytest` 全绿，不需要 LLM key / docker / agentscope。
 
-### 5. Corpus Engine 是规则版 v0
+### 5. Corpus Engine 规则为底、LLM 可选增强
 脱敏、去重、质量门、覆盖度分析、缺口检测、针对性合成、train/eval/test 分割、HTML 报告
-——全部是真实规则实现，不接 LLM 也能跑通并产出可审计报告。
+——全部是真实规则实现，不接 LLM 也能跑通并产出可审计报告。2026-08 起合成与质量
+评分可选接入 MiMo（`corpus --llm`，同签名换内核，失败自动回退规则）。
 
 ### 6. AgentScope API 真实化
 见 `docs/agentscope_api_mapping.md`：把设计文档里的虚构 API
 （`HarnessAgent`/`SequentialPipeline`/`EventSystem.on`/`HumanInTheLoop`/`VectorStore`）
 逐条对齐到真实 2.0.5 API。
+
+### 7. LLM 横切层（可选、可回退、零依赖）
+`fde_scope/llm.py` 是唯一的 LLM 出口（MiMo Token Plan，OpenAI 兼容，标准库 urllib）：
+- **可选注入**：各层接受 `llm=None` 可选参数，无 key 时行为与旧版完全一致；
+- **失败回退**：网络错误/坏 JSON/`content: null` 都回退规则路径（eval 被测 Agent
+  除外——干净退出 exit 1）；
+- **溯源诚实**：回退后不声称 LLM 生成（`llm_runbook` 返回 `(text, used_llm)`）；
+- **凭据只走环境变量** `FDE_SCOPE_MIMO_API_KEY`，不进 git/报告/manifest。
+设计与接入点详见 [`llm_integration.md`](llm_integration.md)。
 
 ## 数据流
 
@@ -98,13 +113,14 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 客户数据源
    │  connect (OPC UA / MQTT / CSV / Zammad…)
    ▼
-[raw rows] → corpus forge → [CorpusReport] → HTML 报告
-   │  deploy (FAT→SAT→commissioning，工业 gate 守卫)
+[raw rows] → corpus forge（可选 LLM 合成/评分，`--llm`）→ [CorpusReport] → HTML 报告
+   │  deploy (FAT→SAT→commissioning，工业 gate 守卫；manifest 可选携带 llm 段)
    ▼
 [DockerWorkspace + PermissionEngine + KnowledgeBase + Agent]
-   │  eval (ticket 指标 或 制造业 KPI)
+   │  eval (ticket 指标 或 制造业 KPI；被测 Agent 可用 mock 或 MiMo)
    ▼
 [EvalReport + bad cases + 建议]
+   │  runbook（可选 `handoff --llm` 由 MiMo 起草）
    │  flywheel (概念事件→真实事件映射→回流→周度重训)
    ▼
 数据飞轮 → 产品化 → 移交包 → 客户签字 → 退场
@@ -124,8 +140,10 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 |---|---|---|
 | Engagement SOP | ✅ 18 阶段 + 10 gate 状态机 | + 与 deploy/flywheel 实时联动 |
 | Connector (CSV) | ✅ 真实实现 | + 工业协议真实 IO + Zammad/Salesforce HTTP |
-| Corpus 清洗/合成 | ✅ 规则版 | LLM 版（同签名换内核） |
-| Deploy 组装 | ✅ 真实类型组装 | + 真实启动 + 模型调用 |
-| Eval | ✅ ticket + 制造业 KPI + mock reply | + 真实 Agent.reply + 分类器 |
+| Corpus 清洗/合成 | ✅ 规则版 + MiMo LLM 可选增强（同签名换内核） | + 批量样本 LLM 评分 |
+| LLM 横切层 | ✅ MiMoClient + 6 接入点（`llm.py`） | + 流式输出 + 多 provider 路由 |
+| Deploy 组装 | ✅ 真实类型组装 + manifest llm 段 | + 真实启动 + 模型调用 |
+| Eval | ✅ ticket + 制造业 KPI + mock/mimo reply | + 真实 AgentScope Agent.reply + 分类器 |
+| Runbook | ✅ Jinja 模板 + MiMo 起草（`handoff --llm`） | + 客户定制模板 |
 | Flywheel | ✅ 事件映射 + 规则回流 | + 真实订阅 reply_stream + 微调 |
-| Web UI | ✅ FastAPI 控制台 | + Studio 集成 + 实时事件流 |
+| Web UI | ✅ FastAPI 控制台（forge 自动感知 LLM） | + Studio 集成 + 实时事件流 |

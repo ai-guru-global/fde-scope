@@ -220,6 +220,10 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 `FDE_SCOPE_MIMO_API_KEY` 未设置时：`corpus --llm` / `eval --agent mimo` / `handoff --llm` 会明确报错（exit 2）提示配置，其余命令静默走规则模式。**凭据只经环境变量传递，请勿写入任何 git 文件。**
 
+协议细节、六个接入点的回退语义、成本模型、测试策略与多 provider 扩展指南见
+[`docs/llm_integration.md`](docs/llm_integration.md)；LLM 路径的加固记录与评审案例库见
+[`docs/code_review_checklist.md`](docs/code_review_checklist.md)。
+
 ---
 
 ## 🧪 Tests
@@ -258,6 +262,8 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 - [`docs/fde_sop_full.md`](docs/fde_sop_full.md) — the 18-phase SOP, 12 anti-patterns, sources
 - [`docs/manufacturing_scenario.md`](docs/manufacturing_scenario.md) — embodied-robotics factory end-to-end walkthrough
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
+- [`docs/llm_integration.md`](docs/llm_integration.md) — MiMo Token Plan integration: 6 touchpoints, fallback semantics, cost model, testing
+- [`docs/code_review_checklist.md`](docs/code_review_checklist.md) — repeatable review workflow + bug case library
 - [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.5 API
 - [`docs/fde_playbook.md`](docs/fde_playbook.md) — on-site 72h playbook
 - [`examples/README.md`](examples/README.md) — CSV cold-start walkthrough (quickstart data included)
