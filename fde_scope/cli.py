@@ -183,7 +183,9 @@ def deploy(
     name: str = typer.Option("Tenant", "--name", help="Tenant display name"),
     corpus: str | None = typer.Option(None, "--corpus", help="Path to forged corpus JSON"),
     model: str = typer.Option("qwen-max", "--model", "-m", help="Model config name"),
-    agent_specs: list[str] | None = typer.Option(None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"),
+    agent_specs: list[str] | None = typer.Option(
+        None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't assemble/start"),
 ) -> None:
     """[Layer 3] Assemble (and optionally start) a multi-tenant agent."""

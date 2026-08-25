@@ -132,9 +132,7 @@ class TenantDeployer:
         engine = build_engine(blueprint)
         agents = [self._assemble_agent(tenant, s, collection) for s in specs]
         templates = self.build_subagent_templates(tenant, specs)
-        manifest["subagent_templates"] = [
-            {"type": t.type, "description": t.description} for t in templates
-        ]
+        manifest["subagent_templates"] = [{"type": t.type, "description": t.description} for t in templates]
         manifest["started"] = True
         return DeployedAgent(
             tenant_id=tenant.id,

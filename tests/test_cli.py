@@ -273,9 +273,16 @@ def test_deploy_manifest_lists_agents(tmp_path: Path, monkeypatch) -> None:
     r = runner.invoke(
         app,
         [
-            "deploy", "--tenant", "acme", "--name", "Acme", "--dry-run",
-            "--agent", "researcher:调研员",
-            "--agent", "coder:实施员:qwen-max",
+            "deploy",
+            "--tenant",
+            "acme",
+            "--name",
+            "Acme",
+            "--dry-run",
+            "--agent",
+            "researcher:调研员",
+            "--agent",
+            "coder:实施员:qwen-max",
         ],
     )
     assert r.exit_code == 0, r.stdout

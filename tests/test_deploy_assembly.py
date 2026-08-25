@@ -52,7 +52,9 @@ def test_sandbox_spec_docker_kwargs_match_real_api() -> None:
         assert required in kwargs
 
 
-def test_deployer_assembles_real_path(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_assembles_real_path(
+    fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Non-dry-run deploy must reach workspace/engine/agent assembly."""
     calls: list[str] = []
 
@@ -138,7 +140,9 @@ def test_deployer_assembles_multi_agent_topology(
     assert agents[0]["toolkit"] == ["corpus_collection", "ticket_api"]
 
 
-def test_deployer_default_single_agent_manifest(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_default_single_agent_manifest(
+    fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """agents 缺省时沿用现有单 Agent 行为（name = {tenant.name}_agent）。"""
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("w", spec.tenant_id))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("e", bp.tenant_id))
@@ -176,7 +180,9 @@ class FakeClosable:
         self.closed = True
 
 
-def test_stop_closes_handles_and_flags_manifest(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stop_closes_handles_and_flags_manifest(
+    fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """2.0 没有 Agent.stop——stop 关闭可关闭句柄并标记 manifest。"""
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: FakeClosable("ws"))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: FakeClosable("engine"))

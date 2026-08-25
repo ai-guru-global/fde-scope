@@ -97,7 +97,10 @@ def test_tenant_config_agents_default_none_and_roundtrip() -> None:
     cfg = TenantConfig(
         id="t",
         name="T",
-        agents=[{"name": "researcher", "role": "调研员"}, {"name": "coder", "role": "实施员", "model": "qwen-max"}],
+        agents=[
+            {"name": "researcher", "role": "调研员"},
+            {"name": "coder", "role": "实施员", "model": "qwen-max"},
+        ],
     )
     assert len(cfg.agents) == 2
     assert cfg.agents[1].model == "qwen-max"
