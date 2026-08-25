@@ -183,6 +183,64 @@ def evaluate_gate(eid: str, slug: str) -> dict:
     return {"slug": slug, "passed": result.passed, "blockers": result.blockers, "warnings": result.warnings}
 
 
+# ---------------------------------------------------------------------------
+# journal API（现场记录）
+# ---------------------------------------------------------------------------
+_JOURNAL_KINDS = ("research", "implementation", "optimization")
+
+
+@app.get("/api/engagements/{eid}/journal")
+def engagement_journal(eid: str) -> list[dict]:
+    eng = _load(eid)
+    return [e.model_dump() for e in eng.ctx.journal]
+
+
+@app.post("/api/engagements/{eid}/journal")
+def journal_append(eid: str, body: dict | None = None) -> dict:
+    eng = _load(eid)
+    body = body or {}
+    note = body.get("note")
+    if not isinstance(note, str) or not note.strip():
+        raise HTTPException(status_code=422, detail="'note' is required") from None
+    kind = body.get("kind", "research")
+    if kind not in _JOURNAL_KINDS:
+        raise HTTPException(status_code=422, detail=f"invalid kind: {kind!r}") from None
+    from ..engagement.context import JournalEntry
+
+    entry = JournalEntry(kind=kind, note=note.strip(), skill_id=body.get("skill_id"))
+    eng.ctx.journal.append(entry)
+    _save(eng)
+    return entry.model_dump()
+
+
+@app.post("/api/engagements/{eid}/journal/{jid}/skill")
+def journal_to_skill(eid: str, jid: str) -> dict:
+    """把一条现场记录沉淀为技能草稿（kind → category 映射预填）。"""
+    eng = _load(eid)
+    entry = next((e for e in eng.ctx.journal if e.id == jid), None)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"journal entry '{jid}' not found") from None
+    if entry.skill_id:
+        raise HTTPException(status_code=409, detail=f"already linked to skill {entry.skill_id}") from None
+    from ..skills.models import SkillCategory, SkillDraft
+
+    mapping = {
+        "research": SkillCategory.RESEARCH,
+        "implementation": SkillCategory.IMPLEMENTATION,
+        "optimization": SkillCategory.OPTIMIZATION,
+    }
+    draft = SkillDraft(
+        title=entry.note[:60],
+        category=mapping[entry.kind],
+        body_md=entry.note,
+        source_engagement=eid,
+    )
+    rec = _skill_service().create(draft)
+    entry.skill_id = rec.id
+    _save(eng)
+    return rec.model_dump()
+
+
 @app.post("/api/engagements/{eid}/context")
 def update_context(eid: str, body: dict | None = None) -> dict:
     """Patch an engagement context (site / safety / slo / stakeholders / assets)."""

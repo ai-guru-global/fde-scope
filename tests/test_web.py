@@ -393,3 +393,39 @@ def test_skills_api_roundtrip(client, tmp_path, monkeypatch) -> None:
     assert exp.json()["files"][0]["name"].endswith("SKILL.md")
     arch = client.post(f"/api/skills/{sid}/archive")
     assert arch.status_code == 200 and arch.json()["status"] == "archived"
+
+
+# ---------------------------------------------------------------------------
+# journal（现场记录）
+# ---------------------------------------------------------------------------
+def test_journal_api_roundtrip(client) -> None:
+    eid = client.post("/api/engagements", data={"customer": "Acme"}).json()["engagement_id"]
+    assert client.get(f"/api/engagements/{eid}/journal").json() == []
+    r = client.post(f"/api/engagements/{eid}/journal", json={"kind": "research", "note": "产线 A 调研"})
+    assert r.status_code == 200
+    jid = r.json()["id"]
+    assert r.json()["kind"] == "research"
+    entries = client.get(f"/api/engagements/{eid}/journal").json()
+    assert len(entries) == 1 and entries[0]["note"] == "产线 A 调研"
+    # 校验：非法 kind / 空 note
+    assert client.post(f"/api/engagements/{eid}/journal", json={"kind": "oops", "note": "x"}).status_code == 422
+    assert client.post(f"/api/engagements/{eid}/journal", json={"note": "  "}).status_code == 422
+
+
+def test_journal_to_skill_bridge(client) -> None:
+    eid = client.post("/api/engagements", data={"customer": "BMW"}).json()["engagement_id"]
+    jid = client.post(
+        f"/api/engagements/{eid}/journal", json={"kind": "implementation", "note": "部署完成"}
+    ).json()["id"]
+    r = client.post(f"/api/engagements/{eid}/journal/{jid}/skill")
+    assert r.status_code == 200
+    rec = r.json()
+    assert rec["category"] == "implementation"  # kind → category 映射
+    assert rec["source_engagement"] == eid
+    assert rec["status"] == "draft"
+    # skill_id 回写 journal entry
+    entries = client.get(f"/api/engagements/{eid}/journal").json()
+    assert entries[0]["skill_id"] == rec["id"]
+    # 重复沉淀 → 409；未知 jid → 404
+    assert client.post(f"/api/engagements/{eid}/journal/{jid}/skill").status_code == 409
+    assert client.post(f"/api/engagements/{eid}/journal/jn-nope/skill").status_code == 404
