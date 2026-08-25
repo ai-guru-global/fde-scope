@@ -30,6 +30,28 @@ def _banner(title: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# LLM wiring (Xiaomi MiMo Token Plan — optional, env-configured)
+# ---------------------------------------------------------------------------
+def _maybe_llm(require: bool = False):
+    """Build the MiMo client from env vars; exit cleanly when a key is missing."""
+    from .llm import MiMoClient
+
+    client = MiMoClient()
+    if not client.available:
+        if require:
+            console.print(
+                "[red]LLM not configured:[/red] set FDE_SCOPE_MIMO_API_KEY "
+                "(Xiaomi MiMo Token Plan, tp-… format) to enable LLM mode."
+            )
+            raise typer.Exit(2)
+        console.print(
+            "[yellow]LLM disabled (FDE_SCOPE_MIMO_API_KEY not set)[/yellow] — "
+            "falling back to rule-based mode.\n"
+        )
+    return client
+
+
+# ---------------------------------------------------------------------------
 # connect
 # ---------------------------------------------------------------------------
 @app.command()
@@ -89,6 +111,9 @@ def corpus(
         "fde_scope/templates/corpus_config.yaml", "--config", "-c", help="CorpusConfig YAML"
     ),
     out: str = typer.Option("reports/corpus_report.html", "--out", "-o", help="Output HTML report path"),
+    llm: bool = typer.Option(
+        False, "--llm", help="Synthesize gap-filling samples with MiMo (needs FDE_SCOPE_MIMO_API_KEY)"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't forge"),
 ) -> None:
     """[Layer 2] Forge a raw sample into an auditable, gap-aware corpus."""
@@ -100,11 +125,12 @@ def corpus(
     from .config import CorpusConfig
     from .corpus import CorpusForge, save_html, save_report_json
 
+    client = _maybe_llm(require=llm) if llm else None
     cfg = CorpusConfig.from_yaml(config) if Path(config).exists() else CorpusConfig()
     rows = _load_rows(input)
     console.print(f"🔄 Loaded [bold]{len(rows)}[/bold] raw rows")
 
-    forge = CorpusForge(cfg)
+    forge = CorpusForge(cfg, llm=client)
     report = forge.forge_rows(rows)
 
     console.print(f"✅ PII entities masked: [bold]{report.pii_entities_masked}[/bold]")
@@ -169,11 +195,19 @@ def deploy(
         except (OSError, ValueError) as exc:
             console.print(f"[red]Cannot load corpus report:[/red] {corpus} ({exc})")
             raise typer.Exit(2) from exc
+    client = _maybe_llm()
     deployer = TenantDeployer()
     deployed = deployer.deploy(cfg, corpus_report=corpus_report, dry_run=dry_run)
+    if client.available:
+        deployed.manifest["llm"] = client.describe()
 
     console.print(f"🔄 Sandbox: [bold]{deployed.manifest['sandbox']['backend']}[/bold]")
     console.print(f"🔄 Corpus collection: [bold]{deployed.corpus_collection}[/bold]")
+    console.print(f"🔄 Model: [bold]{deployed.manifest['model']}[/bold]")
+    if client.available:
+        console.print(f"🔄 LLM: [bold]{client.model}[/bold] @ {client.base_url} (MiMo)")
+    else:
+        console.print("🔄 LLM: [yellow]未配置（设 FDE_SCOPE_MIMO_API_KEY 启用 MiMo）[/yellow]")
     console.print("🔄 Permissions:")
     console.print(f"   allow={deployed.manifest['permissions']['allow']}")
     console.print(f"   deny={deployed.manifest['permissions']['deny']}")
@@ -190,24 +224,33 @@ def deploy(
 @app.command()
 def eval(
     agent: str = typer.Option(
-        "mock", "--agent", "-a", help="Agent ID (only 'mock' is supported; real-agent eval is not wired up)"
+        "mock", "--agent", "-a", help="Agent: 'mock' (rule-based) or 'mimo' (MiMo LLM)"
     ),
     test_set: str = typer.Option(..., "--test-set", help="Path to eval cases (JSON/JSONL)"),
     accuracy: float = typer.Option(0.9, "--accuracy", help="Mock agent accuracy (0-1)"),
 ) -> None:
     """[Layer 4] Run the FDE benchmark over a test set."""
     _banner(f"eval · {agent}")
-    from .eval import FDEBenchmark, MockReplyFn
+    from .eval import FDEBenchmark, MiMoReplyFn, MockReplyFn, ReplyFn
+    from .llm import LLMError
 
     cases = _load_eval_cases(test_set)
-    if agent != "mock":
-        console.print(
-            f"[red]Real-agent eval is not wired up yet[/red] — got agent={agent!r}. "
-            "Only '--agent mock' (rule-based reply fn) is supported."
-        )
+    reply_fn: ReplyFn
+    if agent == "mock":
+        reply_fn = MockReplyFn(accuracy=accuracy)
+    elif agent == "mimo":
+        client = _maybe_llm(require=True)
+        reply_fn = MiMoReplyFn(client)
+    else:
+        console.print(f"[red]Unknown agent:[/red] {agent!r} — use 'mock' (rule-based) or 'mimo' (MiMo LLM).")
         raise typer.Exit(2)
-    reply_fn = MockReplyFn(accuracy=accuracy)
-    report = FDEBenchmark().run(reply_fn, cases)
+    try:
+        report = FDEBenchmark().run(reply_fn, cases)
+    except LLMError as exc:
+        # Mid-run endpoint failure: exit cleanly instead of a traceback that
+        # discards all context (the benchmark has no rule path to fall back to).
+        console.print(f"[red]MiMo eval failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
     table = Table(title="Metrics")
     table.add_column("metric", style="cyan")
@@ -460,16 +503,30 @@ def handoff(
     engagement_id: str = typer.Argument(...),
     eval_report: str | None = typer.Option(None, "--eval-report"),
     training: str | None = typer.Option(None, "--training-material"),
+    llm: bool = typer.Option(
+        False, "--llm", help="Draft the runbook with MiMo (needs FDE_SCOPE_MIMO_API_KEY)"
+    ),
     accept: bool = typer.Option(False, "--accept", help="Mark customer accepted"),
 ) -> None:
     """[Zone D] Assemble the handoff / knowledge-transfer package."""
     from .engagement import build_handoff_package, render_handoff_summary
-    from .engagement.operationalization import render_runbook
+    from .engagement.operationalization import llm_runbook, render_runbook
 
     eng = _load_engagement(engagement_id)
     runbook_path = f"reports/runbook_{engagement_id}.md"
     Path(runbook_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(runbook_path).write_text(render_runbook(eng.ctx), encoding="utf-8")
+    model_name = ""
+    if llm:
+        client = _maybe_llm(require=True)
+        model_name = client.model
+        runbook_md, used_llm = llm_runbook(eng.ctx, client)
+    else:
+        runbook_md, used_llm = render_runbook(eng.ctx), False
+    Path(runbook_path).write_text(runbook_md, encoding="utf-8")
+    if used_llm:
+        console.print(f"🤖 Runbook drafted by MiMo ({model_name})")
+    elif llm:
+        console.print("[yellow]Runbook rendered from template (MiMo draft failed)[/yellow]")
     build_handoff_package(
         eng.ctx,
         runbook_path=runbook_path,

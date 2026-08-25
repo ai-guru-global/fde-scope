@@ -8,6 +8,7 @@ produce the artifacts.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -38,6 +39,10 @@ class SLOGate(Gate):
 # ---------------------------------------------------------------------------
 # Generators
 # ---------------------------------------------------------------------------
+if TYPE_CHECKING:
+    from fde_scope.llm import MiMoClient
+
+
 def render_runbook(ctx: EngagementContext, agent_name: str = "tenant_agent") -> str:
     """Render a Markdown runbook for the deployed agent."""
     env = Environment(
@@ -48,6 +53,40 @@ def render_runbook(ctx: EngagementContext, agent_name: str = "tenant_agent") -> 
     )
     template = env.get_template("runbook.md.j2")
     return template.render(ctx=ctx, agent_name=agent_name)
+
+
+def llm_runbook(
+    ctx: EngagementContext, llm: MiMoClient, agent_name: str = "tenant_agent"
+) -> tuple[str, bool]:
+    """Draft a runbook with the LLM, falling back to the template on failure.
+
+    The LLM draft is grounded in the engagement's real context (customer,
+    profile, phase, SLOs, alert routes); if the endpoint fails for any
+    reason the deterministic template render is returned instead, so a
+    handoff never breaks on a flaky LLM.
+
+    Returns ``(runbook_text, used_llm)`` — ``used_llm`` is False when the
+    endpoint failed and the caller got the template, so provenance output
+    ("drafted by MiMo") stays honest.
+    """
+    slo_lines = "\n".join(f"- {s.name}: {s.target} (route: {s.alert_route or '—'})" for s in ctx.slos)
+    prompt = (
+        f"请为以下客户现场生成一份 agent 运维 runbook（Markdown，中文）：\n\n"
+        f"- 客户: {ctx.customer}\n- 场景 profile: {ctx.profile}\n"
+        f"- 当前阶段: {ctx.current_phase}\n- 当前 zone: {ctx.current_zone.value}\n"
+        f"- SLO:\n{slo_lines or '- 未定义'}\n\n"
+        f"包含章节：1) 系统概述 2) 关键 SLO 与告警 3) 事件响应流程 4) 回滚与安全失败模式 5) 已知限制。"
+    )
+    try:
+        text = llm.complete(
+            prompt,
+            system="你是 SRE 运维专家，输出结构化 Markdown。",
+            temperature=0.4,
+            max_tokens=2048,
+        )
+    except Exception:
+        return render_runbook(ctx, agent_name), False
+    return text, True
 
 
 def build_slo_template() -> list[dict]:

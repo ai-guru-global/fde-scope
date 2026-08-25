@@ -231,11 +231,18 @@ async def forge_corpus(
     tmp.parent.mkdir(parents=True, exist_ok=True)
     tmp.write_text(content, encoding="utf-8")
 
+    from fastapi.concurrency import run_in_threadpool
+
     from ..connectors.csv_fallback import CSVConnector
+    from ..llm import MiMoClient
 
     rows = CSVConnector(str(tmp)).extract_sample(100000)
     cfg = CorpusConfig(min_samples_per_category=min_samples, synth_per_gap=synth_per_gap)
-    report = CorpusForge(cfg).forge_rows(rows)
+    # LLM synthesis kicks in automatically when FDE_SCOPE_MIMO_API_KEY is
+    # set (env-configured); without a key the forge stays rule-based.
+    # forge_rows may make blocking LLM calls (up to ~60s each) — run it in a
+    # worker thread so the event loop (and every other endpoint) stays live.
+    report = await run_in_threadpool(CorpusForge(cfg, llm=MiMoClient()).forge_rows, rows)
     report_id = uuid.uuid4().hex[:8]
     out_html = _REPORTS_DIR / f"corpus_report_{report_id}.html"
     out_json = _REPORTS_DIR / f"corpus_report_{report_id}.json"

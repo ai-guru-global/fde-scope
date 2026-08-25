@@ -1,7 +1,10 @@
 """Corpus synthesizer — fill the coverage gaps.
 
-STATUS: rule-based v0 (template + synonym substitution). The real LLM-backed
-v1 keeps the same ``fill_gaps`` signature and swaps internals.
+STATUS: rule-based v0 (template + synonym substitution) with an optional
+LLM-backed path. The LLM v1 keeps the same ``fill_gaps`` signature and swaps
+internals: when an ``llm`` client is available, each gap is synthesized by
+the model (realistic, category-specific samples); on any LLM failure the
+rule-based path takes over, so a forge never dies on a flaky endpoint.
 
 The contract is the differentiator: the synthesizer *only* fills gaps the
 coverage analyzer identified. It never generates "to pad the count" — every
@@ -12,14 +15,16 @@ customer.
 
 from __future__ import annotations
 
+import json
 import random
+import re
 from typing import TYPE_CHECKING
 
 from .agents import QualityGate
 from .types import CategoryGap, CorpusItem, Provenance
 
 if TYPE_CHECKING:
-    pass
+    from fde_scope.llm import MiMoClient
 
 
 # Tiny paraphrase dictionary — enough to produce genuinely varied samples in
@@ -55,16 +60,23 @@ _CLOSERS = [
 
 
 class CorpusSynthesizer:
-    """Generate synthetic samples to fill specific coverage gaps."""
+    """Generate synthetic samples to fill specific coverage gaps.
+
+    Pass ``llm`` (a :class:`~fde_scope.llm.MiMoClient`) to enable the
+    LLM-backed path; without it, or when the LLM call fails, the rule-based
+    v0 strategies are used.
+    """
 
     def __init__(
         self,
         strategies: list[str] | None = None,
         quality_gate: QualityGate | None = None,
         seed: int = 42,
+        llm: MiMoClient | None = None,
     ) -> None:
         self.strategies = strategies or ["paraphrase", "adversarial", "multi_turn", "emotion_escalation"]
         self.quality_gate = quality_gate or QualityGate(min_score=2.5)
+        self.llm = llm
         self._rng = random.Random(seed)
 
     # -- public API -------------------------------------------------------------
@@ -101,6 +113,41 @@ class CorpusSynthesizer:
         out: list[CorpusItem] = []
         if count <= 0:
             return out
+        # LLM path first: realistic category-specific samples; any failure
+        # (no key, network, bad JSON) falls through to the rule path.
+        if self.llm is not None and self.llm.available:
+            try:
+                # Enforce the same cap + quality gate as the rule path. The
+                # gate runs before the cap: truncating first would waste good
+                # samples whenever the model leads with junk (and low-quality
+                # strings would bypass the forge's contract).
+                texts = self._synthesize_llm(category, seeds, count)
+                seen = {s.content for s in seeds}
+                for text in texts:
+                    if len(out) >= count:
+                        break
+                    if text in seen:
+                        continue
+                    seen.add(text)
+                    score = self.quality_gate.score_text(text, category=category)
+                    if score < self.quality_gate.min_score:
+                        continue
+                    out.append(
+                        CorpusItem(
+                            id=f"syn-{category}-{len(out):04d}",
+                            content=text,
+                            category=category,
+                            channel=self._rng.choice(["email", "chat", "phone"]) if seeds else "synthetic",
+                            quality_score=score,
+                            provenance=Provenance.SYNTHETIC,
+                            trace=["synthesize:llm"],
+                        )
+                    )
+                if out:
+                    return out
+            except Exception:
+                # LLM unavailable/failed — fall back to rules below.
+                out = []
         # If we have seed items, mutate them; otherwise emit templated items.
         base_texts = [s.content for s in seeds] if seeds else [self._template(category)]
         # The v0 mutation space is small, so the same text can come up again.
@@ -130,6 +177,47 @@ class CorpusSynthesizer:
             if item.quality_score >= self.quality_gate.min_score:
                 out.append(item)
         return out
+
+    def _synthesize_llm(self, category: str, seeds: list[CorpusItem], count: int) -> list[str]:
+        """Ask the LLM for ``count`` realistic samples for one category.
+
+        Returns a list of texts (may be shorter than requested). Raises on
+        transport/protocol errors so the caller can fall back to rules.
+        """
+        seed_block = "\n".join(f"- {s.content[:120]}" for s in seeds[:5])
+        seed_part = f"\n\n参考同类样本（风格模仿，不要照抄）：\n{seed_block}" if seed_block else ""
+        if self.llm is None:
+            raise RuntimeError("LLM not configured")
+        prompt = (
+            f"你是客服语料工程师。请为类别「{category}」生成 {count} 条真实感的客户诉求样本"
+            f"（工单/聊天/电话转写风格，每条 15-120 字，彼此不同）。"
+            f"只输出 JSON 字符串数组，不要其他内容。{seed_part}"
+        )
+        raw = self.llm.complete(prompt, temperature=0.9, max_tokens=2048)
+        return self._parse_json_list(raw)
+
+    @staticmethod
+    def _parse_json_list(raw: str) -> list[str]:
+        """Parse a JSON string array, tolerating markdown fences / trailing text."""
+        text = raw.strip()
+        # Strip ```json ... ``` fences if present.
+        fence = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL)
+        if fence:
+            text = fence.group(1)
+        else:
+            # Last-resort: grab the first [...] block.
+            bracket = re.search(r"\[.*\]", text, re.DOTALL)
+            if bracket:
+                text = bracket.group(0)
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"LLM returned non-JSON list: {raw[:200]!r}") from exc
+        if not isinstance(parsed, list):
+            raise ValueError(f"LLM returned non-list JSON: {raw[:200]!r}")
+        # Only keep strings — str() on nested lists/dicts would admit Python
+        # repr garbage ("['a', 'b']") into the corpus.
+        return [s.strip() for s in parsed if isinstance(s, str) and s.strip()]
 
     def _mutate(self, text: str, strategy: str) -> str:
         if strategy == "paraphrase":

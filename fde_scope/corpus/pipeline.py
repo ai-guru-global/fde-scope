@@ -23,21 +23,25 @@ from .types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Proven
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
     from fde_scope.connectors import DataConnector
+    from fde_scope.llm import MiMoClient
 
 
 class CorpusForge:
     """One-call forge: raw connector rows → a CorpusReport."""
 
-    def __init__(self, config: CorpusConfig) -> None:
+    def __init__(self, config: CorpusConfig, llm: MiMoClient | None = None) -> None:
         self.config = config
         self.normalizer = SchemaNormalizer(
             text_field=config.text_field,
             category_field=config.category_field,
             id_field=config.id_field,
         )
-        self.scrubber, self.deduper, self.gate = build_stages(config)
+        self.scrubber, self.deduper, self.gate = build_stages(config, llm=llm)
         self.analyzer = CoverageAnalyzer(config.min_samples_per_category)
-        self.synthesizer = CorpusSynthesizer(quality_gate=QualityGate(config.synth_quality_min_score))
+        self.synthesizer = CorpusSynthesizer(
+            quality_gate=QualityGate(config.synth_quality_min_score, llm=llm),
+            llm=llm,
+        )
 
     # -- the main entry point ---------------------------------------------------
     def forge_rows(self, rows: Iterable[dict]) -> CorpusReport:

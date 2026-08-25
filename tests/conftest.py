@@ -7,6 +7,19 @@ from pathlib import Path
 
 import pytest
 
+
+@pytest.fixture(autouse=True)
+def _no_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the suite offline and deterministic.
+
+    LLM env vars leaked from the developer's shell would make the web forge
+    tests hit the real MiMo endpoint (paid, flaky, slow) and flip LLM-status
+    assertions. Every LLM-aware test re-sets what it needs explicitly.
+    """
+    for var in ("FDE_SCOPE_MIMO_API_KEY", "FDE_SCOPE_MIMO_BASE_URL", "FDE_SCOPE_MIMO_MODEL"):
+        monkeypatch.delenv(var, raising=False)
+
+
 SAMPLE_ROWS = [
     {
         "id": "t-001",

@@ -195,12 +195,39 @@ gate      [SOP] list (per profile) / check (per engagement)
 
 ---
 
+## 🤖 LLM 接入（可选）
+
+核心层零 LLM、零额外依赖：语料合成、质量评分、eval 回复、runbook 生成全部默认走确定性规则路径，只有设置了环境变量才启用 MiMo Token Plan（OpenAI 兼容协议，标准库 `urllib` 直连，无新依赖）。
+
+```bash
+# Token Plan 凭据（tp- 前缀，与按量付费 sk- 不通用）
+export FDE_SCOPE_MIMO_API_KEY="tp-..."
+# 可选：默认已是 https://token-plan-cn.xiaomimimo.com/v1 与 mimo-v2.5-pro
+export FDE_SCOPE_MIMO_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
+export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
+```
+
+所有 LLM 入口都是**失败自动回退规则路径**——网络错误、坏 JSON、无 key 都不会中断流水线：
+
+| 入口 | 启用方式 | 效果 |
+|---|---|---|
+| 语料合成 | `fde-scope corpus --input … --llm` | 每个缺口类别由 LLM 生成真实感样本（参考种子风格，JSON 输出） |
+| 质量评分 | 同上（合成后自动） | LLM 对样本打 1-5 质量分，规则分兜底 |
+| Eval 基准 | `fde-scope eval --agent mimo --test-set …` | 用 MiMo 充当被评测的客服 Agent（`MiMoReplyFn`） |
+| 部署清单 | `fde-scope deploy --tenant …` | manifest 携带 `llm` 段（provider/model/base_url） |
+| Runbook | `fde-scope handoff <id> --llm` | 按客户/profile/阶段/SLO 生成 runbook，失败回退模板 |
+| Web 控制台 | 自动 | `/api/forge` 有 key 即启用 LLM 合成，无需配置 |
+
+`FDE_SCOPE_MIMO_API_KEY` 未设置时：`corpus --llm` / `eval --agent mimo` / `handoff --llm` 会明确报错（exit 2）提示配置，其余命令静默走规则模式。**凭据只经环境变量传递，请勿写入任何 git 文件。**
+
+---
+
 ## 🧪 Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 233 passed, 3 skipped — core + engagement + gates + web,
-                       # no agentscope/mysql/opcua needed (skips are integration-only)
+pytest                 # 256 passed, 3 skipped — core + engagement + gates + web + LLM mock,
+                       # no agentscope/mysql/opcua/LLM-key needed (skips are integration-only)
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```
 
@@ -243,7 +270,8 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 - [x] Category-stratified train/eval/test split（`CorpusReport.splits`）
 - [ ] MQTT-Sparkplug 真实 broker IO（paho-mqtt）
 - [ ] rosbag2 真实回放（rosbags）
-- [ ] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
+- [x] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
+- [x] 小米 MiMo Token Plan 接入（`fde_scope/llm.py`，env 配置，失败回退规则）
 - [ ] Real AgentScope agent startup (Docker workspace + model wiring)
 - [ ] Full Zammad / Salesforce / MES / Historian HTTP/SQL implementations
 - [ ] AgentScope Studio (npm `@agentscope/studio`) integration

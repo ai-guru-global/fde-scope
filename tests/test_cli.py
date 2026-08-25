@@ -82,10 +82,10 @@ def test_corpus_json_written_next_to_out(tmp_path: Path, sample_csv: Path) -> No
 
 
 def test_eval_non_mock_agent_errors(eval_cases_jsonl: Path) -> None:
-    """A real agent ID must fail loudly instead of silently using the mock."""
+    """An unknown agent ID must fail loudly instead of silently using the mock."""
     result = runner.invoke(app, ["eval", "--agent", "acme-prod", "--test-set", str(eval_cases_jsonl)])
     assert result.exit_code == 2
-    assert "not wired up" in result.stdout
+    assert "Unknown agent" in result.stdout
 
 
 def test_deploy_with_corpus_report(tmp_path: Path, sample_csv: Path) -> None:

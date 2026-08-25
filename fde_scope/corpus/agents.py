@@ -23,6 +23,7 @@ from .types import CorpusItem
 
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
+    from fde_scope.llm import MiMoClient
 
 
 # ---------------------------------------------------------------------------
@@ -138,8 +139,9 @@ class QualityGate:
         - pure redaction residue
     """
 
-    def __init__(self, min_score: float = 3.0) -> None:
+    def __init__(self, min_score: float = 3.0, llm: MiMoClient | None = None) -> None:
         self.min_score = min_score
+        self.llm = llm
         self.dropped_count = 0
 
     @staticmethod
@@ -174,6 +176,9 @@ class QualityGate:
         return min(score, 5.0)
 
     def __call__(self, items: list[CorpusItem]) -> list[CorpusItem]:
+        # Batch scoring stays rule-based: LLM-scoring a whole forge would
+        # burn the token budget. LLM scoring is available per-item via
+        # :meth:`score_text` (used for freshly synthesized samples).
         out: list[CorpusItem] = []
         for item in items:
             q = self._score(item)
@@ -183,6 +188,38 @@ class QualityGate:
             else:
                 self.dropped_count += 1
         return out
+
+    def score_text(self, content: str, category: str = "") -> float:
+        """Score raw text 1-5 — rules, upgraded by the LLM when available.
+
+        The LLM path is best-effort: on any failure (no key, network, bad
+        output) the deterministic rule score is returned, so callers always
+        get a number in [1, 5].
+        """
+        rule = self._score(CorpusItem(id="x", content=content, category=category))
+        if self.llm is not None and self.llm.available:
+            try:
+                llm_score = self._score_llm(content)
+                if llm_score is not None:
+                    return llm_score
+            except Exception:
+                pass
+        return rule
+
+    def _score_llm(self, content: str) -> float | None:
+        """Ask the LLM for a 1-5 integer quality score (None on bad output)."""
+        if self.llm is None:
+            return None
+        raw = self.llm.complete(
+            f"请给这条客服语料打质量分（1-5 整数，5 最好，考虑完整性与信息量）：\n\n"
+            f"{content[:500]}\n\n只输出一个数字。",
+            temperature=0.0,
+            max_tokens=16,
+        )
+        m = re.search(r"\d+", raw)
+        if not m:
+            return None
+        return min(max(float(m.group(0)), 1.0), 5.0)
 
 
 # ---------------------------------------------------------------------------
@@ -227,10 +264,12 @@ class SchemaNormalizer:
 
 
 # Convenience factory: build all stages from a CorpusConfig in one call.
-def build_stages(config: CorpusConfig) -> tuple[PIIScrub, Deduplication, QualityGate]:
+def build_stages(
+    config: CorpusConfig, llm: MiMoClient | None = None
+) -> tuple[PIIScrub, Deduplication, QualityGate]:
     """Instantiate the three post-normalization stages from a config."""
     return (
         PIIScrub(config.pii_rules.patterns, config.pii_rules.placeholder),
         Deduplication(config.dedup_threshold),
-        QualityGate(config.quality_min_score),
+        QualityGate(config.quality_min_score, llm=llm),
     )

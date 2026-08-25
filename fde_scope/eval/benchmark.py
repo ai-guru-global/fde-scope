@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from fde_scope.corpus.types import CorpusReport
+    from fde_scope.llm import MiMoClient
 
 from .bad_case_miner import BadCaseMiner, BadCaseReport
 from .metrics import (
@@ -143,6 +144,33 @@ class MockReplyFn:
         if self._rng.random() <= self.accuracy:
             return f"已为您处理：{user_input[:30]}…（mock 回复）"
         return "抱歉，我不太理解您的问题。（mock 回复）"
+
+
+class MiMoReplyFn:
+    """A real LLM-backed reply function for :class:`FDEBenchmark`.
+
+    Wraps a :class:`~fde_scope.llm.MiMoClient` behind the same ``str -> str``
+    ``ReplyFn`` protocol as :class:`MockReplyFn`, so ``FDEBenchmark.run``
+    needs no changes. The system prompt casts the model as the deployed
+    tenant support agent. Raises :class:`~fde_scope.llm.LLMError` when the
+    endpoint fails — the benchmark caller decides how to surface it.
+    """
+
+    def __init__(self, llm: MiMoClient, tenant: str = "client") -> None:
+        self.llm = llm
+        self.tenant = tenant
+
+    def __call__(self, user_input: str) -> str:
+        return self.llm.complete(
+            user_input,
+            system=(
+                f"You are the AI support agent for tenant {self.tenant}. "
+                "Answer customer tickets in Chinese, concisely and helpfully. "
+                "If the request is a refund above policy, say you must escalate."
+            ),
+            temperature=0.3,
+            max_tokens=300,
+        )
 
 
 # ---------------------------------------------------------------------------

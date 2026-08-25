@@ -7,13 +7,14 @@ agent under test is just a ``str -> str`` callable, so a real AgentScope
 """
 
 from .bad_case_miner import BadCase, BadCaseMiner, BadCaseReport
-from .benchmark import EvalReport, FDEBenchmark, MockReplyFn
+from .benchmark import EvalReport, FDEBenchmark, MiMoReplyFn, MockReplyFn
 from .metrics import METRICS, Dimension, EvalCase, ReplyFn
 
 __all__ = [
     "FDEBenchmark",
     "EvalReport",
     "MockReplyFn",
+    "MiMoReplyFn",
     "BadCaseMiner",
     "BadCase",
     "BadCaseReport",
