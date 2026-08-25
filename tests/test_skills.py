@@ -275,7 +275,7 @@ def test_export_agentscope_format():
     rec = _rec(title="OPC UA 排查", tags=["opcua"])
     files = export_skill(rec, "agentscope")
     assert len(files) == 1
-    assert files[0].name == "opc-ua/SKILL.md"  # 技能名 slug 化（中文丢弃，零依赖）
+    assert files[0].name == "opc-ua-排查/SKILL.md"  # 技能名 slug 化（保留中文，零依赖）
     assert "name:" in files[0].content and "description:" in files[0].content
     assert "# body" in files[0].content
 

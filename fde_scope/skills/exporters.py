@@ -24,8 +24,11 @@ class ExportFile:
 
 
 def _slugify(title: str) -> str:
-    """标题 → 目录名：小写、非字母数字转连字符、截断 60 字符。"""
-    s = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    """标题 → 目录名：小写、非字母数字/中文转连字符、截断 60 字符。
+
+    保留 CJK（现场技能标题多为中文；纯符号标题退化为 "skill"）。
+    """
+    s = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", title.lower()).strip("-")
     return s[:60] or "skill"
 
 
