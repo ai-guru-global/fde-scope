@@ -173,3 +173,47 @@ def test_skill_add_requires_category(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     r = runner.invoke(app, ["skill", "add", "--title", "T"])
     assert r.exit_code != 0
+
+
+# ---------------------------------------------------------------------------
+# skills × engagement 钩子
+# ---------------------------------------------------------------------------
+from fde_scope.cli import _save_engagement  # noqa: E402
+from fde_scope.engagement import Engagement, EngagementContext  # noqa: E402
+
+
+def _plant_engagement(tmp_path: Path, *, profile: str = "manufacturing", phase: str = "site_survey") -> None:
+    """构造并落盘一个 engagement（CLI 命令从文件加载）。"""
+    ctx = EngagementContext(id="eng-t", customer="Acme", profile=profile)
+    ctx.current_phase = phase
+    _save_engagement(Engagement(ctx))
+
+
+def test_advance_blocked_suggests_skill(tmp_path: Path, monkeypatch) -> None:
+    """advance 被阻塞时生成 gate_hint 草稿。"""
+    monkeypatch.chdir(tmp_path)
+    _plant_engagement(tmp_path)  # site_survey 空 ctx 必然阻塞
+    result = runner.invoke(app, ["engage", "advance", "eng-t"])
+    assert result.exit_code == 1
+    drafts = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()
+    assert any(r.source.value == "gate_hint" for r in drafts)
+
+
+def test_gate_check_failure_suggests_skill(tmp_path: Path, monkeypatch) -> None:
+    """gate check 失败时同样生成 gate_hint 草稿。"""
+    monkeypatch.chdir(tmp_path)
+    _plant_engagement(tmp_path)
+    result = runner.invoke(app, ["gate", "check", "eng-t", "--gate", "site_survey"])
+    assert result.exit_code == 1
+    drafts = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()
+    assert any(r.source.value == "gate_hint" for r in drafts)
+
+
+def test_advance_success_captures_operation(tmp_path: Path, monkeypatch) -> None:
+    """advance 成功时自动捕获一条 implementation 草稿。"""
+    monkeypatch.chdir(tmp_path)
+    _plant_engagement(tmp_path, profile="ticket", phase="qualification")  # 无 gate
+    result = runner.invoke(app, ["engage", "advance", "eng-t"])
+    assert result.exit_code == 0, result.stdout
+    drafts = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()
+    assert any(r.source.value == "auto_capture" and "advance" in r.tags for r in drafts)

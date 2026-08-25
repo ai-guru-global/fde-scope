@@ -408,11 +408,13 @@ def engage_advance(
         console.print(f"[red]❌ ADVANCE BLOCKED[/red] — phase={eng.ctx.current_phase}")
         console.print(exc.result.summary())
         _save_engagement(eng)
+        _maybe_suggest_skill(engagement_id, eng.ctx.current_phase, list(exc.result.blockers))
         raise typer.Exit(1) from exc
     except StopIteration as exc:
         console.print("[yellow]Engagement already complete.[/yellow]")
         raise typer.Exit(0) from exc
     _save_engagement(eng)
+    _maybe_capture("advance", engagement_id, phase_slug=eng.ctx.current_phase)
     console.print(f"✅ Advanced → [cyan]{nxt.slug}[/cyan] ({nxt.name}) · zone={nxt.zone.value}")
 
 
@@ -492,7 +494,9 @@ def gate_check(
     _save_engagement(eng)
     console.print(result.summary())
     if not result.passed:
+        _maybe_suggest_skill(engagement_id, slug, list(result.blockers))
         raise typer.Exit(1)
+    _maybe_capture("gate_pass", engagement_id, phase_slug=eng.ctx.current_phase)
 
 
 # ---------------------------------------------------------------------------

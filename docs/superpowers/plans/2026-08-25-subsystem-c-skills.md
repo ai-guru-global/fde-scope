@@ -1188,7 +1188,7 @@ def api_skill_export(sid: str, body: dict) -> dict:
 - Consumes: `_maybe_suggest_skill` / `_maybe_capture`（Task 6 已定义）
 - Produces: 行为——`engage advance` 被阻塞时：打印提示 + 生成 gate 提示草稿；`gate check` 失败时：同上；`engage advance` 成功时：`_maybe_capture(action="advance", ...)`；`gate check` 通过时：`_maybe_capture(action="gate_pass", ...)`
 
-- [ ] **Step 1: 写失败测试**（`tests/test_cli.py` 追加；先建一个带阻塞 gate 的 engagement）
+- [x] **Step 1: 写失败测试**（`tests/test_cli.py` 追加；**修正计划缺陷**：内存构造的 eng 必须落盘（`_save_engagement`）CLI 才能加载——`_load_engagement` 从 `.fde_scope/engagements/<id>.json` 读文件；另补 `test_gate_check_failure_suggests_skill` 与 `test_advance_success_captures_operation`，共 3 个）
 
 ```python
 def test_advance_blocked_suggests_skill(tmp_path, monkeypatch):
@@ -1210,8 +1210,8 @@ def test_advance_blocked_suggests_skill(tmp_path, monkeypatch):
 
 （注意：先读 `tests/test_cli.py` 现有 engagement 相关测试，复用其构造方式，避免依赖不存在的 save_to 属性；以 `EngagementContext` 实际 API 为准。）
 
-- [ ] **Step 2: 运行确认失败**：`pytest tests/test_cli.py -k suggest -v` → FAIL
-- [ ] **Step 3: 接入钩子**（`cli.py` 中 `engage_advance` 与 `gate_check` 修改）
+- [x] **Step 2: 运行确认失败**：`pytest tests/test_cli.py -k suggest -v` → FAIL（3 个，草稿未生成）
+- [x] **Step 3: 接入钩子**（`cli.py` 中 `engage_advance` 与 `gate_check` 修改；已确认 `GateResult.blockers` 字段与 `AdvanceBlocked.result` 存在）
 
 ```python
 # engage_advance 中：
@@ -1241,9 +1241,9 @@ def test_advance_blocked_suggests_skill(tmp_path, monkeypatch):
 
 （`GateResult.blockers` 字段名以 `engagement/gates/base.py` 实际定义为准，先读该文件确认。）
 
-- [ ] **Step 4: 运行确认通过**：`pytest tests/test_cli.py -k suggest -v` → PASS
-- [ ] **Step 5: 全量回归**：`pytest`（全部测试必须通过）
-- [ ] **Step 6: Commit**：`git add fde_scope/cli.py tests/test_cli.py && git commit -m "feat(cli): wire skill hooks into engage/gate flow"`
+- [x] **Step 4: 运行确认通过**：`pytest tests/test_cli.py -k suggest -v` → PASS（3 个）
+- [x] **Step 5: 全量回归**：`pytest` → 296 passed, 3 skipped
+- [x] **Step 6: Commit**：`git add fde_scope/cli.py tests/test_cli.py && git commit -m "feat(cli): wire skill hooks into engage/gate flow"`
 
 ---
 
