@@ -114,3 +114,13 @@ FDE 侧接入步骤（本期只交付第 1 步）：
    `delegate_external_agent` tool。
 
 stdio 协议实现、真实 runner 对接不在本期（spec §5.2 占位条款）。
+
+## 5. PawApp 插件（pawapp/）
+
+`pawapp/` 是一个可安装进 QwenPaw App Center 的 PawApp 骨架（`plugin.json`
+声明 + `backend/main.py` FastAPI router + `ui/index.js` React 页面），把 FDE
+引擎（engagement 状态机 / gate / corpus forge / 技能库）以 `/fde-scope/*`
+路由与两个 agent tools（`fde_sop_status` / `fde_sop_advance`）暴露给宿主
+QwenPaw。安装：把 `pawapp/` 拷贝进 QwenPaw 插件目录即可。
+自动化回归：`tests/test_pawapp.py`（stub `qwenpaw.pawapp` SDK，无需安装
+QwenPaw）。

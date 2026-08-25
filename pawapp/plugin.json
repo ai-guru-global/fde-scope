@@ -1,0 +1,32 @@
+{
+  "id": "fde-scope",
+  "name": "FDE Scope",
+  "version": "0.1.0",
+  "description": "Forward-Deployed Engineer workbench: 18-phase SOP lifecycle with enforceable industrial gates, corpus forge, eval and handoff — as a QwenPaw PawApp.",
+  "description_i18n": {
+    "zh-CN": "FDE 现场工作台：18 阶段 SOP 生命周期 + 可执行工业 gate + 语料锻造 + 评估 + 交付，作为 QwenPaw PawApp 运行。",
+    "en-US": "Forward-Deployed Engineer workbench: 18-phase SOP lifecycle with enforceable industrial gates, corpus forge, eval and handoff."
+  },
+  "author": "FDE Scope",
+  "type": "app",
+  "entry": {
+    "backend": "backend/main.py",
+    "frontend": "ui/index.js"
+  },
+  "qwenpaw_version": {
+    "min": "2.0.1"
+  },
+  "meta": {
+    "pawapp": {
+      "icon": "🛠️",
+      "category": "developer",
+      "entry_page": "/apps/fde-scope",
+      "launch_scope": "page"
+    },
+    "permissions": {
+      "chat": true,
+      "storage": true
+    },
+    "settings": []
+  }
+}
