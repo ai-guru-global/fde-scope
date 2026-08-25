@@ -167,6 +167,28 @@ def test_dry_run_manifest_has_agents_section() -> None:
     assert len(agents[0]["system_prompt"]) <= 120
 
 
+class FakeClosable:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+
+
+def test_stop_closes_handles_and_flags_manifest(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """2.0 没有 Agent.stop——stop 关闭可关闭句柄并标记 manifest。"""
+    monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: FakeClosable("ws"))
+    monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: FakeClosable("engine"))
+    deployer = TenantDeployer(agentscope_extra=True)
+    deployed = deployer.deploy(TenantConfig(id="acme", name="Acme"))
+    ws, engine = deployed.workspace, deployed.engine
+    report = deployer.stop(deployed)
+    assert ws.closed is True and engine.closed is True
+    assert report["closed"] == ["workspace", "engine"]
+    assert deployed.manifest["started"] is False
+
+
 class FakeSubAgentTemplate:
     """Stands in for ``agentscope.app.SubAgentTemplate`` (a Pydantic blueprint)."""
 

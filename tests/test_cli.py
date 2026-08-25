@@ -265,3 +265,25 @@ def test_journal_append_view_and_link(tmp_path: Path, monkeypatch) -> None:
     # 不存在的 engagement
     r6 = runner.invoke(app, ["engage", "journal", "eng-nope"])
     assert r6.exit_code == 2
+
+
+def test_deploy_manifest_lists_agents(tmp_path: Path, monkeypatch) -> None:
+    """--agent 可重复声明多 Agent 拓扑，manifest 输出 agents 段。"""
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(
+        app,
+        [
+            "deploy", "--tenant", "acme", "--name", "Acme", "--dry-run",
+            "--agent", "researcher:调研员",
+            "--agent", "coder:实施员:qwen-max",
+        ],
+    )
+    assert r.exit_code == 0, r.stdout
+    assert '"agents"' in r.stdout
+    assert "researcher" in r.stdout and "coder" in r.stdout
+
+
+def test_deploy_invalid_agent_spec_exits_2(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(app, ["deploy", "--tenant", "acme", "--dry-run", "--agent", "bad-spec"])
+    assert r.exit_code == 2

@@ -208,6 +208,26 @@ class TenantDeployer:
         ]
 
     @staticmethod
+    def stop(deployed: DeployedAgent) -> dict:
+        """Gracefully stop a deployment (2.0-adapted).
+
+        AgentScope 2.0 has no ``Agent.stop`` — agents are assembled per
+        chat turn and the app service owns lifecycle via FastAPI lifespan.
+        We close whatever has a close handle (workspace, engine) and flag
+        the manifest; anything without one is left to the process exit.
+        """
+        closed: list[str] = []
+        for name, obj in (("workspace", deployed.workspace), ("engine", deployed.engine)):
+            if obj is None:
+                continue
+            closer = getattr(obj, "close", None)
+            if closer is not None:
+                closer()
+                closed.append(name)
+        deployed.manifest["started"] = False
+        return {"closed": closed}
+
+    @staticmethod
     def _build_prompt(tenant: TenantConfig, spec: AgentSpec) -> str:
         return (
             f"You are the {spec.role} for {tenant.name} (tenant={tenant.id}). "

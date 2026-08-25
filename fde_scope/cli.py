@@ -183,14 +183,26 @@ def deploy(
     name: str = typer.Option("Tenant", "--name", help="Tenant display name"),
     corpus: str | None = typer.Option(None, "--corpus", help="Path to forged corpus JSON"),
     model: str = typer.Option("qwen-max", "--model", "-m", help="Model config name"),
+    agent_specs: list[str] | None = typer.Option(None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't assemble/start"),
 ) -> None:
     """[Layer 3] Assemble (and optionally start) a multi-tenant agent."""
     _banner(f"deploy · {tenant}")
-    from .config import TenantConfig
+    from .config import AgentSpec, TenantConfig
     from .deploy import TenantDeployer
 
-    cfg = TenantConfig(id=tenant, name=name, model=model, corpus_path=corpus)
+    agents = []
+    for a in agent_specs or []:
+        parts = a.split(":")
+        if len(parts) == 2:
+            agent_name, agent_role, agent_model = parts[0], parts[1], None
+        elif len(parts) == 3:
+            agent_name, agent_role, agent_model = parts
+        else:
+            console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
+            raise typer.Exit(2)
+        agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
+    cfg = TenantConfig(id=tenant, name=name, model=model, corpus_path=corpus, agents=agents or None)
     corpus_report = None
     if corpus:
         from .corpus import CorpusReport
@@ -220,6 +232,8 @@ def deploy(
         console.print("✅ Agent deployed! (runtime)")
     else:
         console.print("✅ Deployment plan assembled (dry-run / core-only)")
+    for a in deployed.manifest.get("agents") or []:
+        console.print(f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'}")
     console.print(f"📋 Manifest → [green]{json.dumps(deployed.manifest, ensure_ascii=False)}[/green]")
 
 
