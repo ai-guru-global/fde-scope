@@ -464,3 +464,16 @@ def test_workbench_api_stats_matrix_recent(client) -> None:
     assert wb2["stats"]["draft_skills"] == 0
     assert wb2["stats"]["total_skills"] == 1
     assert wb2["recent_skills"][0]["id"] == sid
+
+
+def test_console_has_workbench_and_skills_views(client) -> None:
+    """控制台包含工作台/技能库视图与现场记录 tab（单页无构建）。"""
+    r = client.get("/console")
+    assert r.status_code == 200
+    assert 'id="view-workbench"' in r.text
+    assert 'id="view-skills"' in r.text
+    assert "📊 工作台" in r.text
+    assert "📚 技能库" in r.text
+    assert "现场记录" in r.text
+    assert "沉淀为技能" in r.text
+    assert "草稿审阅队列" in r.text

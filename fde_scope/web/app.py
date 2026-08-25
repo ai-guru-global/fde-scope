@@ -772,6 +772,10 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
 </header>
 <div class="layout">
   <aside class="sidebar">
+    <div class="row" style="margin-bottom:14px">
+      <button style="flex:1" onclick="go('workbench')">📊 工作台</button>
+      <button class="ghost" style="flex:1" onclick="go('skills')">📚 技能库</button>
+    </div>
     <h2>Engagements</h2>
     <div id="eng-list"></div>
     <div class="card" style="margin-top:16px">
@@ -789,13 +793,195 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
     </div>
   </aside>
   <main class="main" id="main">
-    <div class="empty">← 选择或创建一个 engagement 开始</div>
+    <div id="view-workbench"></div>
+    <div id="view-skills" class="hidden"></div>
+    <div id="view-detail" class="hidden"><div class="empty">← 选择或创建一个 engagement 开始</div></div>
   </main>
 </div>
 
 <script>
 const API = '';
 let current = null;
+
+function showView(name) {
+  ['workbench','skills','detail'].forEach(v=>{
+    const e=document.getElementById('view-'+v); if(e) e.classList.toggle('hidden', v!==name);
+  });
+}
+
+function go(name) {
+  showView(name);
+  if (name==='skills') location.hash = 'skills';
+  else if (location.hash) history.replaceState(null,'',location.pathname);
+  if (name==='workbench') loadWorkbench();
+  if (name==='skills') loadSkills();
+}
+
+// -- 工作台 ---------------------------------------------------------------
+async function loadWorkbench() {
+  const w = await api('/api/workbench');
+  const st = w.stats;
+  const phaseChips = Object.entries(st.phase_distribution).map(([p,n])=>
+    `<span class="pill">${escapeHtml(p)}: ${n}</span>`).join('') || '<span class="meta">—</span>';
+  document.getElementById('view-workbench').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:14px">
+      <div class="kpi"><div class="k">进行中项目</div><div class="v">${st.active_projects}</div></div>
+      <div class="kpi"><div class="k">技能总数</div><div class="v">${st.total_skills}</div></div>
+      <div class="kpi"><div class="k">待审草稿</div><div class="v" style="color:${st.draft_skills?'var(--warn)':'var(--fg)'}">${st.draft_skills}</div></div>
+      <div class="kpi"><div class="k">阶段分布</div><div class="v" style="font-size:.85rem;line-height:1.5">${phaseChips}</div></div>
+    </div>
+    <div class="card"><h2>跨项目矩阵</h2>${matrixHtml(w.matrix)}</div>
+    <div class="card"><h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go('skills')">去沉淀 →</button></h2>${recentHtml(w.recent_skills)}</div>`;
+}
+
+function matrixHtml(matrix) {
+  if (!matrix.length) return '<div class="empty">暂无项目 — 左侧创建第一个 engagement</div>';
+  const rows = matrix.map(s => {
+    const ts = Object.values(s.gate_records||{}).map(g=>g.checked_at).filter(Boolean).sort().pop() || '';
+    return `<tr onclick="selectEng('${escapeHtml(s.engagement_id)}')" style="cursor:pointer">
+      <td><b>${escapeHtml(s.customer)}</b><div class="meta">${escapeHtml(s.engagement_id)}</div></td>
+      <td><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span></td>
+      <td>${escapeHtml(s.current_phase)}<div class="meta">${escapeHtml(zoneLabel(s.current_zone))}</div></td>
+      <td>${s.gate?`${escapeHtml(s.gate)} ${s.gate_passed?'✅':'❌'}`:'—'}</td>
+      <td class="meta">${ts?escapeHtml(String(ts).slice(0,16).replace('T',' ')):'—'}</td>
+      ${s.is_complete?'<td>✅ 完成</td>':''}
+    </tr>`;
+  }).join('');
+  return `<table><thead><tr><th>客户</th><th>Profile</th><th>阶段</th><th>门禁</th><th>最近更新</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function recentHtml(skills) {
+  if (!skills.length) return '<div class="empty">还没有沉淀 — 把现场经验变成可复用技能</div>';
+  return skills.map(r => `<div class="card" style="display:flex;align-items:center;gap:10px">
+    <div style="flex:1"><b>${escapeHtml(r.title)}</b>
+      <div class="meta"><span class="pill">${escapeHtml(r.category)}</span>
+      ${(r.tags||[]).length?' '+r.tags.map(t=>'#'+escapeHtml(t)).join(' '):''}</div></div>
+    <button class="ghost" onclick="selectEng('${escapeHtml(r.source_engagement||'')}')" ${r.source_engagement?'':'disabled'}>查看来源</button>
+  </div>`).join('');
+}
+
+// -- 技能库 ---------------------------------------------------------------
+async function loadSkills() {
+  const q = (document.getElementById('sk-q')||{}).value || '';
+  const cat = (document.getElementById('sk-cat')||{}).value || '';
+  const st = (document.getElementById('sk-status')||{}).value || 'published';
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (cat) params.set('category', cat);
+  if (st) params.set('status', st);
+  const list = await api('/api/skills?' + params);
+  const drafts = await api('/api/skills/drafts');
+  document.getElementById('view-skills').innerHTML = `
+    <div class="card"><h2>技能库</h2>
+      <div class="row"><label>搜索</label><input id="sk-q" value="${escapeHtml(q)}" placeholder="标题 / 正文关键词" onkeydown="if(event.key==='Enter')loadSkills()"></div>
+      <div class="row"><label>分类</label><select id="sk-cat" onchange="loadSkills()">
+        <option value="">全部</option>
+        <option value="research">research</option><option value="implementation">implementation</option>
+        <option value="optimization">optimization</option><option value="methodology">methodology</option></select>
+        <label>状态</label><select id="sk-status" onchange="loadSkills()">
+        <option value="published">published</option><option value="draft">draft</option><option value="archived">archived</option></select></div>
+      ${list.map(skillCard).join('') || '<div class="empty">无匹配技能</div>'}
+    </div>
+    <div class="card"><h2>草稿审阅队列</h2>${draftCards(drafts)}</div>
+    <div class="card"><h2>新建技能</h2>
+      <div class="row"><label>标题</label><input id="sk-title" placeholder="如：OPC UA 连接踩坑"></div>
+      <div class="row"><label>分类</label><select id="sk-new-cat">
+        <option value="research">research 调研</option><option value="implementation" selected>implementation 实施</option>
+        <option value="optimization">optimization 调优</option><option value="methodology">methodology 方法论</option></select></div>
+      <div class="row"><label>标签</label><input id="sk-tags" placeholder="逗号分隔：opcua,plc"></div>
+      <div class="row"><label>正文</label><textarea id="sk-body" rows="4" style="width:100%;background:var(--code);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:.85rem;padding:6px 9px"></textarea></div>
+      <button onclick="submitSkill()">+ 沉淀技能</button>
+    </div>`;
+}
+
+function skillCard(r) {
+  const esc = escapeHtml;
+  const act = r.status==='draft'
+    ? `<button onclick="publishSkill('${esc(r.id)}')">发布</button> <button class="ghost" onclick="editSkill('${esc(r.id)}')">编辑</button>`
+    : r.status==='published'
+      ? `<button class="ghost" onclick="archiveSkill('${esc(r.id)}')">归档</button>` : '';
+  return `<div class="card">
+    <div class="row"><b>${esc(r.title)}</b>
+      <span class="pill">${esc(r.category)}</span>
+      <span class="pill ${r.status==='draft'?'ind':''}">${esc(r.status)}</span>
+      <span class="meta" style="margin-left:auto">${esc(String(r.updated_at||'').slice(0,16).replace('T',' '))}</span></div>
+    ${(r.tags||[]).length?`<div class="meta">${r.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
+    <div class="meta">${esc(r.id)}${r.source_engagement?' · 来自 '+esc(r.source_engagement):''}</div>
+    <div class="row" style="margin:8px 0 0">${act}</div>
+  </div>`;
+}
+
+function draftCards(drafts) {
+  if (!drafts.length) return '<div class="empty">无待审草稿 — 自动捕获与 gate 提示会出现在这里</div>';
+  return drafts.map(r => `<div class="card" style="border-color:var(--warn)">
+    <div class="row"><b>${escapeHtml(r.title)}</b>
+      <span class="pill">${escapeHtml(r.category)}</span>
+      <span class="pill ind">${escapeHtml(r.source)}</span>
+      <span class="meta" style="margin-left:auto">${escapeHtml(String(r.created_at||'').slice(0,16).replace('T',' '))}</span></div>
+    <div class="meta">${escapeHtml(r.id)}${r.phase_slug?' · phase: '+escapeHtml(r.phase_slug):''}${r.gate_slug?' · gate: '+escapeHtml(r.gate_slug):''}${r.source_engagement?' · 来自 '+escapeHtml(r.source_engagement):''}</div>
+    <div class="row" style="margin:8px 0 0">
+      <button onclick="publishSkill('${escapeHtml(r.id)}')">发布</button>
+      <button class="ghost" onclick="editSkill('${escapeHtml(r.id)}')">编辑</button>
+    </div></div>`).join('');
+}
+
+async function submitSkill() {
+  const title = document.getElementById('sk-title').value.trim();
+  if (!title) return alert('请填写标题');
+  const tags = document.getElementById('sk-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
+  await api('/api/skills', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({title, category:document.getElementById('sk-new-cat').value,
+      tags, body_md:document.getElementById('sk-body').value})});
+  loadSkills();
+}
+
+async function publishSkill(sid) { await api(`/api/skills/${sid}/publish`, {method:'POST'}); loadSkills(); }
+async function archiveSkill(sid) { await api(`/api/skills/${sid}/archive`, {method:'POST'}); loadSkills(); }
+
+async function editSkill(sid) {
+  const body = prompt('编辑正文（Markdown）：');
+  if (body===null) return;
+  await api(`/api/skills/${sid}`, {method:'PATCH', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({body_md: body})});
+  loadSkills();
+}
+
+// -- 现场记录 -------------------------------------------------------------
+function journalHtml(ctx) {
+  const esc = escapeHtml;
+  const entries = (ctx && ctx.journal) || [];
+  const rows = entries.map(e => `<div class="card">
+    <div class="row"><span class="pill">${esc(e.kind)}</span><span class="meta">${esc(e.ts)}</span>
+      <span class="meta" style="margin-left:auto">${e.skill_id?'💡 '+esc(e.skill_id):''}</span></div>
+    <div>${esc(e.note)}</div>
+    ${e.skill_id?'':`<button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="journalToSkill('${esc(e.id)}')">沉淀为技能</button>`}
+  </div>`).join('') || '<div class="empty">暂无现场记录</div>';
+  return `<div class="card"><h2>现场记录</h2>${rows}</div>
+    <div class="card"><h2>追加记录</h2>
+      <div class="row"><label>类型</label><select id="jn-kind">
+        <option value="research">research 调研</option>
+        <option value="implementation">implementation 实施</option>
+        <option value="optimization">optimization 调优</option></select></div>
+      <div class="row"><label>内容</label><input id="jn-note" placeholder="记录本次现场发现…"></div>
+      <button onclick="addJournal()">+ 记录</button>
+    </div>`;
+}
+
+async function addJournal() {
+  const kind = document.getElementById('jn-kind').value;
+  const note = document.getElementById('jn-note').value.trim();
+  if (!note) return alert('请填写记录内容');
+  await api(`/api/engagements/${current}/journal`, {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({kind, note})});
+  selectEng(current);
+}
+
+async function journalToSkill(jid) {
+  const r = await api(`/api/engagements/${current}/journal/${jid}/skill`, {method:'POST'});
+  alert(`已沉淀为技能草稿: ${r.id} (${r.category})`);
+  selectEng(current);
+}
 
 async function api(path, opts={}) {
   const r = await fetch(API+path, opts);
@@ -862,7 +1048,7 @@ function renderDetail(s, phases, gates) {
       <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${escapeHtml(slug)}')">重新校验</button></div>`;
   }).join('') || '<div class="empty">无适用 gate（当前 profile）</div>';
 
-  document.getElementById('main').innerHTML = `
+  const html = `
     <div class="tabs">
       <div class="tab active" onclick="tab('overview',this)">概览</div>
       <div class="tab" onclick="tab('sop',this)">SOP 阶段</div>
@@ -870,6 +1056,7 @@ function renderDetail(s, phases, gates) {
       <div class="tab" onclick="tab('context',this)">Context</div>
       <div class="tab" onclick="tab('forge',this)">Corpus Forge</div>
       <div class="tab" onclick="tab('kpi',this)">KPI</div>
+      <div class="tab" onclick="tab('journal',this)">现场记录</div>
     </div>
     <div id="t-overview">
       <div class="card">
@@ -896,6 +1083,7 @@ function renderDetail(s, phases, gates) {
       <button onclick="forge()">锻造</button>
       <div id="forge-out" style="margin-top:10px"></div>
     </div></div>
+    <div id="t-journal" class="hidden">${journalHtml(s.context)}</div>
     <div id="t-kpi" class="hidden"><div class="card">
       <h2>KPI 计算</h2>
       <div class="row"><label>profile</label>
@@ -905,10 +1093,12 @@ function renderDetail(s, phases, gates) {
       <div id="kpi-out" style="margin-top:10px"></div>
     </div></div>
   `;
+  document.getElementById('view-detail').innerHTML = html;
+  showView('detail');
 }
 
 function tab(name, el) {
-  ['overview','sop','gates','context','forge','kpi'].forEach(t=>{
+  ['overview','sop','gates','context','forge','kpi','journal'].forEach(t=>{
     const e=document.getElementById('t-'+t); if(e) e.classList.toggle('hidden', t!==name);
   });
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -1023,6 +1213,11 @@ async function loadProfiles() {
 }
 
 refreshList();
+if (location.hash === '#skills') go('skills'); else loadWorkbench();
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#skills') go('skills');
+  else if (location.hash) go('workbench');
+});
 </script>
 </body>
 </html>
