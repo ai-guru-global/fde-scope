@@ -338,6 +338,33 @@ async def compute_kpis(
 
 
 # ---------------------------------------------------------------------------
+# workbench API（工作台聚合：全局统计 + 跨项目矩阵 + 最近沉淀）
+# ---------------------------------------------------------------------------
+@app.get("/api/workbench")
+def api_workbench() -> dict:
+    from collections import Counter
+
+    from ..skills.models import SkillStatus
+
+    matrix = [eng.status() for eng in _all_engagements()]
+    active = [s for s in matrix if not s.get("is_complete")]
+    skills = _skill_service()
+    published = skills.search(status=SkillStatus.PUBLISHED)
+    return {
+        "stats": {
+            "active_projects": len(active),
+            "phase_distribution": dict(Counter(s["current_phase"] for s in active)),
+            "draft_skills": len(skills.list_drafts()),
+            "total_skills": len(skills.search()),
+        },
+        "matrix": matrix,
+        "recent_skills": [
+            r.model_dump() for r in sorted(published, key=lambda r: r.updated_at, reverse=True)[:5]
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # skills API（技能/方法论沉淀库）
 # ---------------------------------------------------------------------------
 # 模块级导入：FastAPI 路由注册时即解析请求体类型注解
