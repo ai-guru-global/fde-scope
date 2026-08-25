@@ -133,3 +133,43 @@ def test_engage_rollback_unknown_phase_friendly_error(tmp_path: Path, monkeypatc
     assert result.exit_code == 2
     assert "Unknown phase" in result.stdout
     assert "Traceback" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# skills（技能/方法论沉淀）
+# ---------------------------------------------------------------------------
+from fde_scope.skills.models import SkillStatus  # noqa: E402
+from fde_scope.skills.store import SkillStore  # noqa: E402
+
+
+def test_skill_add_publish_export(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, [
+        "skill", "add", "--title", "OPC UA 排查", "--category", "implementation",
+        "--tags", "opcua", "--body", "# 步骤",
+    ])
+    assert result.exit_code == 0, result.stdout
+    store = SkillStore(tmp_path / ".fde_scope" / "skills")
+    drafts = store.load_all()
+    assert len(drafts) == 1
+    assert drafts[0].status == SkillStatus.DRAFT
+    sid = drafts[0].id
+    assert runner.invoke(app, ["skill", "publish", sid]).exit_code == 0
+    assert runner.invoke(app, ["skill", "export", sid, "--format", "agentscope",
+                               "--out", str(tmp_path / "out")]).exit_code == 0
+    assert (tmp_path / "out" / "opc-ua" / "SKILL.md").exists()
+
+
+def test_skill_list_and_review(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["skill", "add", "--title", "T1", "--category", "research"])
+    r = runner.invoke(app, ["skill", "list", "--category", "research"])
+    assert r.exit_code == 0 and "T1" in r.stdout
+    r2 = runner.invoke(app, ["skill", "review"])
+    assert r2.exit_code == 0 and "T1" in r2.stdout
+
+
+def test_skill_add_requires_category(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(app, ["skill", "add", "--title", "T"])
+    assert r.exit_code != 0

@@ -613,5 +613,217 @@ def main() -> None:
     app()
 
 
+# ---------------------------------------------------------------------------
+# skills（技能/方法论沉淀库）
+# ---------------------------------------------------------------------------
+skill_app = typer.Typer(name="skill", help="[Skills] 技能/方法论沉淀库.", no_args_is_help=True)
+app.add_typer(skill_app)
+
+
+def _skill_service() -> SkillService:
+    from .skills.service import SkillService
+    from .skills.store import SkillStore
+
+    return SkillService(SkillStore(Path(".fde_scope/skills")))
+
+
+def _maybe_suggest_skill(engagement_id: str, gate_slug: str, blockers: list[str]) -> None:
+    """gate 阻塞时生成提示草稿；失败静默（不阻塞主流程）。"""
+    try:
+        rec = _skill_service().suggest_from_gate_block(engagement_id, gate_slug, blockers)
+        console.print(
+            f"💡 已把这次阻塞沉淀为草稿 [cyan]{rec.id}[/cyan] — "
+            f"[bold]fde-scope skill review[/bold] 可查看并完善"
+        )
+    except OSError:
+        pass
+
+
+def _maybe_capture(action: str, engagement_id: str, phase_slug: str | None = None,
+                   detail: dict | None = None) -> None:
+    """操作自动捕获；失败静默。"""
+    try:
+        _skill_service().capture_operation(
+            action=action, engagement_id=engagement_id, phase_slug=phase_slug, detail=detail
+        )
+    except OSError:
+        pass
+
+
+@skill_app.command("add")
+def skill_add(
+    title: str = typer.Option(..., "--title"),
+    category: str = typer.Option(..., "--category", help="research|implementation|optimization|methodology"),
+    tags: str = typer.Option("", "--tags", help="逗号分隔"),
+    body: str = typer.Option("", "--body"),
+    body_file: str | None = typer.Option(None, "--body-file", help="从文件读正文"),
+    phase: str | None = typer.Option(None, "--phase"),
+    gate: str | None = typer.Option(None, "--gate"),
+    profile: str = typer.Option("", "--profile", help="ticket,manufacturing 逗号分隔"),
+    engagement: str | None = typer.Option(None, "--engagement"),
+    source: str = typer.Option("manual", "--source", help="manual|gate_hint|auto_capture"),
+) -> None:
+    """创建一条技能草稿。"""
+    _banner(f"skill add · {title}")
+    from .skills.models import SkillCategory, SkillDraft, SkillSource
+
+    try:
+        cat = SkillCategory(category)
+        src = SkillSource(source)
+    except ValueError:
+        console.print("[red]非法 category/source[/red]（见 --help）")
+        raise typer.Exit(2)
+    text = Path(body_file).read_text(encoding="utf-8") if body_file else body
+    service = _skill_service()
+    rec = service.create(SkillDraft(
+        title=title, category=cat,
+        tags=[t.strip() for t in tags.split(",") if t.strip()],
+        body_md=text, phase_slug=phase, gate_slug=gate,
+        applies_to=[p.strip() for p in profile.split(",") if p.strip()],
+        source=src, source_engagement=engagement,
+    ))
+    console.print(f"✅ 草稿创建 [cyan]{rec.id}[/cyan] — [bold]fde-scope skill review[/bold] 可审阅")
+
+
+@skill_app.command("list")
+def skill_list(
+    category: str | None = typer.Option(None, "--category"),
+    tag: str | None = typer.Option(None, "--tag"),
+    status: str | None = typer.Option(None, "--status", help="published|draft|archived（默认全部）"),
+    profile: str | None = typer.Option(None, "--profile"),
+    gate: str | None = typer.Option(None, "--gate"),
+    phase: str | None = typer.Option(None, "--phase"),
+    search: str | None = typer.Option(None, "--search"),
+) -> None:
+    """列出/检索技能。"""
+    _banner("skill list")
+    from .skills.models import SkillCategory, SkillStatus
+
+    service = _skill_service()
+    try:
+        cat = SkillCategory(category) if category else None
+        st = SkillStatus(status) if status else None
+    except ValueError:
+        console.print("[red]非法 category/status[/red]")
+        raise typer.Exit(2)
+    rows = service.search(
+        search, category=cat, tags=[tag] if tag else None, status=st,
+        profile=profile, gate_slug=gate, phase_slug=phase,
+    )
+    if not rows:
+        console.print("[yellow]无匹配技能[/yellow]")
+        return
+    table = Table(title=f"Skills · {len(rows)}")
+    for col in ("id", "title", "category", "status", "tags", "updated"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(r.id, r.title, r.category.value, r.status.value,
+                      ",".join(r.tags), r.updated_at.strftime("%Y-%m-%d"))
+    console.print(table)
+
+
+@skill_app.command("show")
+def skill_show(skill_id: str = typer.Argument(...)) -> None:
+    """显示技能正文与元数据。"""
+    try:
+        rec = _skill_service().get(skill_id)
+    except KeyError:
+        console.print(f"[red]技能不存在:[/red] {skill_id}")
+        raise typer.Exit(2)
+    console.print(f"\n[bold cyan]{rec.title}[/bold cyan] · {rec.category.value} · {rec.status.value} · v{rec.version}")
+    console.print(f"tags={rec.tags} · phase={rec.phase_slug} · gate={rec.gate_slug} · "
+                  f"applies_to={rec.applies_to} · source={rec.source.value}")
+    console.print(f"源自: {rec.source_engagement or '—'} · 创建: {rec.created_at:%Y-%m-%d} · 更新: {rec.updated_at:%Y-%m-%d}")
+    console.print("\n" + rec.body_md)
+
+
+@skill_app.command("edit")
+def skill_edit(
+    skill_id: str = typer.Argument(...),
+    title: str | None = typer.Option(None, "--title"),
+    tags: str | None = typer.Option(None, "--tags"),
+    body: str | None = typer.Option(None, "--body"),
+) -> None:
+    """编辑技能（version+1）。"""
+    from .skills.models import SkillPatch
+
+    try:
+        rec = _skill_service().update(skill_id, SkillPatch(
+            title=title, tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else None,
+            body_md=body,
+        ))
+    except KeyError:
+        console.print(f"[red]技能不存在:[/red] {skill_id}")
+        raise typer.Exit(2)
+    console.print(f"✅ 已更新 [cyan]{rec.id}[/cyan] → v{rec.version}")
+
+
+@skill_app.command("publish")
+def skill_publish(skill_id: str = typer.Argument(...)) -> None:
+    """发布草稿（可检索、可导出）。"""
+    try:
+        _skill_service().publish(skill_id)
+    except KeyError:
+        console.print(f"[red]技能不存在:[/red] {skill_id}")
+        raise typer.Exit(2)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    console.print(f"✅ 已发布 [cyan]{skill_id}[/cyan]")
+
+
+@skill_app.command("archive")
+def skill_archive(skill_id: str = typer.Argument(...)) -> None:
+    """归档技能。"""
+    try:
+        _skill_service().archive(skill_id)
+    except (KeyError, ValueError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    console.print(f"✅ 已归档 [cyan]{skill_id}[/cyan]")
+
+
+@skill_app.command("review")
+def skill_review(limit: int = typer.Option(20, "--limit")) -> None:
+    """草稿审阅队列（自动捕获/gate 提示产生的草稿）。"""
+    _banner("skill review")
+    rows = _skill_service().list_drafts()[:limit]
+    if not rows:
+        console.print("[yellow]没有待审草稿[/yellow]")
+        return
+    table = Table(title=f"Draft queue · {len(rows)}")
+    for col in ("id", "title", "source", "engagement"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(r.id, r.title, r.source.value, r.source_engagement or "—")
+    console.print(table)
+
+
+@skill_app.command("export")
+def skill_export(
+    skill_id: str = typer.Argument(...),
+    fmt: str = typer.Option(..., "--format", help="agentscope|qwenpaw"),
+    out: str = typer.Option("exports", "--out", help="输出目录"),
+) -> None:
+    """导出技能为 AgentScope / QwenPaw 格式。"""
+    from .skills.exporters import export_skill
+
+    try:
+        rec = _skill_service().get(skill_id)
+        files = export_skill(rec, fmt)
+    except KeyError:
+        console.print(f"[red]技能不存在:[/red] {skill_id}")
+        raise typer.Exit(2)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2)
+    out_dir = Path(out)
+    for f in files:
+        p = out_dir / f.name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f.content, encoding="utf-8")
+    console.print(f"✅ 导出 {len(files)} 个文件 → [green]{out_dir}[/green] ({fmt})")
+
+
 if __name__ == "__main__":
     main()

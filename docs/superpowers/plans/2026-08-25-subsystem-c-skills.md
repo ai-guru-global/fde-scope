@@ -788,7 +788,7 @@ def export_many(records: list[SkillRecord], fmt: str) -> list[ExportFile]:
 - Consumes: `SkillService`/`SkillStore`（Task 2-4）、`export_skill/export_many`（Task 5）
 - Produces: 子命令 `fde-scope skill add|list|show|edit|publish|archive|review|export`（参数见 spec §2.4）；`_maybe_suggest_skill(engagement_id: str, gate_slug: str, blockers: list[str], console)` —— 尝试创建 gate 提示草稿，失败静默；`_maybe_capture(service, *, action, engagement_id, phase_slug, detail=None)` —— 自动捕获，失败静默
 
-- [ ] **Step 1: 写失败测试**（`tests/test_cli.py` 追加）
+- [x] **Step 1: 写失败测试**（`tests/test_cli.py` 追加）
 
 ```python
 from typer.testing import CliRunner
@@ -831,8 +831,8 @@ def test_skill_add_requires_category():
     assert r.exit_code != 0
 ```
 
-- [ ] **Step 2: 运行确认失败**：`pytest tests/test_cli.py -k skill -v` → FAIL（no such command）
-- [ ] **Step 3: 实现 CLI**（`cli.py` 追加；风格对齐现有命令：`_banner` + rich Table + exit 2）
+- [x] **Step 2: 运行确认失败**：`pytest tests/test_cli.py -k skill -v` → FAIL（no such command）
+- [x] **Step 3: 实现 CLI**（`cli.py` 追加；风格对齐现有命令：`_banner` + rich Table + exit 2；**修正：`skill list` 默认 status 从 `published` 改为不过滤（None）**——测试期望 add 后立即可 list，且草稿审阅已由 `review` 专职负责）
 
 ```python
 # -- skills（技能/方法论沉淀） ------------------------------------------------
@@ -1044,8 +1044,8 @@ def skill_export(
     console.print(f"✅ 导出 {len(files)} 个文件 → [green]{out_dir}[/green] ({fmt})")
 ```
 
-- [ ] **Step 4: 运行确认通过**：`pytest tests/test_cli.py -k skill -v` → PASS
-- [ ] **Step 5: 全量回归**：`pytest tests/test_cli.py -v`（确认现有 CLI 测试未破坏）
+- [x] **Step 4: 运行确认通过**：`pytest tests/test_cli.py -k skill -v` → PASS（16 个全量）
+- [x] **Step 5: 全量回归**：`pytest` → 292 passed, 3 skipped（现有 CLI 测试未破坏）
 - [ ] **Step 6: Commit**：`git add fde_scope/cli.py tests/test_cli.py && git commit -m "feat(cli): add skill command group"`
 
 ---
