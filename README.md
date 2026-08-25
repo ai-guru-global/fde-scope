@@ -188,8 +188,8 @@ flywheel  [Layer 5] Start (or replay into) the data flywheel
 handoff   [Zone D]  Assemble the handoff / knowledge-transfer package
 kpi       Profile-specific KPIs over a sample set
 profiles  List available deployment scenario profiles
-web       Launch the Web UI (engagement dashboard + gates + reports)
-engage    [SOP] init / status / advance / rollback / list
+web       Launch the Web UI (workbench + skills + engagement console)
+engage    [SOP] init / status / advance / rollback / journal / list
 gate      [SOP] list (per profile) / check (per engagement)
 skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
 ```
@@ -221,6 +221,21 @@ fde-scope skill export <skill-id> --format qwenpaw --out exports/   # 或 --form
 ```
 
 Web UI 暴露完整的 skills API：`GET/POST /api/skills`、`GET/PATCH /api/skills/{id}`、`POST /api/skills/{id}/publish|archive|export`、`GET /api/skills/drafts`。
+
+---
+
+## 🖥️ FDE 工作台（Workbench + 现场记录）
+
+`fde-scope web` 打开的单页控制台现在是一个跨项目工作台：
+
+- **工作台首页**（`/console`）：全局统计条（进行中项目 / 阶段分布 / 待审草稿 / 技能总数）、
+  跨项目矩阵（客户/阶段/zone/门禁/最近更新，点击进入详情）、最近沉淀技能；
+- **技能库页**（`/console#skills`）：搜索 + 分类/状态筛选 + 技能卡片 +
+  新建技能表单 + 草稿审阅队列（一键发布/编辑）；
+- **现场记录**（详情页 tab）：`research / implementation / optimization` 三类记录，
+  任意一条可一键“沉淀为技能”（kind → category 自动映射、关联来源 engagement）。
+
+CLI 等价入口：`fde-scope engage journal <id> --kind research --note "..." [--link-skill <sid>]`。
 
 ---
 

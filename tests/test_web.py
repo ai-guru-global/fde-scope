@@ -403,12 +403,13 @@ def test_journal_api_roundtrip(client) -> None:
     assert client.get(f"/api/engagements/{eid}/journal").json() == []
     r = client.post(f"/api/engagements/{eid}/journal", json={"kind": "research", "note": "产线 A 调研"})
     assert r.status_code == 200
-    jid = r.json()["id"]
     assert r.json()["kind"] == "research"
     entries = client.get(f"/api/engagements/{eid}/journal").json()
     assert len(entries) == 1 and entries[0]["note"] == "产线 A 调研"
     # 校验：非法 kind / 空 note
-    assert client.post(f"/api/engagements/{eid}/journal", json={"kind": "oops", "note": "x"}).status_code == 422
+    assert (
+        client.post(f"/api/engagements/{eid}/journal", json={"kind": "oops", "note": "x"}).status_code == 422
+    )
     assert client.post(f"/api/engagements/{eid}/journal", json={"note": "  "}).status_code == 422
 
 
