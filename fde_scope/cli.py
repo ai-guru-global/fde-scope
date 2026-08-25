@@ -463,6 +463,45 @@ def engage_list() -> None:
     console.print(table)
 
 
+@engage_app.command("journal")
+def engage_journal(
+    engagement_id: str = typer.Argument(..., help="Engagement id"),
+    kind: str = typer.Option("research", "--kind", "-k", help="research | implementation | optimization"),
+    note: str | None = typer.Option(None, "--note", "-n", help="记录内容；缺省时只查看"),
+    link_skill: str | None = typer.Option(None, "--link-skill", help="关联技能 id（追加时校验存在性）"),
+) -> None:
+    """Record / view field notes (现场记录：调研/实施/调优)."""
+    eng = _load_engagement(engagement_id)
+    if note is None:  # 查看模式
+        _banner(f"journal · {engagement_id}")
+        if not eng.ctx.journal:
+            console.print("[yellow]暂无现场记录。[/yellow]")
+            console.print('  添加: fde-scope engage journal <id> --kind research --note "..."')
+            return
+        table = Table(title="Journal")
+        for col in ("id", "ts", "kind", "note", "skill"):
+            table.add_column(col)
+        for e in eng.ctx.journal:
+            table.add_row(e.id, e.ts, e.kind, e.note, e.skill_id or "—")
+        console.print(table)
+        return
+    if kind not in ("research", "implementation", "optimization"):
+        console.print(f"[red]Invalid kind:[/red] {kind} (research | implementation | optimization)")
+        raise typer.Exit(2)
+    if link_skill:
+        try:
+            _skill_service().get(link_skill)
+        except KeyError:
+            console.print(f"[red]Unknown skill:[/red] {link_skill}")
+            raise typer.Exit(2) from None
+    from .engagement.context import JournalEntry
+
+    entry = JournalEntry(kind=kind, note=note, skill_id=link_skill)
+    eng.ctx.journal.append(entry)
+    _save_engagement(eng)
+    console.print(f"✅ 已记录 [cyan]{entry.id}[/cyan] ({kind}) · {entry.note}")
+
+
 # ---------------------------------------------------------------------------
 # gate subcommands
 # ---------------------------------------------------------------------------

@@ -232,3 +232,36 @@ def test_advance_success_captures_operation(tmp_path: Path, monkeypatch) -> None
     assert result.exit_code == 0, result.stdout
     drafts = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()
     assert any(r.source.value == "auto_capture" and "advance" in r.tags for r in drafts)
+
+
+# ---------------------------------------------------------------------------
+# engage journal（现场记录）
+# ---------------------------------------------------------------------------
+def test_journal_append_view_and_link(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _plant_engagement(tmp_path)
+    # 先造一个技能供 --link-skill 校验
+    r = runner.invoke(app, ["skill", "add", "--title", "现场技巧", "--category", "implementation"])
+    assert r.exit_code == 0, r.stdout
+    sid = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()[0].id
+    # 追加
+    r2 = runner.invoke(
+        app,
+        ["engage", "journal", "eng-t", "--kind", "research", "--note", "产线A 调研完成", "--link-skill", sid],
+    )
+    assert r2.exit_code == 0, r2.stdout
+    assert "产线A 调研完成" in r2.stdout
+    # 查看
+    r3 = runner.invoke(app, ["engage", "journal", "eng-t"])
+    assert r3.exit_code == 0
+    assert "产线A 调研完成" in r3.stdout
+    assert sid in r3.stdout
+    # 非法 kind
+    r4 = runner.invoke(app, ["engage", "journal", "eng-t", "--kind", "oops", "--note", "x"])
+    assert r4.exit_code == 2
+    # 未知 skill
+    r5 = runner.invoke(app, ["engage", "journal", "eng-t", "--note", "x", "--link-skill", "skill-nope"])
+    assert r5.exit_code == 2
+    # 不存在的 engagement
+    r6 = runner.invoke(app, ["engage", "journal", "eng-nope"])
+    assert r6.exit_code == 2
