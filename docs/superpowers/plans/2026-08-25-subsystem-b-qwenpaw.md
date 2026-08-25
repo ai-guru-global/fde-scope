@@ -736,4 +736,4 @@ git add docs/qwenpaw_integration.md README.md && git commit -m "docs: QwenPaw in
 - B-T2 实现：`corpus_report` 与 `skills` 参数显式类型标注（`CorpusReport | None` / `list[SkillRecord] | None`），满足 mypy `no_implicit_optional`。
 - B-T3 Step 1：frontmatter 篡改测试同样写死中文路径——改为 glob 定位实际 SKILL.md 后再篡改。
 - B-T4 Step 3：`_skill_service().search(status="published")` 触发 mypy `arg-type` 错误（`search` 收 `SkillStatus | None`）——改为 `SkillStatus("published")`。
-- 已知：中文技能标题经 `_slugify` 全部退化为 `skill`，多中文技能会互相覆盖——为子系统 C `exporters` 的既有行为，不在本期范围（记录待后续处理）。
+- 已知：中文技能标题经 `_slugify` 全部退化为 `skill`，多中文技能会互相覆盖——E2E 演练实锤后已修复（`exporters._slugify` 保留 CJK，commit 03a4673），并同步更新 `test_export_agentscope_format` / `test_skill_add_publish_export` 断言。
