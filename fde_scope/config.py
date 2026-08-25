@@ -97,6 +97,20 @@ class ApprovalPolicy(BaseModel):
     timeout_seconds: int = 300
 
 
+class AgentSpec(BaseModel):
+    """One agent in a tenant's multi-agent topology.
+
+    ``model`` is the agentscope model config name; ``None`` means the
+    runtime injects it (matches tenant-level model semantics).
+    """
+
+    name: str
+    role: str
+    system_prompt: str | None = None
+    model: str | None = None
+    toolkit: dict = Field(default_factory=dict)
+
+
 class TenantConfig(BaseModel):
     """Per-tenant deployment descriptor.
 
@@ -112,6 +126,7 @@ class TenantConfig(BaseModel):
     ticket_api: str | None = None
     resource_quota: str = "2cpu-4gb"
     profile: str = "ticket"  # ticket | manufacturing
+    agents: list[AgentSpec] | None = None
     approval_policy: ApprovalPolicy = Field(default_factory=ApprovalPolicy)
     dashboard_config: dict = Field(default_factory=dict)
 

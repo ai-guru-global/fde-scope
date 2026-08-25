@@ -81,3 +81,33 @@ def test_permission_blueprint_describes() -> None:
     bp = PermissionBlueprint(tenant_id="x")
     text = bp.describe()
     assert "ALLOW" in text and "DENY" in text
+
+
+def test_agent_spec_defaults() -> None:
+    from fde_scope.config import AgentSpec
+
+    spec = AgentSpec(name="researcher", role="调研员")
+    assert spec.system_prompt is None
+    assert spec.model is None  # None → runtime injection
+    assert spec.toolkit == {}
+
+
+def test_tenant_config_agents_default_none_and_roundtrip() -> None:
+    assert TenantConfig(id="t", name="T").agents is None  # 向后兼容
+    cfg = TenantConfig(
+        id="t",
+        name="T",
+        agents=[{"name": "researcher", "role": "调研员"}, {"name": "coder", "role": "实施员", "model": "qwen-max"}],
+    )
+    assert len(cfg.agents) == 2
+    assert cfg.agents[1].model == "qwen-max"
+
+
+def test_tenant_config_from_yaml_reads_agents(tmp_path) -> None:
+    p = tmp_path / "tenant.yaml"
+    p.write_text(
+        "id: acme\nname: Acme\nagents:\n  - name: researcher\n    role: 调研员\n  - name: coder\n    role: 实施员\n",
+        encoding="utf-8",
+    )
+    cfg = TenantConfig.from_yaml(p)
+    assert [a.name for a in cfg.agents] == ["researcher", "coder"]

@@ -23,3 +23,13 @@ approval_policy:
 dashboard_config:
   show_bad_cases: true
   show_flywheel: true
+
+# Multi-agent topology (optional). Each entry becomes one agentscope.agent.Agent
+# at deploy time; the manifest carries them as the `agents` section.
+#   model: agentscope model config name; omitted → runtime injection (None)
+agents:
+  - name: researcher
+    role: 现场调研员
+  - name: coder
+    role: 实施工程师
+    model: qwen-max
