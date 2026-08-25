@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from fde_scope.config import TenantConfig
+from fde_scope.config import AgentSpec, TenantConfig
 
 from .permission_builder import build_engine, default_blueprint
 from .sandbox_config import SandboxSpec, build_workspace
@@ -41,6 +41,7 @@ class DeployedAgent:
 
     tenant_id: str
     agent: Any = None
+    agents: list[Any] = field(default_factory=list)
     workspace: Any = None
     engine: Any = None
     corpus_collection: str = ""
@@ -81,6 +82,7 @@ class TenantDeployer:
         # The approval policy decides which tool calls escalate to ASK (HITL).
         blueprint = default_blueprint(tenant.id, mode=tenant.approval_policy.mode)
         collection = f"corpus_{tenant.id}"
+        specs = tenant.agents or [AgentSpec(name=f"{tenant.name}_agent", role=tenant.name)]
 
         manifest = {
             "tenant_id": tenant.id,
@@ -100,6 +102,16 @@ class TenantDeployer:
             "approval_policy": tenant.approval_policy.model_dump(),
             "started": False,
         }
+        manifest["agents"] = [
+            {
+                "name": s.name,
+                "role": s.role,
+                "model": s.model,  # None → wired by the runtime
+                "system_prompt": (s.system_prompt or self._build_prompt(tenant, s))[:120],
+                "toolkit": sorted(self._build_toolkit(tenant, collection).keys()),
+            }
+            for s in specs
+        ]
         if corpus_report is not None:
             manifest["corpus"] = {
                 "total": corpus_report.total,
@@ -117,11 +129,12 @@ class TenantDeployer:
         # -- real assembly (only when agentscope extra is installed) ----------
         workspace = build_workspace(spec)
         engine = build_engine(blueprint)
-        agent = self._assemble_agent(tenant, collection, engine)
+        agents = [self._assemble_agent(tenant, s, collection) for s in specs]
         manifest["started"] = True
         return DeployedAgent(
             tenant_id=tenant.id,
-            agent=agent,
+            agent=agents[0],
+            agents=agents,
             workspace=workspace,
             engine=engine,
             corpus_collection=collection,
@@ -129,8 +142,8 @@ class TenantDeployer:
         )
 
     # -- internals --------------------------------------------------------------
-    def _assemble_agent(self, tenant: TenantConfig, collection: str, engine: Any) -> Any:
-        """Build the real ``agentscope.agent.Agent`` (lazy import).
+    def _assemble_agent(self, tenant: TenantConfig, spec: AgentSpec, collection: str) -> Any:
+        """Build one real ``agentscope.agent.Agent`` from an AgentSpec (lazy import).
 
         This is the faithful 2.0 translation of the design doc's fictional
         ``HarnessAgent(...)`` block: same intent (corpus tool + ticket tool +
@@ -138,14 +151,14 @@ class TenantDeployer:
         """
         from agentscope.agent import Agent, ReActConfig
 
-        sys_prompt = self._build_prompt(tenant)
+        sys_prompt = spec.system_prompt or self._build_prompt(tenant, spec)
         # ReActConfig replaces the implicit reasoning loop of the fictional
         # HarnessAgent; HITL emerges from rules with behavior=ASK.
         react = ReActConfig(max_iters=20)
         return Agent(
-            name=f"{tenant.name}_agent",
+            name=spec.name,
             system_prompt=sys_prompt,
-            model=None,  # wired from tenant.model at runtime
+            model=spec.model,  # None → wired from tenant.model at runtime
             toolkit=self._build_toolkit(tenant, collection),
             react_config=react,
         )
@@ -164,9 +177,9 @@ class TenantDeployer:
         }
 
     @staticmethod
-    def _build_prompt(tenant: TenantConfig) -> str:
+    def _build_prompt(tenant: TenantConfig, spec: AgentSpec) -> str:
         return (
-            f"You are the support agent for {tenant.name} (tenant={tenant.id}). "
+            f"You are the {spec.role} for {tenant.name} (tenant={tenant.id}). "
             "Answer customer tickets using only the tenant corpus. "
             "Escalate (ASK) refunds above policy thresholds. "
             "Never access other tenants' data."

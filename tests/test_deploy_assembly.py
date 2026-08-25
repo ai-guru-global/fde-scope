@@ -106,3 +106,61 @@ def test_dry_run_skips_assembly(monkeypatch: pytest.MonkeyPatch) -> None:
     deployed = deployer.deploy(tenant, dry_run=True)
     assert deployed.is_assembled is False
     assert deployed.manifest["started"] is False
+
+
+def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """每个 AgentSpec 组装一个 Agent；model 从 spec wiring；manifest 带 agents 段。"""
+    calls: list[str] = []
+    monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("workspace", spec.tenant_id))
+    monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("engine", bp.tenant_id))
+    deployer = TenantDeployer(agentscope_extra=True)
+    tenant = TenantConfig(
+        id="acme",
+        name="Acme",
+        agents=[
+            {"name": "researcher", "role": "调研员"},
+            {"name": "coder", "role": "实施员", "model": "qwen-max", "system_prompt": "You code."},
+        ],
+    )
+    deployed = deployer.deploy(tenant)
+    assert len(deployed.agents) == 2
+    assert deployed.agent is deployed.agents[0]  # 单 Agent 兼容
+    assert deployed.agents[0].kwargs["name"] == "researcher"
+    assert deployed.agents[0].kwargs["model"] is None  # spec.model 缺失 → 运行时注入
+    assert "调研员" in deployed.agents[0].kwargs["system_prompt"]
+    assert deployed.agents[1].kwargs["model"] == "qwen-max"
+    assert deployed.agents[1].kwargs["system_prompt"] == "You code."
+    # manifest agents 段（dry-run 与 real 都有）
+    agents = deployed.manifest["agents"]
+    assert [a["name"] for a in agents] == ["researcher", "coder"]
+    assert agents[1]["model"] == "qwen-max"
+    assert agents[0]["toolkit"] == ["corpus_collection", "ticket_api"]
+
+
+def test_deployer_default_single_agent_manifest(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    """agents 缺省时沿用现有单 Agent 行为（name = {tenant.name}_agent）。"""
+    monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("w", spec.tenant_id))
+    monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("e", bp.tenant_id))
+    deployer = TenantDeployer(agentscope_extra=True)
+    deployed = deployer.deploy(TenantConfig(id="acme", name="Acme"))
+    assert len(deployed.agents) == 1
+    assert deployed.agents[0].kwargs["name"] == "Acme_agent"
+    assert deployed.manifest["agents"][0]["name"] == "Acme_agent"
+
+
+def test_dry_run_manifest_has_agents_section() -> None:
+    """dry-run 也携带 agents 拓扑声明（计划可校验）。"""
+    deployer = TenantDeployer(agentscope_extra=False)
+    deployed = deployer.deploy(
+        TenantConfig(id="acme", name="Acme", agents=[{"name": "r", "role": "调研"}]),
+        dry_run=True,
+    )
+    agents = deployed.manifest["agents"]
+    assert len(agents) == 1
+    assert agents[0]["name"] == "r"
+    assert agents[0]["role"] == "调研"
+    assert agents[0]["model"] is None  # None → wired by the runtime
+    assert agents[0]["toolkit"] == ["corpus_collection", "ticket_api"]
+    # 默认 system_prompt 由 _build_prompt 生成（含 role），截 120 字符
+    assert "调研" in agents[0]["system_prompt"]
+    assert len(agents[0]["system_prompt"]) <= 120
