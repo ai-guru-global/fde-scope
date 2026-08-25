@@ -91,3 +91,60 @@ def test_qwenpaw_export_includes_skills_and_corpus(tmp_path) -> None:
     skill_mds = list((tmp_path / "skills").glob("*/SKILL.md"))
     assert len(skill_mds) == 1
     assert "## Checklist" in skill_mds[0].read_text(encoding="utf-8")
+
+
+def test_validate_export_rejects_missing_id(tmp_path) -> None:
+    from fde_scope.config import TenantConfig
+    from fde_scope.integrations.qwenpaw_exporter import QwenPawExporter
+    from fde_scope.integrations.validator import validate_export
+
+    tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
+    QwenPawExporter().export(tenant, tmp_path)
+    # 篡改：删掉 profile 的 name → 校验必须报错
+    cfg = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    del cfg["agents"]["profiles"]["a1"]["name"]
+    (tmp_path / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+    assert any("name" in e for e in report["errors"])
+
+
+def test_validate_export_rejects_bad_agent_id(tmp_path) -> None:
+    from fde_scope.config import TenantConfig
+    from fde_scope.integrations.qwenpaw_exporter import QwenPawExporter
+    from fde_scope.integrations.validator import validate_export
+
+    tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
+    QwenPawExporter().export(tenant, tmp_path)
+    cfg = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    cfg["agents"]["profiles"]["bad id!"] = dict(cfg["agents"]["profiles"]["a1"], id="bad id!")
+    (tmp_path / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+
+
+def test_validate_export_rejects_missing_skill_frontmatter(tmp_path) -> None:
+    from fde_scope.config import TenantConfig
+    from fde_scope.integrations.qwenpaw_exporter import QwenPawExporter
+    from fde_scope.integrations.validator import validate_export
+    from fde_scope.skills.models import SkillRecord
+
+    tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
+    skills = [
+        SkillRecord(
+            id="sk-1",
+            title="技巧",
+            category="research",
+            body_md="body",
+            source="manual",
+            status="published",
+            version=1,
+        )
+    ]
+    QwenPawExporter().export(tenant, tmp_path, skills=skills)
+    # 目录名由 exporters._slugify 决定，用 glob 定位实际 SKILL.md
+    skill_mds = list((tmp_path / "skills").glob("*/SKILL.md"))
+    assert skill_mds
+    skill_mds[0].write_text("no frontmatter", encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
