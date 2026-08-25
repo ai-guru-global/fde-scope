@@ -251,3 +251,47 @@ def test_capture_operation_sets_source_and_engagement(service):
     assert rec.source == SkillSource.AUTO_CAPTURE
     assert rec.source_engagement == "eng-y"
     assert "eng-y" in rec.title
+
+
+# -- 导出器（Task 5） ----------------------------------------------------------
+
+
+def test_export_agentscope_format():
+    from fde_scope.skills.exporters import export_skill
+
+    rec = _rec(title="OPC UA 排查", tags=["opcua"])
+    files = export_skill(rec, "agentscope")
+    assert len(files) == 1
+    assert files[0].name == "opc-ua/SKILL.md"  # 技能名 slug 化（中文丢弃，零依赖）
+    assert "name:" in files[0].content and "description:" in files[0].content
+    assert "# body" in files[0].content
+
+
+def test_export_qwenpaw_format():
+    from fde_scope.skills.exporters import export_skill
+
+    files = export_skill(_rec(title="T"), "qwenpaw")
+    assert files[0].name.endswith("SKILL.md")
+    assert files[0].content  # 非空
+
+
+def test_export_unknown_format_raises():
+    from fde_scope.skills.exporters import export_skill
+
+    with pytest.raises(ValueError):
+        export_skill(_rec(), "bogus")
+
+
+def test_export_many_produces_one_dir_per_skill():
+    from fde_scope.skills.exporters import export_many
+
+    files = export_many([_rec(title="A"), _rec(title="B")], "agentscope")
+    assert len(files) == 2
+    assert {f.name.split("/")[0] for f in files} == {"a", "b"}
+
+
+def test_export_slug_falls_back_for_pure_symbols():
+    from fde_scope.skills.exporters import export_skill
+
+    files = export_skill(_rec(title="！！！"), "agentscope")
+    assert files[0].name == "skill/SKILL.md"

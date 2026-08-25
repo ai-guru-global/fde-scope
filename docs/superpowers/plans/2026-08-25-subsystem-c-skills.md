@@ -681,11 +681,12 @@ def test_capture_operation_maps_category(service):
 - Consumes: `SkillRecord`（Task 1）
 - Produces: `ExportFile = dataclass(name: str, content: str)`、`export_skill(record: SkillRecord, fmt: str) -> list[ExportFile]`（fmt 非法抛 `ValueError`）、`export_many(records, fmt) -> list[ExportFile]`（批量：每个技能一个目录条目）；agentscope 格式：`<skill-name>/SKILL.md`；qwenpaw 格式：`<skill-name>/SKILL.md`（frontmatter 字段经官方文档检索确认后定稿）
 
-- [ ] **Step 1: 检索官方格式**（exporters 实现前必做，避免虚构 API）
-  - WebFetch `https://doc.agentscope.io/versions/2.0.x/`（或 GitHub `agentscope-ai/agentscope` 仓库 `examples/` 下真实 SKILL.md 样例），确认 frontmatter 字段（name/description/…）与目录约定
-  - WebFetch `https://qwenpaw.agentscope.io/docs/` 的 Skills 章节，确认 QwenPaw 技能格式与 AgentScope 的差异
-  - 将确认结果写入本文件（Task 5 的实现代码区）
-- [ ] **Step 2: 写失败测试**（按检索确认的格式）
+- [x] **Step 1: 检索官方格式**（已完成 2026-08-25）
+  - **AgentScope 2.0**（官方教程 `doc.agentscope.io/tutorial/task_agent_skill.html`）：skill 目录必须含 `SKILL.md`（YAML frontmatter + Markdown 指令）；frontmatter 必填字段 `name`、`description`；注册 API 为 `Toolkit.register_agent_skill(dir)` / `get_agent_skill_prompt()`
+  - **QwenPaw**（仓库 `CONTRIBUTING_zh.md` + 真实样例 `src/qwenpaw/agents/skills/file_reader-zh/SKILL.md`）：同一 Anthropic Agent Skills 规范，frontmatter 至少 `name` + `description`，可选 `metadata`（如 `qwenpaw.emoji`、`requires`）；目录可含可选 `references/`、`scripts/`；放入 skills 目录即自动发现（无需注册）
+  - **两格式同源，差异仅 QwenPaw 可选 `metadata`** → 共用一个渲染器，qwenpaw 追加 metadata 块；目录名用 `_slugify(title)`（QwenPaw 目录惯例为下划线小写，但连字符亦兼容，见 ISSUE #2323）
+  - 确认结果已写入 Step 4 实现代码区（docstring）
+- [x] **Step 2: 写失败测试**（按检索确认的格式）
 
 ```python
 def test_export_agentscope_format():
@@ -711,13 +712,16 @@ def test_export_unknown_format_raises():
         export_skill(_rec(), "bogus")
 ```
 
-- [ ] **Step 3: 运行确认失败**：`pytest tests/test_skills.py -k export -v` → FAIL
-- [ ] **Step 4: 实现 exporters.py**（frontmatter 字段以 Step 1 检索结果为准）
+- [x] **Step 3: 运行确认失败**：`pytest tests/test_skills.py -k export -v` → FAIL（ModuleNotFoundError，5 个失败）
+- [x] **Step 4: 实现 exporters.py**（frontmatter 字段以 Step 1 检索结果为准；注：`_slugify` 零依赖实现丢弃非 ASCII 字符，测试断言中文标题 slug 化为 `opc-ua` 而非拼音）
 
 ```python
 """技能导出器：SkillRecord → AgentScope / QwenPaw 兼容 SKILL.md。
 
-格式约定来自官方文档检索（2026-08-25）：<在此处记录检索到的 frontmatter 字段与目录约定>。
+格式约定来自官方文档检索（2026-08-25）：AgentScope 2.0 教程
+task_agent_skill.html 与 QwenPaw CONTRIBUTING_zh.md 均遵循 Anthropic
+Agent Skills 规范：目录含 SKILL.md（YAML frontmatter + Markdown 指令），
+frontmatter 必填 name + description；QwenPaw 额外支持可选 metadata。
 """
 
 from __future__ import annotations
@@ -769,7 +773,7 @@ def export_many(records: list[SkillRecord], fmt: str) -> list[ExportFile]:
     return files
 ```
 
-- [ ] **Step 5: 运行确认通过**：`pytest tests/test_skills.py -k export -v` → PASS
+- [x] **Step 5: 运行确认通过**：`pytest tests/test_skills.py -k export -v` → PASS（全量 26 个）
 - [ ] **Step 6: Commit**：`git add fde_scope/skills/exporters.py tests/test_skills.py && git commit -m "feat(skills): add agentscope/qwenpaw exporters"`
 
 ---
@@ -810,7 +814,7 @@ def test_skill_add_publish_export(tmp_path, monkeypatch):
     assert runner.invoke(app, ["skill", "publish", sid]).exit_code == 0
     assert runner.invoke(app, ["skill", "export", sid, "--format", "agentscope",
                                "--out", str(tmp_path / "out")]).exit_code == 0
-    assert (tmp_path / "out" / "opc-ua-pai-cha" / "SKILL.md").exists()
+    assert (tmp_path / "out" / "opc-ua" / "SKILL.md").exists()
 
 
 def test_skill_list_and_review(tmp_path, monkeypatch):
