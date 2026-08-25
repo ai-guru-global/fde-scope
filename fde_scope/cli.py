@@ -684,6 +684,84 @@ skill_app = typer.Typer(name="skill", help="[Skills] 技能/方法论沉淀库."
 app.add_typer(skill_app)
 
 
+# ---------------------------------------------------------------------------
+# qwenpaw（QwenPaw 集成：导出 / 校验）
+# ---------------------------------------------------------------------------
+qwenpaw_app = typer.Typer(
+    name="qwenpaw", help="[QwenPaw] 导出 / 校验 QwenPaw 兼容产物.", no_args_is_help=True
+)
+app.add_typer(qwenpaw_app)
+
+
+@qwenpaw_app.command("export")
+def qwenpaw_export(
+    tenant: str = typer.Option(..., "--tenant", "-t", help="Tenant ID"),
+    name: str = typer.Option("Tenant", "--name", help="Tenant display name"),
+    model: str = typer.Option("qwen-max", "--model", "-m", help="Model config name"),
+    agent_specs: list[str] | None = typer.Option(
+        None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"
+    ),
+    out: str = typer.Option(..., "--out", help="Output directory"),
+    corpus: str | None = typer.Option(None, "--corpus", help="Path to forged corpus JSON (optional)"),
+) -> None:
+    """[QwenPaw] 导出 tenant 拓扑 + published 技能 + corpus 说明为 QwenPaw 兼容产物."""
+    _banner(f"qwenpaw export · {tenant}")
+    from .config import AgentSpec, TenantConfig
+    from .integrations.qwenpaw_exporter import QwenPawExporter
+    from .skills.models import SkillStatus
+
+    agents = []
+    for a in agent_specs or []:
+        parts = a.split(":")
+        if len(parts) == 2:
+            agent_name, agent_role, agent_model = parts[0], parts[1], None
+        elif len(parts) == 3:
+            agent_name, agent_role, agent_model = parts
+        else:
+            console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
+            raise typer.Exit(2)
+        agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
+    cfg = TenantConfig(id=tenant, name=name, model=model, agents=agents or None)
+
+    corpus_report = None
+    if corpus:
+        from .corpus import CorpusReport
+
+        try:
+            corpus_report = CorpusReport.model_validate_json(Path(corpus).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            console.print(f"[red]Cannot load corpus report:[/red] {corpus} ({exc})")
+            raise typer.Exit(2) from exc
+
+    skills = _skill_service().search(status=SkillStatus("published"))
+    bundle = QwenPawExporter().export(cfg, Path(out), skills=skills, corpus_report=corpus_report)
+    for w in bundle.written:
+        console.print(f"📦 {w}")
+    if bundle.report["valid"]:
+        console.print(f"✅ Exported {len(bundle.written)} files → [green]{out}[/green]")
+    else:
+        console.print("[yellow]⚠ export contains validation errors (see qwenpaw_validate.json)[/yellow]")
+    console.print(f"📋 Manifest → [green]{json.dumps(bundle.report, ensure_ascii=False)}[/green]")
+
+
+@qwenpaw_app.command("validate")
+def qwenpaw_validate(
+    out: str = typer.Option(..., "--out", help="Export directory to validate"),
+) -> None:
+    """[QwenPaw] 校验导出产物（结构 + 必填字段 + agent id 规则）。"""
+    _banner(f"qwenpaw validate · {out}")
+    from .integrations.validator import validate_export
+
+    report = validate_export(Path(out))
+    if report["valid"]:
+        console.print("✅ [green]VALID[/green] — QwenPaw-compatible bundle")
+    else:
+        for e in report["errors"]:
+            console.print(f"[red]✗[/red] {e}")
+        console.print(f"❌ [red]INVALID[/red] — {len(report['errors'])} error(s)")
+        raise typer.Exit(1)
+
+
 def _skill_service() -> SkillService:
     from .skills.service import SkillService
     from .skills.store import SkillStore

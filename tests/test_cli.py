@@ -294,3 +294,42 @@ def test_deploy_invalid_agent_spec_exits_2(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     r = runner.invoke(app, ["deploy", "--tenant", "acme", "--dry-run", "--agent", "bad-spec"])
     assert r.exit_code == 2
+
+
+def test_qwenpaw_export_and_validate(tmp_path: Path, monkeypatch) -> None:
+    """qwenpaw export 产出可被 qwenpaw validate 验证通过。"""
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "out"
+    r = runner.invoke(
+        app,
+        [
+            "qwenpaw",
+            "export",
+            "--tenant",
+            "acme",
+            "--name",
+            "Acme",
+            "--out",
+            str(out),
+            "--agent",
+            "researcher:调研员",
+            "--agent",
+            "coder:实施员:qwen-max",
+        ],
+    )
+    assert r.exit_code == 0, r.stdout
+    assert (out / "config.json").exists()
+    assert '"profiles"' in (out / "config.json").read_text(encoding="utf-8")
+    r2 = runner.invoke(app, ["qwenpaw", "validate", "--out", str(out)])
+    assert r2.exit_code == 0, r2.stdout
+    assert "VALID" in r2.stdout
+
+
+def test_qwenpaw_validate_reports_bad_bundle(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "config.json").write_text('{"agents": {"profiles": {}}}', encoding="utf-8")
+    r = runner.invoke(app, ["qwenpaw", "validate", "--out", str(out)])
+    assert r.exit_code == 1
+    assert "profiles" in r.stdout
