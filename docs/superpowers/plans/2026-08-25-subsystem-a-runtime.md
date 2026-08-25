@@ -58,7 +58,10 @@ def test_tenant_config_agents_default_none_and_roundtrip() -> None:
     cfg = TenantConfig(
         id="t",
         name="T",
-        agents=[{"name": "researcher", "role": "调研员"}, {"name": "coder", "role": "实施员", "model": "qwen-max"}],
+        agents=[
+            {"name": "researcher", "role": "调研员"},
+            {"name": "coder", "role": "实施员", "model": "qwen-max"},
+        ],
     )
     assert len(cfg.agents) == 2
     assert cfg.agents[1].model == "qwen-max"
@@ -142,7 +145,9 @@ pytest -q && git add fde_scope/config.py fde_scope/templates/tenant_config.yaml 
 - [x] **Step 1: 写失败测试**（追加到 `tests/test_deploy_assembly.py` 末尾，复用 `fake_agentscope` fixture 与 FakeAgent）
 
 ```python
-def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_assembles_multi_agent_topology(
+    fake_agentscope: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """每个 AgentSpec 组装一个 Agent；model 从 spec wiring；manifest 带 agents 段。"""
     calls: list[str] = []
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("workspace", spec.tenant_id))
@@ -171,7 +176,9 @@ def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypa
     assert agents[0]["toolkit"] == ["corpus_collection", "ticket_api"]
 
 
-def test_deployer_default_single_agent_manifest(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_default_single_agent_manifest(
+    fake_agentscope: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """agents 缺省时沿用现有单 Agent 行为（name = {tenant.name}_agent）。"""
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("w", spec.tenant_id))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("e", bp.tenant_id))
@@ -190,7 +197,13 @@ def test_dry_run_manifest_has_agents_section() -> None:
         dry_run=True,
     )
     assert deployed.manifest["agents"] == [
-        {"name": "r", "role": "调研", "model": None, "system_prompt": "", "toolkit": ["corpus_collection", "ticket_api"]}
+        {
+            "name": "r",
+            "role": "调研",
+            "model": None,
+            "system_prompt": "",
+            "toolkit": ["corpus_collection", "ticket_api"],
+        }
     ]
 ```
 
@@ -443,7 +456,9 @@ class FakeClosable:
         self.closed = True
 
 
-def test_stop_closes_handles_and_flags_manifest(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_stop_closes_handles_and_flags_manifest(
+    fake_agentscope: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """2.0 没有 Agent.stop——stop 关闭可关闭句柄并标记 manifest。"""
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: FakeClosable("ws"))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: FakeClosable("engine"))
@@ -464,9 +479,16 @@ def test_deploy_manifest_lists_agents(tmp_path: Path, monkeypatch) -> None:
     r = runner.invoke(
         app,
         [
-            "deploy", "--tenant", "acme", "--name", "Acme", "--dry-run",
-            "--agent", "researcher:调研员",
-            "--agent", "coder:实施员:qwen-max",
+            "deploy",
+            "--tenant",
+            "acme",
+            "--name",
+            "Acme",
+            "--dry-run",
+            "--agent",
+            "researcher:调研员",
+            "--agent",
+            "coder:实施员:qwen-max",
         ],
     )
     assert r.exit_code == 0, r.stdout
@@ -514,7 +536,9 @@ Expected: FAIL（`stop` 不存在 / `--agent` 未知选项）
 `fde_scope/cli.py` `deploy` 命令签名增加：
 
 ```python
-    agent_specs: list[str] = typer.Option([], "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"),
+agent_specs: list[str] = (
+    typer.Option([], "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"),
+)
 ```
 
 `cfg` 构造前解析（`corpus_report` 处理后）：
@@ -537,8 +561,8 @@ Expected: FAIL（`stop` 不存在 / `--agent` 未知选项）
 `from .config import AgentSpec` 加入现有 import 行。`deploy` 输出在 `Manifest` 行前加：
 
 ```python
-    for a in (deployed.manifest.get("agents") or []):
-        console.print(f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'}")
+for a in deployed.manifest.get("agents") or []:
+    console.print(f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'}")
 ```
 
 - [x] **Step 4: 运行确认通过**

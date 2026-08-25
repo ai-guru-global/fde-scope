@@ -303,7 +303,7 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 296 passed, 3 skipped — core + engagement + gates + skills + web + LLM mock,
+pytest                 # 326 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock,
                        # no agentscope/mysql/opcua/LLM-key needed (skips are integration-only)
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```

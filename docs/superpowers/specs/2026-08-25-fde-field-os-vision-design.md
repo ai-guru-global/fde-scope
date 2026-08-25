@@ -38,37 +38,40 @@ FDE Scope 目前是"单项目 SOP 工具链"（CLI + Web 控制台 + Python 库�
 
 ```python
 class SkillCategory(str, Enum):
-    RESEARCH        = "research"         # 调研
-    IMPLEMENTATION  = "implementation"   # 实施
-    OPTIMIZATION    = "optimization"     # 调优
-    METHODOLOGY     = "methodology"      # 方法论
+    RESEARCH = "research"  # 调研
+    IMPLEMENTATION = "implementation"  # 实施
+    OPTIMIZATION = "optimization"  # 调优
+    METHODOLOGY = "methodology"  # 方法论
+
 
 class SkillStatus(str, Enum):
-    DRAFT       = "draft"       # 草稿（自动捕获/提示产生）
-    PUBLISHED   = "published"   # 已发布（可检索、可导出）
-    ARCHIVED    = "archived"    # 已归档（弃用）
+    DRAFT = "draft"  # 草稿（自动捕获/提示产生）
+    PUBLISHED = "published"  # 已发布（可检索、可导出）
+    ARCHIVED = "archived"  # 已归档（弃用）
+
 
 class SkillSource(str, Enum):
-    MANUAL         = "manual"          # 手动沉淀
-    GATE_HINT      = "gate_hint"       # gate 阻塞时提示生成
-    AUTO_CAPTURE   = "auto_capture"    # 操作自动捕获
+    MANUAL = "manual"  # 手动沉淀
+    GATE_HINT = "gate_hint"  # gate 阻塞时提示生成
+    AUTO_CAPTURE = "auto_capture"  # 操作自动捕获
+
 
 class SkillRecord(BaseModel):
-    id: str                       # skill-<8 位随机>
-    title: str                    # ≤80 字
+    id: str  # skill-<8 位随机>
+    title: str  # ≤80 字
     category: SkillCategory
-    tags: list[str]               # 自由标签
-    body_md: str                  # Markdown 正文
-    phase_slug: str | None        # 可选绑定 18 阶段
-    gate_slug: str | None         # 可选绑定 10 门禁
-    applies_to: list[str]         # 适用 profile：ticket / manufacturing
+    tags: list[str]  # 自由标签
+    body_md: str  # Markdown 正文
+    phase_slug: str | None  # 可选绑定 18 阶段
+    gate_slug: str | None  # 可选绑定 10 门禁
+    applies_to: list[str]  # 适用 profile：ticket / manufacturing
     source: SkillSource
-    source_engagement: str | None # 溯源 engagement id
+    source_engagement: str | None  # 溯源 engagement id
     status: SkillStatus
-    version: int                  # 每次编辑 +1
+    version: int  # 每次编辑 +1
     created_at: datetime
     updated_at: datetime
-    export_formats: list[str]     # 已导出格式记录
+    export_formats: list[str]  # 已导出格式记录
 ```
 
 ### 2.2 存储布局（零新增依赖）

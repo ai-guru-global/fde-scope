@@ -9,7 +9,7 @@ engagement survives across CLI invocations.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -83,7 +83,7 @@ class JournalEntry(BaseModel):
     """一条现场记录：调研 / 实施 / 调优（可选关联已沉淀技能）。"""
 
     id: str = Field(default_factory=lambda: f"jn-{secrets.token_hex(4)}")
-    ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    ts: str = Field(default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds"))
     kind: Literal["research", "implementation", "optimization"]
     note: str
     skill_id: str | None = None

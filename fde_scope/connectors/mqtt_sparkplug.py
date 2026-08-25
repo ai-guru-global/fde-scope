@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Iterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -230,7 +230,7 @@ class MqttSparkplugConnector(DataConnector):
                         "topic": msg.topic,
                         "payload": msg.payload.decode("utf-8", errors="replace"),
                         # No wire timestamp in plain MQTT — stamp receive time.
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                         "qos": msg.qos,
                         "retain": msg.retain,
                     }
@@ -271,7 +271,7 @@ class MqttSparkplugConnector(DataConnector):
                     "topic": msg.topic,
                     "payload": msg.payload.decode("utf-8", errors="replace"),
                     # No wire timestamp in plain MQTT — stamp receive time.
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "qos": msg.qos,
                     "retain": msg.retain,
                 }

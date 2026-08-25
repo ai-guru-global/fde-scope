@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Literal
 
@@ -43,7 +43,7 @@ ExportFormat = Literal["agentscope", "qwenpaw"]
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SkillDraft(BaseModel):

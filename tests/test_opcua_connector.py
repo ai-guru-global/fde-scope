@@ -21,7 +21,7 @@ import sys
 import types
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -160,7 +160,7 @@ def fake_asyncua_module() -> Iterator[_FakeAsyncUAModule]:
 
 # Helpers --------------------------------------------------------------------
 def _ts() -> datetime:
-    return datetime(2026, 8, 5, 12, 0, 0, tzinfo=timezone.utc)
+    return datetime(2026, 8, 5, 12, 0, 0, tzinfo=UTC)
 
 
 def _build_tree() -> _FakeNode:

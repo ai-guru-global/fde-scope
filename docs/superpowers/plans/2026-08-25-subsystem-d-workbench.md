@@ -247,13 +247,17 @@ def test_journal_api_roundtrip(client) -> None:
     entries = client.get(f"/api/engagements/{eid}/journal").json()
     assert len(entries) == 1 and entries[0]["note"] == "产线 A 调研"
     # 校验：非法 kind / 空 note
-    assert client.post(f"/api/engagements/{eid}/journal", json={"kind": "oops", "note": "x"}).status_code == 422
+    assert (
+        client.post(f"/api/engagements/{eid}/journal", json={"kind": "oops", "note": "x"}).status_code == 422
+    )
     assert client.post(f"/api/engagements/{eid}/journal", json={"note": "  "}).status_code == 422
 
 
 def test_journal_to_skill_bridge(client) -> None:
     eid = client.post("/api/engagements", data={"customer": "BMW"}).json()["engagement_id"]
-    jid = client.post(f"/api/engagements/{eid}/journal", json={"kind": "implementation", "note": "部署完成"}).json()["id"]
+    jid = client.post(
+        f"/api/engagements/{eid}/journal", json={"kind": "implementation", "note": "部署完成"}
+    ).json()["id"]
     r = client.post(f"/api/engagements/{eid}/journal/{jid}/skill")
     assert r.status_code == 200
     rec = r.json()

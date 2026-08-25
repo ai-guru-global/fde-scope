@@ -10,7 +10,7 @@ SOP real.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .context import EngagementContext, GateRecord
 from .gates.base import Gate, GateResult
@@ -137,7 +137,7 @@ class Engagement:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _merge_results(results: list[GateResult]) -> GateResult:

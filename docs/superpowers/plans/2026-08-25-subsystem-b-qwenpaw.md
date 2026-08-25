@@ -194,7 +194,10 @@ def test_qwenpaw_export_writes_full_bundle(tmp_path) -> None:
     tenant = TenantConfig(
         id="acme",
         name="Acme",
-        agents=[{"name": "researcher", "role": "调研员"}, {"name": "coder", "role": "实施员", "system_prompt": "You code."}],
+        agents=[
+            {"name": "researcher", "role": "调研员"},
+            {"name": "coder", "role": "实施员", "system_prompt": "You code."},
+        ],
     )
     ex = QwenPawExporter()
     bundle = ex.export(tenant, tmp_path)
@@ -224,8 +227,13 @@ def test_qwenpaw_export_includes_skills_and_corpus(tmp_path) -> None:
     tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
     skills = [
         SkillRecord(
-            id="sk-1", title="现场调研清单", category="research", body_md="## Checklist\n1. 首件确认",
-            source="manual", status="published", version=1,
+            id="sk-1",
+            title="现场调研清单",
+            category="research",
+            body_md="## Checklist\n1. 首件确认",
+            source="manual",
+            status="published",
+            version=1,
         )
     ]
     ex = QwenPawExporter()
@@ -440,8 +448,17 @@ def test_validate_export_rejects_missing_skill_frontmatter(tmp_path) -> None:
     from fde_scope.skills.models import SkillRecord
 
     tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
-    skills = [SkillRecord(id="sk-1", title="技巧", category="research", body_md="body",
-                          source="manual", status="published", version=1)]
+    skills = [
+        SkillRecord(
+            id="sk-1",
+            title="技巧",
+            category="research",
+            body_md="body",
+            source="manual",
+            status="published",
+            version=1,
+        )
+    ]
     QwenPawExporter().export(tenant, tmp_path, skills=skills)
     (tmp_path / "skills" / "技巧" / "SKILL.md").write_text("no frontmatter", encoding="utf-8")
     report = validate_export(tmp_path)
@@ -555,8 +572,20 @@ def test_qwenpaw_export_and_validate(tmp_path: Path, monkeypatch) -> None:
     out = tmp_path / "out"
     r = runner.invoke(
         app,
-        ["qwenpaw", "export", "--tenant", "acme", "--name", "Acme", "--out", str(out),
-         "--agent", "researcher:调研员", "--agent", "coder:实施员:qwen-max"],
+        [
+            "qwenpaw",
+            "export",
+            "--tenant",
+            "acme",
+            "--name",
+            "Acme",
+            "--out",
+            str(out),
+            "--agent",
+            "researcher:调研员",
+            "--agent",
+            "coder:实施员:qwen-max",
+        ],
     )
     assert r.exit_code == 0, r.stdout
     assert (out / "config.json").exists()
@@ -586,7 +615,9 @@ Expected: FAIL（`No such command 'qwenpaw'`）
 在 `skill_app` 定义后新增：
 
 ```python
-qwenpaw_app = typer.Typer(name="qwenpaw", help="[QwenPaw] 导出 / 校验 QwenPaw 兼容产物.", no_args_is_help=True)
+qwenpaw_app = typer.Typer(
+    name="qwenpaw", help="[QwenPaw] 导出 / 校验 QwenPaw 兼容产物.", no_args_is_help=True
+)
 app.add_typer(qwenpaw_app)
 
 
@@ -595,7 +626,9 @@ def qwenpaw_export(
     tenant: str = typer.Option(..., "--tenant", "-t", help="Tenant ID"),
     name: str = typer.Option("Tenant", "--name", help="Tenant display name"),
     model: str = typer.Option("qwen-max", "--model", "-m", help="Model config name"),
-    agent_specs: list[str] | None = typer.Option(None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"),
+    agent_specs: list[str] | None = typer.Option(
+        None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"
+    ),
     out: str = typer.Option(..., "--out", help="Output directory"),
     corpus: str | None = typer.Option(None, "--corpus", help="Path to forged corpus JSON (optional)"),
 ) -> None:
