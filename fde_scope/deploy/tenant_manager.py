@@ -42,6 +42,7 @@ class DeployedAgent:
     tenant_id: str
     agent: Any = None
     agents: list[Any] = field(default_factory=list)
+    subagent_templates: list[Any] = field(default_factory=list)
     workspace: Any = None
     engine: Any = None
     corpus_collection: str = ""
@@ -130,11 +131,16 @@ class TenantDeployer:
         workspace = build_workspace(spec)
         engine = build_engine(blueprint)
         agents = [self._assemble_agent(tenant, s, collection) for s in specs]
+        templates = self.build_subagent_templates(tenant, specs)
+        manifest["subagent_templates"] = [
+            {"type": t.type, "description": t.description} for t in templates
+        ]
         manifest["started"] = True
         return DeployedAgent(
             tenant_id=tenant.id,
             agent=agents[0],
             agents=agents,
+            subagent_templates=templates,
             workspace=workspace,
             engine=engine,
             corpus_collection=collection,
@@ -175,6 +181,31 @@ class TenantDeployer:
             "corpus_collection": collection,
             "ticket_api": tenant.ticket_api,
         }
+
+    def build_subagent_templates(self, tenant: TenantConfig, specs: list[AgentSpec]) -> list[Any]:
+        """2.0 官方多 Agent 蓝图：喂给 ``create_app(custom_subagent_templates=...)``.
+
+        ``SubAgentTemplate`` 是纯数据蓝图（agentscope.app._types），leader agent
+        通过 ``AgentCreate`` tool 的 ``subagent_type`` 路由；占位符模板串使用
+        官方支持的 {team_name}/{member_name}/{member_description}。
+        """
+        from agentscope.app import SubAgentTemplate
+
+        return [
+            SubAgentTemplate(
+                type=s.name,
+                description=s.role,
+                system_prompt_template=(
+                    s.system_prompt
+                    or (
+                        f"You are {{member_name}} ({s.role}) on the {{team_name}} team "
+                        f"for tenant {tenant.id}. Work with the leader and other members "
+                        "using TeamSay; never access other tenants' data."
+                    )
+                ),
+            )
+            for s in specs
+        ]
 
     @staticmethod
     def _build_prompt(tenant: TenantConfig, spec: AgentSpec) -> str:

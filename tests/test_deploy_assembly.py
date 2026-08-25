@@ -52,7 +52,7 @@ def test_sandbox_spec_docker_kwargs_match_real_api() -> None:
         assert required in kwargs
 
 
-def test_deployer_assembles_real_path(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_assembles_real_path(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
     """Non-dry-run deploy must reach workspace/engine/agent assembly."""
     calls: list[str] = []
 
@@ -108,9 +108,10 @@ def test_dry_run_skips_assembly(monkeypatch: pytest.MonkeyPatch) -> None:
     assert deployed.manifest["started"] is False
 
 
-def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_assembles_multi_agent_topology(
+    fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """每个 AgentSpec 组装一个 Agent；model 从 spec wiring；manifest 带 agents 段。"""
-    calls: list[str] = []
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("workspace", spec.tenant_id))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("engine", bp.tenant_id))
     deployer = TenantDeployer(agentscope_extra=True)
@@ -137,7 +138,7 @@ def test_deployer_assembles_multi_agent_topology(fake_agentscope: None, monkeypa
     assert agents[0]["toolkit"] == ["corpus_collection", "ticket_api"]
 
 
-def test_deployer_default_single_agent_manifest(fake_agentscope: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deployer_default_single_agent_manifest(fake_agentscope: None, fake_agentscope_app: None, monkeypatch: pytest.MonkeyPatch) -> None:
     """agents 缺省时沿用现有单 Agent 行为（name = {tenant.name}_agent）。"""
     monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("w", spec.tenant_id))
     monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("e", bp.tenant_id))
@@ -164,3 +165,48 @@ def test_dry_run_manifest_has_agents_section() -> None:
     # 默认 system_prompt 由 _build_prompt 生成（含 role），截 120 字符
     assert "调研" in agents[0]["system_prompt"]
     assert len(agents[0]["system_prompt"]) <= 120
+
+
+class FakeSubAgentTemplate:
+    """Stands in for ``agentscope.app.SubAgentTemplate`` (a Pydantic blueprint)."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        self.kwargs = kwargs
+        self.type = kwargs["type"]
+        self.description = kwargs["description"]
+
+
+@pytest.fixture
+def fake_agentscope_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = types.ModuleType("agentscope.app")
+    module.SubAgentTemplate = FakeSubAgentTemplate  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "agentscope.app", module)
+
+
+def test_build_subagent_templates_uses_2_0_blueprints(
+    fake_agentscope_app: None, fake_agentscope: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """每个 AgentSpec → 一个 SubAgentTemplate（type 路由键 + 占位符模板串）。"""
+    monkeypatch.setattr(tenant_manager, "build_workspace", lambda spec: ("w", spec.tenant_id))
+    monkeypatch.setattr(tenant_manager, "build_engine", lambda bp: ("e", bp.tenant_id))
+    deployer = TenantDeployer(agentscope_extra=True)
+    tenant = TenantConfig(
+        id="acme",
+        name="Acme",
+        agents=[
+            {"name": "researcher", "role": "调研员"},
+            {"name": "coder", "role": "实施员", "system_prompt": "You are {member_name}."},
+        ],
+    )
+    deployed = deployer.deploy(tenant)
+    templates = deployed.subagent_templates
+    assert len(templates) == 2
+    assert templates[0].kwargs["type"] == "researcher"
+    assert templates[0].kwargs["description"] == "调研员"
+    # 默认模板串必须含 2.0 占位符（{member_name} 等）
+    assert "{member_name}" in templates[0].kwargs["system_prompt_template"]
+    assert templates[1].kwargs["system_prompt_template"] == "You are {member_name}."
+    assert deployed.manifest["subagent_templates"] == [
+        {"type": "researcher", "description": "调研员"},
+        {"type": "coder", "description": "实施员"},
+    ]
