@@ -101,9 +101,7 @@ class SkillService:
         "kpi": SkillCategory.OPTIMIZATION,
     }
 
-    def suggest_from_gate_block(
-        self, engagement_id: str, gate_slug: str, blockers: list[str]
-    ) -> SkillRecord:
+    def suggest_from_gate_block(self, engagement_id: str, gate_slug: str, blockers: list[str]) -> SkillRecord:
         """gate 被阻塞时生成预填草稿（关键点提示）。"""
         summary = "; ".join(blockers[:3]) if blockers else "无"
         rec = SkillRecord(

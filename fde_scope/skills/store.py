@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 from .models import SkillRecord
@@ -65,11 +66,7 @@ class SkillStore:
     def load_all(self) -> list[SkillRecord]:
         if not self.root.exists():
             return []
-        return [
-            r
-            for r in (self.load(p.name) for p in self.root.iterdir() if p.is_dir())
-            if r is not None
-        ]
+        return [r for r in (self.load(p.name) for p in self.root.iterdir() if p.is_dir()) if r is not None]
 
     # -- 索引 ----------------------------------------------------------------
     def index_entries(self) -> list[dict]:
@@ -122,8 +119,6 @@ class SkillStore:
                 fh.write(content)
             os.replace(tmp, path)
         except BaseException:
-            try:
+            with suppress(OSError):
                 os.unlink(tmp)
-            except OSError:
-                pass
             raise

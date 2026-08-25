@@ -368,10 +368,16 @@ def test_kpi_oversized_upload_413(client) -> None:
 # ---------------------------------------------------------------------------
 def test_skills_api_roundtrip(client, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    r = client.post("/api/skills", json={
-        "title": "OPC UA 排查", "category": "implementation", "tags": ["opcua"],
-        "body_md": "# 步骤", "phase_slug": "deploy",
-    })
+    r = client.post(
+        "/api/skills",
+        json={
+            "title": "OPC UA 排查",
+            "category": "implementation",
+            "tags": ["opcua"],
+            "body_md": "# 步骤",
+            "phase_slug": "deploy",
+        },
+    )
     assert r.status_code == 200
     sid = r.json()["id"]
     assert r.json()["status"] == "draft"

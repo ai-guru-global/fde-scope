@@ -144,10 +144,21 @@ from fde_scope.skills.store import SkillStore  # noqa: E402
 
 def test_skill_add_publish_export(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(app, [
-        "skill", "add", "--title", "OPC UA 排查", "--category", "implementation",
-        "--tags", "opcua", "--body", "# 步骤",
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "skill",
+            "add",
+            "--title",
+            "OPC UA 排查",
+            "--category",
+            "implementation",
+            "--tags",
+            "opcua",
+            "--body",
+            "# 步骤",
+        ],
+    )
     assert result.exit_code == 0, result.stdout
     store = SkillStore(tmp_path / ".fde_scope" / "skills")
     drafts = store.load_all()
@@ -155,8 +166,12 @@ def test_skill_add_publish_export(tmp_path: Path, monkeypatch) -> None:
     assert drafts[0].status == SkillStatus.DRAFT
     sid = drafts[0].id
     assert runner.invoke(app, ["skill", "publish", sid]).exit_code == 0
-    assert runner.invoke(app, ["skill", "export", sid, "--format", "agentscope",
-                               "--out", str(tmp_path / "out")]).exit_code == 0
+    assert (
+        runner.invoke(
+            app, ["skill", "export", sid, "--format", "agentscope", "--out", str(tmp_path / "out")]
+        ).exit_code
+        == 0
+    )
     assert (tmp_path / "out" / "opc-ua" / "SKILL.md").exists()
 
 

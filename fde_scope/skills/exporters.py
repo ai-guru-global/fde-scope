@@ -31,12 +31,7 @@ def _slugify(title: str) -> str:
 
 def _frontmatter(record: SkillRecord) -> str:
     """按官方格式生成 frontmatter（name/description 必填，QwenPaw 兼容）。"""
-    return (
-        "---\n"
-        f"name: {_slugify(record.title)}\n"
-        f"description: {record.title}\n"
-        "---\n"
-    )
+    return f"---\nname: {_slugify(record.title)}\ndescription: {record.title}\n---\n"
 
 
 def export_skill(record: SkillRecord, fmt: str) -> list[ExportFile]:

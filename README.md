@@ -191,7 +191,36 @@ profiles  List available deployment scenario profiles
 web       Launch the Web UI (engagement dashboard + gates + reports)
 engage    [SOP] init / status / advance / rollback / list
 gate      [SOP] list (per profile) / check (per engagement)
+skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
 ```
+
+---
+
+## 💡 Skill 沉淀（Skills / Methodology capture）
+
+FDE 在现场的每一步（调研、实施、调优、方法论）都可以沉淀为可复用的技能，跨 engagement、跨客户复用。技能存为文件库 `.fde_scope/skills/`（每个技能一个目录：`skill.md` + `meta.json`），随项目携带，零数据库依赖。
+
+**三种沉淀入口：**
+
+| 入口 | 触发方式 | 说明 |
+|---|---|---|
+| 手动 | `fde-scope skill add` | 随时沉淀，四类分类（research / implementation / optimization / methodology）+ 标签 |
+| gate 阻塞提示 | `engage advance` / `gate check` 失败时自动 | 生成预填草稿（gate_hint），`skill review` 完善 |
+| 操作自动捕获 | `engage advance` 成功 / `gate check` 通过时自动 | 轻量记录（auto_capture），`skill review` 完善 |
+
+**生命周期：** draft → published → archived。`skill review` 审阅草稿队列 → `skill publish` → 可检索、可导出。
+
+**导出给 Agent：** 支持 AgentScope 2.0 与 QwenPaw 两种格式（Anthropic Agent Skills 规范：`<skill-name>/SKILL.md`，frontmatter 含 `name` + `description`）。导出目录可直接交给 AgentScope `Toolkit.register_agent_skill()`，或放入 QwenPaw 的 `customized_skills` 目录自动发现。
+
+```bash
+fde-scope skill add --title "OPC UA 连接踩坑" --category implementation --tags opcua --body "# 步骤..."
+fde-scope skill review                  # 审阅自动捕获/gate 提示产生的草稿队列
+fde-scope skill publish <skill-id>
+fde-scope skill list --category implementation --tag opcua
+fde-scope skill export <skill-id> --format qwenpaw --out exports/   # 或 --format agentscope
+```
+
+Web UI 暴露完整的 skills API：`GET/POST /api/skills`、`GET/PATCH /api/skills/{id}`、`POST /api/skills/{id}/publish|archive|export`、`GET /api/skills/drafts`。
 
 ---
 
@@ -230,7 +259,7 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 256 passed, 3 skipped — core + engagement + gates + web + LLM mock,
+pytest                 # 296 passed, 3 skipped — core + engagement + gates + skills + web + LLM mock,
                        # no agentscope/mysql/opcua/LLM-key needed (skips are integration-only)
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```

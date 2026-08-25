@@ -295,17 +295,29 @@ def _skill_service():
 
 
 @app.get("/api/skills")
-def api_skills(q: str | None = None, category: str | None = None, tag: str | None = None,
-               status: str = "published", profile: str | None = None,
-               gate: str | None = None, phase: str | None = None) -> list[dict]:
+def api_skills(
+    q: str | None = None,
+    category: str | None = None,
+    tag: str | None = None,
+    status: str = "published",
+    profile: str | None = None,
+    gate: str | None = None,
+    phase: str | None = None,
+) -> list[dict]:
     from ..skills.models import SkillCategory, SkillStatus
 
-    return [r.model_dump() for r in _skill_service().search(
-        q, category=SkillCategory(category) if category else None,
-        tags=[tag] if tag else None,
-        status=SkillStatus(status) if status else None,
-        profile=profile, gate_slug=gate, phase_slug=phase,
-    )]
+    return [
+        r.model_dump()
+        for r in _skill_service().search(
+            q,
+            category=SkillCategory(category) if category else None,
+            tags=[tag] if tag else None,
+            status=SkillStatus(status) if status else None,
+            profile=profile,
+            gate_slug=gate,
+            phase_slug=phase,
+        )
+    ]
 
 
 @app.post("/api/skills")
@@ -323,7 +335,7 @@ def api_skill_get(sid: str) -> dict:
     try:
         return _skill_service().get(sid).model_dump()
     except KeyError:
-        raise HTTPException(status_code=404, detail="skill not found")
+        raise HTTPException(status_code=404, detail="skill not found") from None
 
 
 @app.patch("/api/skills/{sid}")
@@ -331,7 +343,7 @@ def api_skill_patch(sid: str, patch: SkillPatch) -> dict:
     try:
         return _skill_service().update(sid, patch).model_dump()
     except KeyError:
-        raise HTTPException(status_code=404, detail="skill not found")
+        raise HTTPException(status_code=404, detail="skill not found") from None
 
 
 @app.post("/api/skills/{sid}/publish")
@@ -339,9 +351,9 @@ def api_skill_publish(sid: str) -> dict:
     try:
         return _skill_service().publish(sid).model_dump()
     except KeyError:
-        raise HTTPException(status_code=404, detail="skill not found")
+        raise HTTPException(status_code=404, detail="skill not found") from None
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
 @app.post("/api/skills/{sid}/archive")
@@ -349,9 +361,9 @@ def api_skill_archive(sid: str) -> dict:
     try:
         return _skill_service().archive(sid).model_dump()
     except KeyError:
-        raise HTTPException(status_code=404, detail="skill not found")
+        raise HTTPException(status_code=404, detail="skill not found") from None
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from None
 
 
 @app.post("/api/skills/{sid}/export")
@@ -359,15 +371,16 @@ def api_skill_export(sid: str, body: dict) -> dict:
     from ..skills.exporters import export_skill
 
     fmt = body.get("format")
+    if not isinstance(fmt, str):
+        raise HTTPException(status_code=400, detail="missing or invalid 'format'") from None
     try:
         rec = _skill_service().get(sid)
         files = export_skill(rec, fmt)
     except KeyError:
-        raise HTTPException(status_code=404, detail="skill not found")
+        raise HTTPException(status_code=404, detail="skill not found") from None
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    return {"skill_id": sid, "format": fmt,
-            "files": [{"name": f.name, "content": f.content} for f in files]}
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return {"skill_id": sid, "format": fmt, "files": [{"name": f.name, "content": f.content} for f in files]}
 
 
 from fastapi.staticfiles import StaticFiles  # noqa: E402

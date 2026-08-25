@@ -8,13 +8,18 @@ so the whole flow is walkable with zero data and zero extras installed.
 from __future__ import annotations
 
 import json
+from contextlib import suppress
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from . import __version__
+
+if TYPE_CHECKING:
+    from .skills.service import SkillService
 
 app = typer.Typer(
     name="fde-scope",
@@ -633,25 +638,22 @@ def _skill_service() -> SkillService:
 
 def _maybe_suggest_skill(engagement_id: str, gate_slug: str, blockers: list[str]) -> None:
     """gate 阻塞时生成提示草稿；失败静默（不阻塞主流程）。"""
-    try:
+    with suppress(OSError):
         rec = _skill_service().suggest_from_gate_block(engagement_id, gate_slug, blockers)
         console.print(
             f"💡 已把这次阻塞沉淀为草稿 [cyan]{rec.id}[/cyan] — "
             f"[bold]fde-scope skill review[/bold] 可查看并完善"
         )
-    except OSError:
-        pass
 
 
-def _maybe_capture(action: str, engagement_id: str, phase_slug: str | None = None,
-                   detail: dict | None = None) -> None:
+def _maybe_capture(
+    action: str, engagement_id: str, phase_slug: str | None = None, detail: dict | None = None
+) -> None:
     """操作自动捕获；失败静默。"""
-    try:
+    with suppress(OSError):
         _skill_service().capture_operation(
             action=action, engagement_id=engagement_id, phase_slug=phase_slug, detail=detail
         )
-    except OSError:
-        pass
 
 
 @skill_app.command("add")
@@ -676,16 +678,22 @@ def skill_add(
         src = SkillSource(source)
     except ValueError:
         console.print("[red]非法 category/source[/red]（见 --help）")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     text = Path(body_file).read_text(encoding="utf-8") if body_file else body
     service = _skill_service()
-    rec = service.create(SkillDraft(
-        title=title, category=cat,
-        tags=[t.strip() for t in tags.split(",") if t.strip()],
-        body_md=text, phase_slug=phase, gate_slug=gate,
-        applies_to=[p.strip() for p in profile.split(",") if p.strip()],
-        source=src, source_engagement=engagement,
-    ))
+    rec = service.create(
+        SkillDraft(
+            title=title,
+            category=cat,
+            tags=[t.strip() for t in tags.split(",") if t.strip()],
+            body_md=text,
+            phase_slug=phase,
+            gate_slug=gate,
+            applies_to=[p.strip() for p in profile.split(",") if p.strip()],
+            source=src,
+            source_engagement=engagement,
+        )
+    )
     console.print(f"✅ 草稿创建 [cyan]{rec.id}[/cyan] — [bold]fde-scope skill review[/bold] 可审阅")
 
 
@@ -709,10 +717,15 @@ def skill_list(
         st = SkillStatus(status) if status else None
     except ValueError:
         console.print("[red]非法 category/status[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     rows = service.search(
-        search, category=cat, tags=[tag] if tag else None, status=st,
-        profile=profile, gate_slug=gate, phase_slug=phase,
+        search,
+        category=cat,
+        tags=[tag] if tag else None,
+        status=st,
+        profile=profile,
+        gate_slug=gate,
+        phase_slug=phase,
     )
     if not rows:
         console.print("[yellow]无匹配技能[/yellow]")
@@ -721,8 +734,14 @@ def skill_list(
     for col in ("id", "title", "category", "status", "tags", "updated"):
         table.add_column(col)
     for r in rows:
-        table.add_row(r.id, r.title, r.category.value, r.status.value,
-                      ",".join(r.tags), r.updated_at.strftime("%Y-%m-%d"))
+        table.add_row(
+            r.id,
+            r.title,
+            r.category.value,
+            r.status.value,
+            ",".join(r.tags),
+            r.updated_at.strftime("%Y-%m-%d"),
+        )
     console.print(table)
 
 
@@ -733,11 +752,17 @@ def skill_show(skill_id: str = typer.Argument(...)) -> None:
         rec = _skill_service().get(skill_id)
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
-        raise typer.Exit(2)
-    console.print(f"\n[bold cyan]{rec.title}[/bold cyan] · {rec.category.value} · {rec.status.value} · v{rec.version}")
-    console.print(f"tags={rec.tags} · phase={rec.phase_slug} · gate={rec.gate_slug} · "
-                  f"applies_to={rec.applies_to} · source={rec.source.value}")
-    console.print(f"源自: {rec.source_engagement or '—'} · 创建: {rec.created_at:%Y-%m-%d} · 更新: {rec.updated_at:%Y-%m-%d}")
+        raise typer.Exit(2) from None
+    console.print(
+        f"\n[bold cyan]{rec.title}[/bold cyan] · {rec.category.value} · {rec.status.value} · v{rec.version}"
+    )
+    console.print(
+        f"tags={rec.tags} · phase={rec.phase_slug} · gate={rec.gate_slug} · "
+        f"applies_to={rec.applies_to} · source={rec.source.value}"
+    )
+    console.print(
+        f"源自: {rec.source_engagement or '—'} · 创建: {rec.created_at:%Y-%m-%d} · 更新: {rec.updated_at:%Y-%m-%d}"
+    )
     console.print("\n" + rec.body_md)
 
 
@@ -752,13 +777,17 @@ def skill_edit(
     from .skills.models import SkillPatch
 
     try:
-        rec = _skill_service().update(skill_id, SkillPatch(
-            title=title, tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else None,
-            body_md=body,
-        ))
+        rec = _skill_service().update(
+            skill_id,
+            SkillPatch(
+                title=title,
+                tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else None,
+                body_md=body,
+            ),
+        )
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     console.print(f"✅ 已更新 [cyan]{rec.id}[/cyan] → v{rec.version}")
 
 
@@ -769,10 +798,10 @@ def skill_publish(skill_id: str = typer.Argument(...)) -> None:
         _skill_service().publish(skill_id)
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     console.print(f"✅ 已发布 [cyan]{skill_id}[/cyan]")
 
 
@@ -783,7 +812,7 @@ def skill_archive(skill_id: str = typer.Argument(...)) -> None:
         _skill_service().archive(skill_id)
     except (KeyError, ValueError) as exc:
         console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     console.print(f"✅ 已归档 [cyan]{skill_id}[/cyan]")
 
 
@@ -817,10 +846,10 @@ def skill_export(
         files = export_skill(rec, fmt)
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(2)
+        raise typer.Exit(2) from None
     out_dir = Path(out)
     for f in files:
         p = out_dir / f.name

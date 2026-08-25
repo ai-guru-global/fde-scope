@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
@@ -14,7 +12,6 @@ from fde_scope.skills.models import (
     SkillSource,
     SkillStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # models
@@ -38,7 +35,10 @@ def test_skill_draft_defaults():
 
 def test_skill_record_generates_id_and_timestamps():
     rec = SkillRecord(
-        title="t", category=SkillCategory.RESEARCH, tags=[], body_md="b",
+        title="t",
+        category=SkillCategory.RESEARCH,
+        tags=[],
+        body_md="b",
     )
     assert rec.id.startswith("skill-")
     assert rec.version == 1
@@ -183,13 +183,26 @@ def test_service_update_bumps_version(service):
 
 def test_service_search_filters(service):
     service.create(
-        SkillDraft(title="OPC UA 连接", category=SkillCategory.IMPLEMENTATION,
-                   tags=["opcua"], phase_slug="deploy", applies_to=["manufacturing"])
+        SkillDraft(
+            title="OPC UA 连接",
+            category=SkillCategory.IMPLEMENTATION,
+            tags=["opcua"],
+            phase_slug="deploy",
+            applies_to=["manufacturing"],
+        )
     )
-    service.create(SkillDraft(title="工单分类", category=SkillCategory.RESEARCH,
-                              tags=["ticket"], applies_to=["ticket"]))
-    service.create(SkillDraft(title="工会评审", category=SkillCategory.METHODOLOGY,
-                              tags=["gate"], gate_slug="works_council", applies_to=["ticket"]))
+    service.create(
+        SkillDraft(title="工单分类", category=SkillCategory.RESEARCH, tags=["ticket"], applies_to=["ticket"])
+    )
+    service.create(
+        SkillDraft(
+            title="工会评审",
+            category=SkillCategory.METHODOLOGY,
+            tags=["gate"],
+            gate_slug="works_council",
+            applies_to=["ticket"],
+        )
+    )
     assert len(service.search("opc")) == 1
     assert len(service.search(status=SkillStatus.DRAFT)) == 3
     assert len(service.search(category=SkillCategory.RESEARCH)) == 1
