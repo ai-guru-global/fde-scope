@@ -8,8 +8,10 @@ engagement survives across CLI invocations.
 
 from __future__ import annotations
 
+import secrets
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -77,6 +79,16 @@ class GateRecord(BaseModel):
     checked_at: str = ""
 
 
+class JournalEntry(BaseModel):
+    """一条现场记录：调研 / 实施 / 调优（可选关联已沉淀技能）。"""
+
+    id: str = Field(default_factory=lambda: f"jn-{secrets.token_hex(4)}")
+    ts: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    kind: Literal["research", "implementation", "optimization"]
+    note: str
+    skill_id: str | None = None
+
+
 class EngagementContext(BaseModel):
     """The full running state of one FDE engagement."""
 
@@ -89,6 +101,7 @@ class EngagementContext(BaseModel):
     success_criteria: list[str] = Field(default_factory=list)
     safety: SafetyPosture = Field(default_factory=SafetyPosture)
     slos: list[SLOSpec] = Field(default_factory=list)
+    journal: list[JournalEntry] = Field(default_factory=list)
     gate_records: dict[str, GateRecord] = Field(default_factory=dict)
     assets: dict[str, Any] = Field(default_factory=dict)  # free-form per-phase outputs
 

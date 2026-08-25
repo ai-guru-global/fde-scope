@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from fde_scope.engagement import (
@@ -11,6 +13,7 @@ from fde_scope.engagement import (
     Stakeholder,
     phases_for_profile,
 )
+from fde_scope.engagement.context import JournalEntry
 from fde_scope.engagement.phases import phase_by_slug
 
 
@@ -189,3 +192,27 @@ def test_evaluate_gate_unknown_slug_raises() -> None:
     eng = Engagement(_ctx())
     with pytest.raises(KeyError):
         eng.evaluate_gate("fatt_sat")  # typo must not "pass" silently
+
+
+# -- journal（现场记录） -----------------------------------------------------------
+def test_journal_entry_defaults() -> None:
+    e = JournalEntry(kind="research", note="现场调研")
+    assert e.id.startswith("jn-")
+    assert e.ts  # ISO timestamp auto-generated
+    assert e.skill_id is None
+
+
+def test_context_journal_roundtrip() -> None:
+    ctx = EngagementContext(id="e1", customer="Acme")
+    ctx.journal.append(JournalEntry(kind="optimization", note="调优：降低误报"))
+    ctx2 = EngagementContext.model_validate(ctx.model_dump())
+    assert len(ctx2.journal) == 1
+    assert ctx2.journal[0].kind == "optimization"
+    assert ctx2.journal[0].note == "调优：降低误报"
+
+
+def test_legacy_context_json_without_journal_loads(tmp_path) -> None:
+    p = tmp_path / "legacy.json"
+    p.write_text(json.dumps({"id": "e-old", "customer": "OldCo"}), encoding="utf-8")
+    ctx = EngagementContext.load(p)
+    assert ctx.journal == []
