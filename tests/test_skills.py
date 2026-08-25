@@ -64,3 +64,74 @@ def test_touch_bumps_version_and_updated_at():
     rec.touch()
     assert rec.version == 2
     assert rec.updated_at >= old
+
+
+# ---------------------------------------------------------------------------
+# store
+# ---------------------------------------------------------------------------
+
+
+def _rec(title="t", **kw) -> SkillRecord:
+    kw.setdefault("category", SkillCategory.METHODOLOGY)
+    kw.setdefault("tags", [])
+    kw.setdefault("body_md", "# body")
+    return SkillRecord(title=title, **kw)
+
+
+def test_store_roundtrip(tmp_path):
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    rec = _rec(title="OPC UA 踩坑")
+    store.save(rec)
+    loaded = store.load(rec.id)
+    assert loaded == rec
+    assert (tmp_path / "skills" / rec.id / "skill.md").read_text() == "# body"
+    assert (tmp_path / "skills" / rec.id / "meta.json").exists()
+
+
+def test_store_index_and_rebuild(tmp_path):
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    a, b = _rec(title="A"), _rec(title="B", category=SkillCategory.RESEARCH)
+    store.save(a)
+    store.save(b)
+    assert len(store.index_entries()) == 2
+    # 模拟索引损坏：重建必须从目录恢复
+    (tmp_path / "skills" / "index.json").write_text("{broken")
+    store.rebuild_index()
+    assert len(store.index_entries()) == 2
+
+
+def test_store_load_missing_and_corrupt(tmp_path):
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    assert store.load("skill-nope") is None
+    d = tmp_path / "skills" / "skill-bad"
+    d.mkdir(parents=True)
+    (d / "meta.json").write_text("{bad json")
+    assert store.load("skill-bad") is None  # 损坏条目跳过，不抛异常
+
+
+def test_store_delete(tmp_path):
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    rec = _rec()
+    store.save(rec)
+    store.delete(rec.id)
+    assert store.load(rec.id) is None
+    assert len(store.index_entries()) == 0
+
+
+def test_store_load_all_skips_corrupt(tmp_path):
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    store.save(_rec(title="OK"))
+    d = tmp_path / "skills" / "skill-bad"
+    d.mkdir(parents=True)
+    (d / "meta.json").write_text("not json")
+    assert len(store.load_all()) == 1

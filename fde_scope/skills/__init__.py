@@ -12,6 +12,7 @@ from .models import (
     SkillSource,
     SkillStatus,
 )
+from .store import SkillStore
 
 __all__ = [
     "SkillCategory",
@@ -20,4 +21,5 @@ __all__ = [
     "SkillRecord",
     "SkillSource",
     "SkillStatus",
+    "SkillStore",
 ]
