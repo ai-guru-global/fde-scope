@@ -44,9 +44,12 @@ jobs:
           python -m pip install mypy
           mypy fde_scope
 
+      - name: Check PawApp frontend syntax
+        run: node --check pawapp/ui/index.js
+
       - name: Test (with coverage)
         run: |
-          pytest --cov=fde_scope --cov-report=xml --cov-report=term
+          pytest --cov=fde_scope --cov=pawapp/backend --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.12'
@@ -80,3 +83,25 @@ jobs:
           python -m pip install --force-reinstall dist/*.whl
           python -c "import fde_scope; print(fde_scope.__version__)"
           fde-scope --help
+
+  pawapp-host:
+    name: PawApp vs real QwenPaw host
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install (fde-scope + QwenPaw host runtime)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]" qwenpaw
+
+      # Guards against upstream PawApp SDK contract drift (e.g. the 2.1.0
+      # skill_provider gap found during real-host verification).
+      - name: Load pawapp through the real PluginLoader + smoke routes
+        run: python scripts/verify_pawapp_host.py

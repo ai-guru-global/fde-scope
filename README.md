@@ -303,8 +303,8 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 326 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock,
-                       # no agentscope/mysql/opcua/LLM-key needed (skips are integration-only)
+pytest                 # 333 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
+                       # no agentscope/mysql/opcua/LLM-key/QwenPaw needed (skips are integration-only)
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```
 
@@ -335,7 +335,10 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 - [`docs/fde_sop_full.md`](docs/fde_sop_full.md) — the 18-phase SOP, 12 anti-patterns, sources
 - [`docs/manufacturing_scenario.md`](docs/manufacturing_scenario.md) — embodied-robotics factory end-to-end walkthrough
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
+- [`docs/skills.md`](docs/skills.md) — 技能沉淀系统：数据模型 / 生命周期 / 三种入口 / 双格式导出
 - [`docs/llm_integration.md`](docs/llm_integration.md) — MiMo Token Plan integration: 6 touchpoints, fallback semantics, cost model, testing
+- [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md) — QwenPaw 集成：配置两层结构 / 导出与校验 / PawApp 桌面形态
+- [`pawapp/README.md`](pawapp/README.md) — QwenPaw PawApp 安装/开发/API 契约
 - [`docs/code_review_checklist.md`](docs/code_review_checklist.md) — repeatable review workflow + bug case library
 - [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.5 API
 - [`docs/fde_playbook.md`](docs/fde_playbook.md) — on-site 72h playbook
@@ -351,6 +354,9 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 - [ ] rosbag2 真实回放（rosbags）
 - [x] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
 - [x] 小米 MiMo Token Plan 接入（`fde_scope/llm.py`，env 配置，失败回退规则）
+- [x] Skill 沉淀库（四类分类 + 生命周期 + AgentScope/QwenPaw 双格式导出）
+- [x] 多 Agent 拓扑（SubAgentTemplate 蓝图 + manifest agents 段）
+- [x] QwenPaw 集成（qwenpaw export/validate + PawApp 桌面应用，真机验证通过）
 - [ ] Real AgentScope agent startup (Docker workspace + model wiring)
 - [ ] Full Zammad / Salesforce / MES / Historian HTTP/SQL implementations
 - [ ] AgentScope Studio (npm `@agentscope/studio`) integration

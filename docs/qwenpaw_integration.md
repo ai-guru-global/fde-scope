@@ -117,10 +117,28 @@ stdio 协议实现、真实 runner 对接不在本期（spec §5.2 占位条款�
 
 ## 5. PawApp 插件（pawapp/）
 
-`pawapp/` 是一个可安装进 QwenPaw App Center 的 PawApp 骨架（`plugin.json`
+`pawapp/` 是一个可安装进 QwenPaw App Center 的完整 PawApp（`plugin.json`
 声明 + `backend/main.py` FastAPI router + `ui/index.js` React 页面），把 FDE
-引擎（engagement 状态机 / gate / corpus forge / 技能库）以 `/fde-scope/*`
-路由与两个 agent tools（`fde_sop_status` / `fde_sop_advance`）暴露给宿主
-QwenPaw。安装：把 `pawapp/` 拷贝进 QwenPaw 插件目录即可。
-自动化回归：`tests/test_pawapp.py`（stub `qwenpaw.pawapp` SDK，无需安装
-QwenPaw）。
+引擎以 `/api/fde-scope/*` 路由与两个 agent tools（`fde_sop_status` /
+`fde_sop_advance`）暴露给宿主 QwenPaw。安装：把 `pawapp/` 拷贝进 QwenPaw
+插件目录即可（`qwenpaw plugin install ./pawapp`）。详见 `pawapp/README.md`。
+
+**已实现能力（路线图 10/10）**：
+
+| 能力 | 实现 |
+|---|---|
+| SOP 全生命周期 | 17 路由：engagement CRUD / 18 阶段 / gate 实时校验 / 推进拦截 |
+| 语料锻造 / KPI / 技能库 | forge（LLM 合成自动感知 MIMO key）、双 profile KPI、草稿审阅+发布 |
+| handoff + runbook | `ctx.chat()` 宿主 LLM 起草（失败回退模板，`used_llm` 如实标注）——不再需要外部 LLM key |
+| 技能即能力 | 导出的 SKILL.md 写盘到 `.fde_scope/skills/export/`，经 `skill_provider()` 注册给宿主 Agent |
+| Agent 可查状态 | `ctx.storage` 同步 engagement 快照（`engagements_index`，文件仍为唯一事实源） |
+| 前端 | 5 Tab 工作台：SOP 流水线 / 语料锻造 / KPI / 技能库 / 交接 |
+
+**版本兼容**：PyPI 2.1.0 版 PawApp SDK 无 `skill_provider()`（GitHub main
+分支才有），代码用 `hasattr` 探测降级：新宿主自动注册，2.1.0 上导出文件留在
+磁盘供手动发现。
+
+**验证**：真实 QwenPaw 2.1.0 `PluginLoader` 管线加载通过（manifest 解析 →
+模块加载 → `register(PluginApi)` → 17 路由挂载 + 工具注册），全部路由 HTTP
+冒烟 200。自动化回归：`tests/test_pawapp.py`（stub `qwenpaw.pawapp` SDK，
+无需安装 QwenPaw）。

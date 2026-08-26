@@ -696,7 +696,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 
 <footer>
   FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
-  326 tests passed · 69 source files · 零配置可跑
+  333 tests passed · 69 source files · 零配置可跑
 </footer>
 
 </div>

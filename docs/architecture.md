@@ -51,6 +51,14 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 > 评分）、Layer 4（MiMoReplyFn）、Zone C/D（runbook）与 Web Forge 注入的可选
 > LLM 能力；纯标准库实现，无 key 时全链路规则路径。详见
 > [`llm_integration.md`](llm_integration.md)。
+>
+> **横切模块 `fde_scope/skills/`（技能沉淀库）**：现场经验 → 可复用技能的文件库
+> （draft → published → archived），可导出为 AgentScope / QwenPaw 的 Agent
+> Skills。详见 [`skills.md`](skills.md)。
+>
+> **桌面形态 `pawapp/`（QwenPaw PawApp）**：把上述全部能力以插件应用形式嵌入
+> QwenPaw 桌面端（App Center），复用宿主 LLM/沙箱/记忆。详见
+> [`qwenpaw_integration.md`](qwenpaw_integration.md)。
 ```
 
 ## 核心设计决策
@@ -107,6 +115,31 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 - **凭据只走环境变量** `FDE_SCOPE_MIMO_API_KEY`，不进 git/报告/manifest。
 设计与接入点详见 [`llm_integration.md`](llm_integration.md)。
 
+### 8. 技能沉淀库（经验资产化）
+`fde_scope/skills/` 把现场经验变成可复用、可导出的技能资产：
+- 文件库存储（`.fde_scope/skills/`，零数据库）；四类分类 + draft→published→archived 生命周期；
+- 三种自动/半自动沉淀入口（gate 阻塞提示、操作自动捕获、现场记录桥接）都产出草稿，
+  `skill review` 人工审阅后才发布，保证信噪比；
+- 导出遵循 Anthropic Agent Skills 规范（SKILL.md + frontmatter），
+  AgentScope `Toolkit.register_agent_skill()` 与 QwenPaw `customized_skills` 双兼容。
+详见 [`skills.md`](skills.md)。
+
+### 9. 多 Agent 拓扑（AgentScope 2.0 真实机制）
+`deploy` 支持多 Agent：`tenant_config.yaml` 的 `agents` 段（或 CLI `--agent
+name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 官方
+`SubAgentTemplate` 蓝图 + leader agent 的 `AgentCreate`/`TeamSay` 协调。
+本期交付蓝图导出 + 拓扑声明（manifest 携带 `agents` + `subagent_templates`），
+真实 app 服务（storage/message_bus/workspace_manager）需要独立后端，不虚构 API。
+
+### 10. QwenPaw 桌面形态（PawApp）
+`pawapp/` 把整个引擎做成 QwenPaw 的 PawApp（App Center 插件应用）：
+- 后端薄封装 `fde_scope`（17 路由挂载到 `/api/fde-scope`）+ 2 个 Agent 工具
+  （`fde_sop_status` / `fde_sop_advance`）；
+- runbook 起草用宿主 `ctx.chat()`（不再需要外部 LLM key）；
+- `ctx.storage` 同步 engagement 快照（文件仍为唯一事实源）；
+- `skill_provider()` 把导出的技能目录直接注册给宿主 Agent（技能即能力）。
+安装/契约详见 [`qwenpaw_integration.md`](qwenpaw_integration.md)。
+
 ## 数据流
 
 ```
@@ -121,9 +154,12 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
    ▼
 [EvalReport + bad cases + 建议]
    │  runbook（可选 `handoff --llm` 由 MiMo 起草）
+   │  skills（现场经验 → 草稿 → 发布 → 导出 Agent Skills）
    │  flywheel (概念事件→真实事件映射→回流→周度重训)
    ▼
 数据飞轮 → 产品化 → 移交包 → 客户签字 → 退场
+
+可选宿主形态：QwenPaw 桌面端（pawapp/ PawApp，复用宿主 LLM/沙箱/记忆）
 ```
 
 ## 三层隔离（多租户数据泄露防御）
@@ -145,5 +181,8 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 | Deploy 组装 | ✅ 真实类型组装 + manifest llm 段 | + 真实启动 + 模型调用 |
 | Eval | ✅ ticket + 制造业 KPI + mock/mimo reply | + 真实 AgentScope Agent.reply + 分类器 |
 | Runbook | ✅ Jinja 模板 + MiMo 起草（`handoff --llm`） | + 客户定制模板 |
+| Skills 沉淀库 | ✅ 四类分类 + 生命周期 + 双格式导出（AgentScope/QwenPaw） | + 技能检索嵌入化 + 跨项目同步 |
+| 多 Agent 拓扑 | ✅ SubAgentTemplate 蓝图导出 + manifest agents 段 | + 真实 app 服务 + 运行时协调 |
 | Flywheel | ✅ 事件映射 + 规则回流 | + 真实订阅 reply_stream + 微调 |
-| Web UI | ✅ FastAPI 控制台（forge 自动感知 LLM） | + Studio 集成 + 实时事件流 |
+| Web 工作台 | ✅ 三视图控制台（workbench 聚合 + journal + skills） | + 实时事件流 |
+| QwenPaw 集成 | ✅ qwenpaw export/validate + PawApp（真机验证通过） | + ACP 适配 + Studio 集成 |
