@@ -734,7 +734,11 @@ def qwenpaw_export(
             raise typer.Exit(2) from exc
 
     skills = _skill_service().search(status=SkillStatus("published"))
-    bundle = QwenPawExporter().export(cfg, Path(out), skills=skills, corpus_report=corpus_report)
+    try:
+        bundle = QwenPawExporter().export(cfg, Path(out), skills=skills, corpus_report=corpus_report)
+    except ValueError as exc:
+        console.print(f"[red]Cannot derive a valid QwenPaw agent id:[/red] {exc}")
+        raise typer.Exit(2) from exc
     for w in bundle.written:
         console.print(f"📦 {w}")
     if bundle.report["valid"]:

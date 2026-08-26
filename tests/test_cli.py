@@ -333,3 +333,14 @@ def test_qwenpaw_validate_reports_bad_bundle(tmp_path: Path, monkeypatch) -> Non
     r = runner.invoke(app, ["qwenpaw", "validate", "--out", str(out)])
     assert r.exit_code == 1
     assert "profiles" in r.stdout
+
+
+def test_qwenpaw_export_pure_chinese_agent_name_exits_2(tmp_path: Path, monkeypatch) -> None:
+    """纯中文 agent 名无法归一化为合法 id → 友好报错而非 traceback。"""
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(
+        app,
+        ["qwenpaw", "export", "--tenant", "acme", "--out", str(tmp_path / "out"), "--agent", "客服:支持"],
+    )
+    assert r.exit_code == 2
+    assert "agent id" in r.stdout

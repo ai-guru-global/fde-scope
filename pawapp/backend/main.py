@@ -214,7 +214,7 @@ async def forge_corpus(
     from fde_scope.corpus import CorpusForge, save_html
     from fde_scope.llm import MiMoClient
 
-    content = await file.read()
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="file too large (max 10 MiB)")
     try:
@@ -259,7 +259,7 @@ async def compute_kpis(
 
     from fde_scope.profiles import get_profile
 
-    content = await file.read()
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="file too large (max 10 MiB)")
     try:
@@ -395,8 +395,16 @@ app.include_router(router)
 
 # Expose exported skills (SKILL.md, Anthropic Agent Skills format) to the
 # QwenPaw agent — FDE field experience captured here becomes agent capability.
+# skill_provider() landed on main after the 2.1.0 PyPI release: detect and
+# degrade gracefully so the app still loads on older hosts.
 _SKILLS_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-app.skill_provider(_SKILLS_EXPORT_DIR)
+if hasattr(app, "skill_provider"):
+    app.skill_provider(_SKILLS_EXPORT_DIR)
+else:  # pragma: no cover — host-side discovery only
+    logger.info(
+        "PawApp host lacks skill_provider(); exported skills stay in %s for manual discovery",
+        _SKILLS_EXPORT_DIR,
+    )
 
 
 @app.tool(
@@ -434,3 +442,9 @@ async def fde_sop_advance(engagement_id: str, force: bool = False) -> dict:
 @app.on_launch
 async def _on_launch() -> None:
     logger.info("FDE Scope PawApp launched (engagements dir: %s)", _ENGAGEMENTS_DIR.resolve())
+
+
+# QwenPaw 2.1.0 contract: the runtime loader accepts a PawApp exported as
+# ``app``, but ``qwenpaw plugin validate/install`` only recognises the name
+# ``plugin`` — export both so the same file passes every pipeline.
+plugin = app

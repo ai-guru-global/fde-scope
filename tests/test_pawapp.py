@@ -12,7 +12,8 @@ import sys
 import types
 from pathlib import Path
 
-from fastapi import FastAPI
+import pytest
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 _PAWAPP_BACKEND = Path(__file__).parent.parent / "pawapp" / "backend"
@@ -92,13 +93,12 @@ def test_pawapp_routes_end_to_end(tmp_path: Path, monkeypatch) -> None:
     assert client.get("/fde-scope/skills").status_code == 200
 
 
-def test_pawapp_rejects_path_traversal_ids(tmp_path: Path, monkeypatch) -> None:
-    """Engagement ids escaping the store dir are rejected (defense parity with web console)."""
+def test_pawapp_eng_path_rejects_traversal(tmp_path: Path, monkeypatch) -> None:
+    """直接单测防御函数：穿越型 engagement id 抛 400（HTTP 层会被路由提前 404）。"""
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".fde_scope" / "engagements").mkdir(parents=True)
 
     main = _load_pawapp_main(monkeypatch)
-    client = _client(main)
-
-    r = client.get("/fde-scope/engagements/..%2F..%2Fetc%2Fpasswd")
-    assert r.status_code in (400, 404)
+    with pytest.raises(HTTPException) as ei:
+        main._eng_path("../../etc/passwd")
+    assert ei.value.status_code == 400

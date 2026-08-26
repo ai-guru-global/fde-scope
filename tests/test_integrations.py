@@ -148,3 +148,97 @@ def test_validate_export_rejects_missing_skill_frontmatter(tmp_path) -> None:
     skill_mds[0].write_text("no frontmatter", encoding="utf-8")
     report = validate_export(tmp_path)
     assert report["valid"] is False
+
+
+def test_validate_export_short_circuits_on_traversal_id(tmp_path) -> None:
+    """穿越型 agent id 只报规则错误，不得探测目录外路径。"""
+    from fde_scope.integrations.validator import validate_export
+
+    (tmp_path / "config.json").write_text(
+        json.dumps(
+            {"agents": {"profiles": {"../../probe": {"id": "../../probe", "name": "x", "enabled": True}}}}
+        ),
+        encoding="utf-8",
+    )
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+    assert any("violates QwenPaw id rules" in e for e in report["errors"])
+    assert not any("workspaces/../" in e for e in report["errors"])
+
+
+def test_validate_export_rejects_malformed_structure(tmp_path) -> None:
+    """结构畸形 JSON 应报错而非抛 AttributeError。"""
+    from fde_scope.integrations.validator import validate_export
+
+    (tmp_path / "config.json").write_text(
+        json.dumps({"agents": {"profiles": {"x": ["notadict"]}}}), encoding="utf-8"
+    )
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+    assert any("not an object" in e for e in report["errors"])
+
+
+def test_validate_export_rejects_non_object_root_and_agents(tmp_path) -> None:
+    """config.json 根非对象 / agents 段缺失都返回错误报告而非异常。"""
+    from fde_scope.integrations.validator import validate_export
+
+    (tmp_path / "config.json").write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False and "root is not an object" in report["errors"][0]
+
+    (tmp_path / "config.json").write_text(json.dumps({"agents": "nope"}), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False and "agents section" in report["errors"][0]
+
+    (tmp_path / "config.json").write_text(json.dumps({"agents": {}}), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False and "agents.profiles" in report["errors"][0]
+
+
+def test_validate_export_checks_active_agent(tmp_path) -> None:
+    """active_agent 必须指向存在的 profile。"""
+    from fde_scope.config import TenantConfig
+    from fde_scope.integrations.qwenpaw_exporter import QwenPawExporter
+    from fde_scope.integrations.validator import validate_export
+
+    tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
+    QwenPawExporter().export(tenant, tmp_path)
+    cfg = json.loads((tmp_path / "config.json").read_text(encoding="utf-8"))
+    cfg["agents"]["active_agent"] = "ghost"
+    (tmp_path / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+    assert any("active_agent" in e for e in report["errors"])
+
+
+def test_validate_export_rejects_persona_traversal(tmp_path) -> None:
+    """system_prompt_files 含 .. 时报错，不得探测目录外路径。"""
+    from fde_scope.integrations.validator import validate_export
+
+    ws = tmp_path / "workspaces" / "a1"
+    ws.mkdir(parents=True)
+    (tmp_path / "config.json").write_text(
+        json.dumps({"agents": {"profiles": {"a1": {"id": "a1", "name": "a1", "enabled": True}}}}),
+        encoding="utf-8",
+    )
+    (ws / "agent.json").write_text(
+        json.dumps({"id": "a1", "name": "a1", "system_prompt_files": ["../../probe.md"]}),
+        encoding="utf-8",
+    )
+    report = validate_export(tmp_path)
+    assert report["valid"] is False
+    assert any("not a relative file" in e for e in report["errors"])
+
+
+def test_qwenpaw_export_includes_corpus(tmp_path) -> None:
+    """corpus_report 写出 corpus.json（collection/total/real/synthetic）。"""
+    from types import SimpleNamespace
+
+    from fde_scope.config import TenantConfig
+    from fde_scope.integrations.qwenpaw_exporter import QwenPawExporter
+
+    tenant = TenantConfig(id="acme", name="Acme", agents=[{"name": "a1", "role": "r1"}])
+    corpus = SimpleNamespace(total=10, real=8, synthetic=2)
+    QwenPawExporter().export(tenant, tmp_path, corpus_report=corpus)
+    data = json.loads((tmp_path / "corpus.json").read_text(encoding="utf-8"))
+    assert data == {"collection": "corpus_acme", "total": 10, "real": 8, "synthetic": 2}
