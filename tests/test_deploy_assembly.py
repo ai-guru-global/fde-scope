@@ -34,13 +34,23 @@ class FakeAgent:
         self.kwargs = kwargs
 
 
+class FakeChatModel:
+    """Stands in for ``agentscope.model.OllamaChatModel``."""
+
+    def __init__(self, model: str = "", **kwargs: Any) -> None:
+        self.model = model
+
+
 @pytest.fixture
 def fake_agentscope(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Inject a fake ``agentscope.agent`` module for the lazy import."""
+    """Inject fake ``agentscope.agent`` / ``agentscope.model`` modules for the lazy imports."""
     module = types.ModuleType("agentscope.agent")
     module.Agent = FakeAgent  # type: ignore[attr-defined]
     module.ReActConfig = FakeReActConfig  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "agentscope.agent", module)
+    model_mod = types.ModuleType("agentscope.model")
+    model_mod.OllamaChatModel = FakeChatModel  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "agentscope.model", model_mod)
 
 
 def test_sandbox_spec_docker_kwargs_match_real_api() -> None:
@@ -83,7 +93,7 @@ def test_deployer_assembles_real_path(
     agent = deployed.agent
     assert isinstance(agent, FakeAgent)
     assert agent.kwargs["name"] == "Acme_agent"
-    assert agent.kwargs["model"] is None  # wired from tenant.model at runtime
+    assert agent.kwargs["model"].model == "qwen-max"  # spec.model 缺省 → tenant.model
     assert "Acme" in agent.kwargs["system_prompt"]
     assert agent.kwargs["toolkit"] == {
         "corpus_collection": "corpus_acme",
@@ -129,9 +139,9 @@ def test_deployer_assembles_multi_agent_topology(
     assert len(deployed.agents) == 2
     assert deployed.agent is deployed.agents[0]  # 单 Agent 兼容
     assert deployed.agents[0].kwargs["name"] == "researcher"
-    assert deployed.agents[0].kwargs["model"] is None  # spec.model 缺失 → 运行时注入
+    assert deployed.agents[0].kwargs["model"].model == "qwen-max"  # spec.model 缺失 → tenant.model
     assert "调研员" in deployed.agents[0].kwargs["system_prompt"]
-    assert deployed.agents[1].kwargs["model"] == "qwen-max"
+    assert deployed.agents[1].kwargs["model"].model == "qwen-max"
     assert deployed.agents[1].kwargs["system_prompt"] == "You code."
     # manifest agents 段（dry-run 与 real 都有）
     agents = deployed.manifest["agents"]

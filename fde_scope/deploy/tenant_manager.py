@@ -154,15 +154,20 @@ class TenantDeployer:
         workspace + permission + HITL), real types.
         """
         from agentscope.agent import Agent, ReActConfig
+        from agentscope.model import OllamaChatModel
 
         sys_prompt = spec.system_prompt or self._build_prompt(tenant, spec)
         # ReActConfig replaces the implicit reasoning loop of the fictional
         # HarnessAgent; HITL emerges from rules with behavior=ASK.
         react = ReActConfig(max_iters=20)
+        # 2.0 的 Agent 要求 ChatModelBase 实例（不接受字符串）：用 spec.model
+        # （缺省 tenant.model）构造零配置占位模型，生产运行时以带凭证的
+        # ChatModel 替换。
+        model_name = spec.model or tenant.model
         return Agent(
             name=spec.name,
             system_prompt=sys_prompt,
-            model=spec.model,  # None → wired from tenant.model at runtime
+            model=OllamaChatModel(model=model_name),
             toolkit=self._build_toolkit(tenant, collection),
             react_config=react,
         )

@@ -16,6 +16,7 @@ and translates it to the real ``DockerWorkspace`` constructor arguments.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 
@@ -70,5 +71,7 @@ def build_workspace(spec: SandboxSpec):
     if spec.backend == "docker":
         return DockerWorkspace(**spec.as_docker_kwargs())
     if spec.backend == "local":
-        return LocalWorkspace(workspace_id=f"fde_{spec.tenant_id}")
+        workdir = Path(".fde_scope/workspaces") / f"fde_{spec.tenant_id}"
+        workdir.mkdir(parents=True, exist_ok=True)
+        return LocalWorkspace(workdir=str(workdir), workspace_id=f"fde_{spec.tenant_id}")
     raise ValueError(f"Unsupported backend for build_workspace: {spec.backend!r}")

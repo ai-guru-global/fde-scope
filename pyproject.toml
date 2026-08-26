@@ -96,7 +96,7 @@ indent-style = "space"
 # mypy — static type-checker (advisory, not blocking on missing imports)
 # ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"              # venv/runtime floor; numpy 2.5 stubs (agentscope extra) use py312 `type` syntax
 ignore_missing_imports = true     # agentscope / fastapi / pydantic all have stubs but
                                   # third-party industrial libs (asyncua, paho) often don't
 plugins = ["pydantic.mypy"]        # teach mypy how pydantic v2 Field defaults work
