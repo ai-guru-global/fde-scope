@@ -41,10 +41,8 @@ from fde_scope.skills.models import SkillCategory, SkillDraft, SkillRecord, Skil
 
 def test_skill_draft_defaults():
     draft = SkillDraft(
-        title="OPC UA 连接踩坑",
-        category=SkillCategory.IMPLEMENTATION,
-        tags=["opcua"],
-        body_md="# 步骤\n1. ...",
+        title="OPC UA 连接踩坑", category=SkillCategory.IMPLEMENTATION,
+        tags=["opcua"], body_md="# 步骤\n1. ...",
     )
     assert draft.source == SkillSource.MANUAL
     assert draft.status == SkillStatus.DRAFT
@@ -55,10 +53,7 @@ def test_skill_draft_defaults():
 
 def test_skill_record_generates_id_and_timestamps():
     rec = SkillRecord(
-        title="t",
-        category=SkillCategory.RESEARCH,
-        tags=[],
-        body_md="b",
+        title="t", category=SkillCategory.RESEARCH, tags=[], body_md="b",
     )
     assert rec.id.startswith("skill-")
     assert rec.version == 1
@@ -341,11 +336,8 @@ class SkillStore:
         """从目录重建索引（index.json 缺失/损坏/删除后调用）。"""
         entries = [
             {
-                "id": r.id,
-                "title": r.title,
-                "category": r.category.value,
-                "status": r.status.value,
-                "tags": r.tags,
+                "id": r.id, "title": r.title, "category": r.category.value,
+                "status": r.status.value, "tags": r.tags,
                 "updated_at": r.updated_at.isoformat(),
             }
             for r in self.load_all()
@@ -355,16 +347,11 @@ class SkillStore:
 
     def _touch_index(self, record: SkillRecord) -> None:
         entries = [e for e in self.index_entries() if e["id"] != record.id]
-        entries.append(
-            {
-                "id": record.id,
-                "title": record.title,
-                "category": record.category.value,
-                "status": record.status.value,
-                "tags": record.tags,
-                "updated_at": record.updated_at.isoformat(),
-            }
-        )
+        entries.append({
+            "id": record.id, "title": record.title, "category": record.category.value,
+            "status": record.status.value, "tags": record.tags,
+            "updated_at": record.updated_at.isoformat(),
+        })
         self._atomic_write(self._index_path, json.dumps(entries, ensure_ascii=False, indent=2))
 
     # -- 原子写 --------------------------------------------------------------
@@ -437,7 +424,6 @@ def test_publish_requires_draft(service):
 def test_update_bumps_version(service):
     rec = service.create(SkillDraft(title="T", category=SkillCategory.RESEARCH))
     from fde_scope.skills.models import SkillPatch
-
     updated = service.update(rec.id, SkillPatch(title="T2", tags=["x"]))
     assert updated.title == "T2"
     assert updated.tags == ["x"]
@@ -445,23 +431,12 @@ def test_update_bumps_version(service):
 
 
 def test_search_filters(service):
-    service.create(
-        SkillDraft(
-            title="OPC UA 连接",
-            category=SkillCategory.IMPLEMENTATION,
-            tags=["opcua"],
-            phase_slug="deploy",
-            applies_to=["manufacturing"],
-        )
-    )
-    service.create(
-        SkillDraft(title="工单分类", category=SkillCategory.RESEARCH, tags=["ticket"], applies_to=["ticket"])
-    )
-    service.create(
-        SkillDraft(
-            title="工会评审", category=SkillCategory.METHODOLOGY, tags=["gate"], gate_slug="works_council"
-        )
-    )
+    service.create(SkillDraft(title="OPC UA 连接", category=SkillCategory.IMPLEMENTATION,
+                              tags=["opcua"], phase_slug="deploy", applies_to=["manufacturing"]))
+    service.create(SkillDraft(title="工单分类", category=SkillCategory.RESEARCH,
+                              tags=["ticket"], applies_to=["ticket"]))
+    service.create(SkillDraft(title="工会评审", category=SkillCategory.METHODOLOGY,
+                              tags=["gate"], gate_slug="works_council"))
     assert len(service.search("opc")) == 1
     assert len(service.search(status=SkillStatus.DRAFT)) == 3
     assert len(service.search(category=SkillCategory.RESEARCH)) == 1
@@ -614,7 +589,6 @@ def test_suggest_from_gate_block(service):
 
 def test_capture_operation_maps_category(service):
     from fde_scope.skills.models import SkillCategory
-
     r1 = service.capture_operation(action="advance", engagement_id="eng-x", phase_slug="deploy")
     assert r1 is not None and r1.category == SkillCategory.IMPLEMENTATION
     r2 = service.capture_operation(action="gate_pass", engagement_id="eng-x", phase_slug="deploy")
@@ -631,65 +605,65 @@ def test_capture_operation_maps_category(service):
 - [ ] **Step 3: 实现**（追加到 service.py）
 
 ```python
-# -- 上下文沉淀 -----------------------------------------------------------
-_ACTION_CATEGORIES = {
-    "advance": SkillCategory.IMPLEMENTATION,
-    "gate_pass": SkillCategory.METHODOLOGY,
-    "kpi": SkillCategory.OPTIMIZATION,
-}
+    # -- 上下文沉淀 -----------------------------------------------------------
+    _ACTION_CATEGORIES = {
+        "advance": SkillCategory.IMPLEMENTATION,
+        "gate_pass": SkillCategory.METHODOLOGY,
+        "kpi": SkillCategory.OPTIMIZATION,
+    }
 
+    def suggest_from_gate_block(
+        self, engagement_id: str, gate_slug: str, blockers: list[str]
+    ) -> SkillRecord:
+        """gate 被阻塞时生成预填草稿（关键点提示）。"""
+        summary = "; ".join(blockers[:3]) if blockers else "无"
+        rec = SkillRecord(
+            title=f"gate 被阻塞: {gate_slug} — {summary[:40]}",
+            category=SkillCategory.METHODOLOGY,
+            tags=[gate_slug, "gate-blocked"],
+            body_md=(
+                f"## 背景\n\n`{gate_slug}` 门禁在 engagement `{engagement_id}` 被阻塞。\n\n"
+                f"## 阻塞项\n\n{summary}\n\n"
+                "## 解法（待补充）\n\n- 步骤 1：…\n\n"
+                "## 验收标准\n\n- …\n"
+            ),
+            gate_slug=gate_slug,
+            source=SkillSource.GATE_HINT,
+            source_engagement=engagement_id,
+        )
+        self.store.save(rec)
+        return rec
 
-def suggest_from_gate_block(self, engagement_id: str, gate_slug: str, blockers: list[str]) -> SkillRecord:
-    """gate 被阻塞时生成预填草稿（关键点提示）。"""
-    summary = "; ".join(blockers[:3]) if blockers else "无"
-    rec = SkillRecord(
-        title=f"gate 被阻塞: {gate_slug} — {summary[:40]}",
-        category=SkillCategory.METHODOLOGY,
-        tags=[gate_slug, "gate-blocked"],
-        body_md=(
-            f"## 背景\n\n`{gate_slug}` 门禁在 engagement `{engagement_id}` 被阻塞。\n\n"
-            f"## 阻塞项\n\n{summary}\n\n"
-            "## 解法（待补充）\n\n- 步骤 1：…\n\n"
-            "## 验收标准\n\n- …\n"
-        ),
-        gate_slug=gate_slug,
-        source=SkillSource.GATE_HINT,
-        source_engagement=engagement_id,
-    )
-    self.store.save(rec)
-    return rec
-
-
-def capture_operation(
-    self,
-    *,
-    action: str,
-    engagement_id: str,
-    phase_slug: str | None = None,
-    detail: dict | None = None,
-) -> SkillRecord | None:
-    """操作自动捕获：记录一条轻量草稿；未知 action 返回 None。"""
-    category = self._ACTION_CATEGORIES.get(action)
-    if category is None:
-        return None
-    note = (detail or {}).get("note", "")
-    body = (
-        f"## 操作摘要\n\n`{action}` @ engagement `{engagement_id}`"
-        + (f"（阶段 `{phase_slug}`）" if phase_slug else "")
-        + (f"\n\n{note}" if note else "")
-        + "\n\n## 可复用点（待补充）\n\n- …\n"
-    )
-    rec = SkillRecord(
-        title=f"{action} 记录: {engagement_id}" + (f" @ {phase_slug}" if phase_slug else ""),
-        category=category,
-        tags=[action],
-        body_md=body,
-        phase_slug=phase_slug,
-        source=SkillSource.AUTO_CAPTURE,
-        source_engagement=engagement_id,
-    )
-    self.store.save(rec)
-    return rec
+    def capture_operation(
+        self,
+        *,
+        action: str,
+        engagement_id: str,
+        phase_slug: str | None = None,
+        detail: dict | None = None,
+    ) -> SkillRecord | None:
+        """操作自动捕获：记录一条轻量草稿；未知 action 返回 None。"""
+        category = self._ACTION_CATEGORIES.get(action)
+        if category is None:
+            return None
+        note = (detail or {}).get("note", "")
+        body = (
+            f"## 操作摘要\n\n`{action}` @ engagement `{engagement_id}`"
+            + (f"（阶段 `{phase_slug}`）" if phase_slug else "")
+            + (f"\n\n{note}" if note else "")
+            + "\n\n## 可复用点（待补充）\n\n- …\n"
+        )
+        rec = SkillRecord(
+            title=f"{action} 记录: {engagement_id}" + (f" @ {phase_slug}" if phase_slug else ""),
+            category=category,
+            tags=[action],
+            body_md=body,
+            phase_slug=phase_slug,
+            source=SkillSource.AUTO_CAPTURE,
+            source_engagement=engagement_id,
+        )
+        self.store.save(rec)
+        return rec
 ```
 
 - [ ] **Step 4: 运行确认通过**：`pytest tests/test_skills.py -k "suggest or capture" -v` → PASS
@@ -709,6 +683,7 @@ def capture_operation(
 
 - [x] **Step 1: 检索官方格式**（已完成 2026-08-25）
   - **AgentScope 2.0**（官方教程 `doc.agentscope.io/tutorial/task_agent_skill.html`）：skill 目录必须含 `SKILL.md`（YAML frontmatter + Markdown 指令）；frontmatter 必填字段 `name`、`description`；注册 API 为 `Toolkit.register_agent_skill(dir)` / `get_agent_skill_prompt()`
+    > ⚠️ **更正（2026-08-27 实测）**：本行当时基于文档检索，注册 API 写错了。AgentScope 2.0 **没有** `register_agent_skill()` / `get_agent_skill_prompt()`；真实通道是把每个单技能目录作为一项传入 `Toolkit(skills_or_loaders=[...])`（即 `AgentSpec.toolkit["skills_dirs"]`），loader **只认单技能目录、不递归父目录**。代码事实见 `fde_scope/deploy/toolkit.py` 与 `tenant_manager.py`，文档见 `docs/skills.md`。下方 Step 4 实现代码区已按正确的 2.0 通道实现，未受影响。
   - **QwenPaw**（仓库 `CONTRIBUTING_zh.md` + 真实样例 `src/qwenpaw/agents/skills/file_reader-zh/SKILL.md`）：同一 Anthropic Agent Skills 规范，frontmatter 至少 `name` + `description`，可选 `metadata`（如 `qwenpaw.emoji`、`requires`）；目录可含可选 `references/`、`scripts/`；放入 skills 目录即自动发现（无需注册）
   - **两格式同源，差异仅 QwenPaw 可选 `metadata`** → 共用一个渲染器，qwenpaw 追加 metadata 块；目录名用 `_slugify(title)`（QwenPaw 目录惯例为下划线小写，但连字符亦兼容，见 ISSUE #2323）
   - 确认结果已写入 Step 4 实现代码区（docstring）
@@ -717,7 +692,6 @@ def capture_operation(
 ```python
 def test_export_agentscope_format():
     from fde_scope.skills.exporters import export_skill
-
     rec = _rec(title="OPC UA 排查", tags=["opcua"])
     files = export_skill(rec, "agentscope")
     assert len(files) == 1
@@ -728,7 +702,6 @@ def test_export_agentscope_format():
 
 def test_export_qwenpaw_format():
     from fde_scope.skills.exporters import export_skill
-
     files = export_skill(_rec(title="T"), "qwenpaw")
     assert files[0].name.endswith("SKILL.md")
     assert files[0].content  # 非空
@@ -736,7 +709,6 @@ def test_export_qwenpaw_format():
 
 def test_export_unknown_format_raises():
     from fde_scope.skills.exporters import export_skill
-
     with pytest.raises(ValueError):
         export_skill(_rec(), "bogus")
 ```
@@ -777,7 +749,12 @@ def _slugify(title: str) -> str:
 
 def _frontmatter(record: SkillRecord) -> str:
     """按官方格式生成 frontmatter（字段以检索结果为准）。"""
-    return f"---\nname: {_slugify(record.title)}\ndescription: {record.title}\n---\n"
+    return (
+        "---\n"
+        f"name: {_slugify(record.title)}\n"
+        f"description: {record.title}\n"
+        "---\n"
+    )
 
 
 def export_skill(record: SkillRecord, fmt: str) -> list[ExportFile]:
@@ -825,21 +802,10 @@ runner = CliRunner()
 
 def test_skill_add_publish_export(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    result = runner.invoke(
-        app,
-        [
-            "skill",
-            "add",
-            "--title",
-            "OPC UA 排查",
-            "--category",
-            "implementation",
-            "--tags",
-            "opcua",
-            "--body",
-            "# 步骤",
-        ],
-    )
+    result = runner.invoke(app, [
+        "skill", "add", "--title", "OPC UA 排查", "--category", "implementation",
+        "--tags", "opcua", "--body", "# 步骤",
+    ])
     assert result.exit_code == 0
     store = SkillStore(tmp_path / ".fde_scope" / "skills")
     drafts = store.load_all()
@@ -847,12 +813,8 @@ def test_skill_add_publish_export(tmp_path, monkeypatch):
     assert drafts[0].status == SkillStatus.DRAFT
     sid = drafts[0].id
     assert runner.invoke(app, ["skill", "publish", sid]).exit_code == 0
-    assert (
-        runner.invoke(
-            app, ["skill", "export", sid, "--format", "agentscope", "--out", str(tmp_path / "out")]
-        ).exit_code
-        == 0
-    )
+    assert runner.invoke(app, ["skill", "export", sid, "--format", "agentscope",
+                               "--out", str(tmp_path / "out")]).exit_code == 0
     assert (tmp_path / "out" / "opc-ua" / "SKILL.md").exists()
 
 
@@ -898,9 +860,8 @@ def _maybe_suggest_skill(engagement_id: str, gate_slug: str, blockers: list[str]
         pass
 
 
-def _maybe_capture(
-    action: str, engagement_id: str, phase_slug: str | None = None, detail: dict | None = None
-) -> None:
+def _maybe_capture(action: str, engagement_id: str, phase_slug: str | None = None,
+                   detail: dict | None = None) -> None:
     """操作自动捕获；失败静默。"""
     try:
         _skill_service().capture_operation(
@@ -935,19 +896,13 @@ def skill_add(
         raise typer.Exit(2)
     text = Path(body_file).read_text(encoding="utf-8") if body_file else body
     service = _skill_service()
-    rec = service.create(
-        SkillDraft(
-            title=title,
-            category=cat,
-            tags=[t.strip() for t in tags.split(",") if t.strip()],
-            body_md=text,
-            phase_slug=phase,
-            gate_slug=gate,
-            applies_to=[p.strip() for p in profile.split(",") if p.strip()],
-            source=src,
-            source_engagement=engagement,
-        )
-    )
+    rec = service.create(SkillDraft(
+        title=title, category=cat,
+        tags=[t.strip() for t in tags.split(",") if t.strip()],
+        body_md=text, phase_slug=phase, gate_slug=gate,
+        applies_to=[p.strip() for p in profile.split(",") if p.strip()],
+        source=src, source_engagement=engagement,
+    ))
     console.print(f"✅ 草稿创建 [cyan]{rec.id}[/cyan] — [bold]fde-scope skill review[/bold] 可审阅")
 
 
@@ -973,13 +928,8 @@ def skill_list(
         console.print("[red]非法 category/status[/red]")
         raise typer.Exit(2)
     rows = service.search(
-        search,
-        category=cat,
-        tags=[tag] if tag else None,
-        status=st,
-        profile=profile,
-        gate_slug=gate,
-        phase_slug=phase,
+        search, category=cat, tags=[tag] if tag else None, status=st,
+        profile=profile, gate_slug=gate, phase_slug=phase,
     )
     if not rows:
         console.print("[yellow]无匹配技能[/yellow]")
@@ -988,14 +938,8 @@ def skill_list(
     for col in ("id", "title", "category", "status", "tags", "updated"):
         table.add_column(col)
     for r in rows:
-        table.add_row(
-            r.id,
-            r.title,
-            r.category.value,
-            r.status.value,
-            ",".join(r.tags),
-            r.updated_at.strftime("%Y-%m-%d"),
-        )
+        table.add_row(r.id, r.title, r.category.value, r.status.value,
+                      ",".join(r.tags), r.updated_at.strftime("%Y-%m-%d"))
     console.print(table)
 
 
@@ -1003,22 +947,15 @@ def skill_list(
 def skill_show(skill_id: str = typer.Argument(...)) -> None:
     """显示技能正文与元数据。"""
     from .skills.models import SkillStatus
-
     try:
         rec = _skill_service().get(skill_id)
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
         raise typer.Exit(2)
-    console.print(
-        f"\n[bold cyan]{rec.title}[/bold cyan] · {rec.category.value} · {rec.status.value} · v{rec.version}"
-    )
-    console.print(
-        f"tags={rec.tags} · phase={rec.phase_slug} · gate={rec.gate_slug} · "
-        f"applies_to={rec.applies_to} · source={rec.source.value}"
-    )
-    console.print(
-        f"源自: {rec.source_engagement or '—'} · 创建: {rec.created_at:%Y-%m-%d} · 更新: {rec.updated_at:%Y-%m-%d}"
-    )
+    console.print(f"\n[bold cyan]{rec.title}[/bold cyan] · {rec.category.value} · {rec.status.value} · v{rec.version}")
+    console.print(f"tags={rec.tags} · phase={rec.phase_slug} · gate={rec.gate_slug} · "
+                  f"applies_to={rec.applies_to} · source={rec.source.value}")
+    console.print(f"源自: {rec.source_engagement or '—'} · 创建: {rec.created_at:%Y-%m-%d} · 更新: {rec.updated_at:%Y-%m-%d}")
     console.print("\n" + rec.body_md)
 
 
@@ -1031,16 +968,11 @@ def skill_edit(
 ) -> None:
     """编辑技能（version+1）。"""
     from .skills.models import SkillPatch
-
     try:
-        rec = _skill_service().update(
-            skill_id,
-            SkillPatch(
-                title=title,
-                tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else None,
-                body_md=body,
-            ),
-        )
+        rec = _skill_service().update(skill_id, SkillPatch(
+            title=title, tags=[t.strip() for t in tags.split(",") if t.strip()] if tags else None,
+            body_md=body,
+        ))
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
         raise typer.Exit(2)
@@ -1096,7 +1028,6 @@ def skill_export(
 ) -> None:
     """导出技能为 AgentScope / QwenPaw 格式。"""
     from .skills.exporters import export_skill
-
     try:
         rec = _skill_service().get(skill_id)
         files = export_skill(rec, fmt)
@@ -1135,16 +1066,10 @@ def skill_export(
 ```python
 def test_skills_api_roundtrip(client, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    r = client.post(
-        "/api/skills",
-        json={
-            "title": "OPC UA 排查",
-            "category": "implementation",
-            "tags": ["opcua"],
-            "body_md": "# 步骤",
-            "phase_slug": "deploy",
-        },
-    )
+    r = client.post("/api/skills", json={
+        "title": "OPC UA 排查", "category": "implementation", "tags": ["opcua"],
+        "body_md": "# 步骤", "phase_slug": "deploy",
+    })
     assert r.status_code == 200
     sid = r.json()["id"]
     assert r.json()["status"] == "draft"
@@ -1177,29 +1102,16 @@ def _skill_service():
 
 
 @app.get("/api/skills")
-def api_skills(
-    q: str | None = None,
-    category: str | None = None,
-    tag: str | None = None,
-    status: str = "published",
-    profile: str | None = None,
-    gate: str | None = None,
-    phase: str | None = None,
-) -> list[dict]:
+def api_skills(q: str | None = None, category: str | None = None, tag: str | None = None,
+               status: str = "published", profile: str | None = None,
+               gate: str | None = None, phase: str | None = None) -> list[dict]:
     from ..skills.models import SkillCategory, SkillStatus
-
-    return [
-        r.model_dump()
-        for r in _skill_service().search(
-            q,
-            category=SkillCategory(category) if category else None,
-            tags=[tag] if tag else None,
-            status=SkillStatus(status) if status else None,
-            profile=profile,
-            gate_slug=gate,
-            phase_slug=phase,
-        )
-    ]
+    return [r.model_dump() for r in _skill_service().search(
+        q, category=SkillCategory(category) if category else None,
+        tags=[tag] if tag else None,
+        status=SkillStatus(status) if status else None,
+        profile=profile, gate_slug=gate, phase_slug=phase,
+    )]
 
 
 @app.post("/api/skills")
@@ -1251,7 +1163,6 @@ def api_skill_archive(sid: str) -> dict:
 @app.post("/api/skills/{sid}/export")
 def api_skill_export(sid: str, body: dict) -> dict:
     from ..skills.exporters import export_skill
-
     try:
         rec = _skill_service().get(sid)
         files = export_skill(rec, body["format"])
@@ -1259,11 +1170,8 @@ def api_skill_export(sid: str, body: dict) -> dict:
         raise HTTPException(status_code=404, detail="skill not found")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return {
-        "skill_id": sid,
-        "format": body["format"],
-        "files": [{"name": f.name, "content": f.content} for f in files],
-    }
+    return {"skill_id": sid, "format": body["format"],
+            "files": [{"name": f.name, "content": f.content} for f in files]}
 ```
 
 - [x] **Step 4: 运行确认通过**：`pytest tests/test_web.py -k skills -v` → PASS；全量 `pytest` → 293 passed, 3 skipped
@@ -1297,7 +1205,6 @@ def test_advance_blocked_suggests_skill(tmp_path, monkeypatch):
     eng.save_to = lambda: None  # 不需要
     runner.invoke(app, ["engage", "advance", "eng-t"])  # 阻塞 → 触发提示
     from fde_scope.skills.store import SkillStore
-
     drafts = SkillStore(tmp_path / ".fde_scope" / "skills").load_all()
     assert any(r.source.value == "gate_hint" for r in drafts)
 ```

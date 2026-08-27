@@ -8,6 +8,7 @@ so the whole flow is walkable with zero data and zero extras installed.
 from __future__ import annotations
 
 import json
+import os
 from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -709,6 +710,19 @@ def profiles() -> None:
     console.print(table)
 
 
+def _host_is_loopback(host: str) -> bool:
+    """True for loopback bind targets. Non-resolvable names are treated as
+    remote — exposing the unauthenticated console requires an explicit opt-in."""
+    if host == "localhost":
+        return True
+    try:
+        import ipaddress
+
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 @app.command()
 def web(
     host: str = typer.Option("127.0.0.1", "--host"),
@@ -722,6 +736,18 @@ def web(
     except ImportError:
         console.print("[red]Web UI needs the 'web' extra:[/red] pip install 'fde-scope[web]'")
         raise typer.Exit(2) from None
+    # Safety gate: the console APIs are unauthenticated by design (single-user
+    # local tool). Binding beyond loopback exposes engagements, journals and
+    # the corpus-upload endpoint to the local network unless explicitly opted in.
+    if not _host_is_loopback(host) and os.environ.get("FDE_SCOPE_ALLOW_REMOTE") != "1":
+        console.print(
+            f"[red]Refusing to bind non-loopback host {host!r}.[/red] "
+            "The workbench has no authentication — engagements, journals and the "
+            "corpus upload API would be reachable from your network.\n"
+            f"[dim]Opt in only on a trusted network:[/dim] "
+            f"[bold]FDE_SCOPE_ALLOW_REMOTE=1[/bold] fde-scope web --host {host}"
+        )
+        raise typer.Exit(2)
     console.print(f"🚀 Launching [cyan]http://{host}:{port}[/cyan]")
     uvicorn.run(
         "fde_scope.web.app:app",

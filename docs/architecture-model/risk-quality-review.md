@@ -12,6 +12,8 @@
 
 代码库整体健康度**高于同规模 Alpha 项目平均水平**：核心引擎（18 阶段 SOP 状态机、10 个可执行 gate、语料管线）设计严谨、失败语义显式、防御性编码一致。主要债务集中在**外围持久化一致性**（三条写入路径三种风格）、**文档↔依赖契约漂移**、以及**跨入口的数据目录假设**——三者共同构成「多人/多入口使用时才开始付费」的技术债，现在修都是小时级改动。
 
+> **整改注记（2026-08-27 追加）**：P0 三项已全部落地并有验收证据——A1 `[full]` extra、A2 远程绑定门禁、A3 原子写收口（`fde_scope/fsutil.py`），连同验收依赖 B3（`tests/test_architecture_guard.py` 5 例 + 原子写注入/往返测试 2 例）；全部改动位于工作区未提交状态。逐项证据见 [`remediation-plan.md`](remediation-plan.md) 文末「完成记录」。本报告其余发现（R1/R5/R6/R7 及 B/C 级项）仍为待办有效项。
+
 ## 最高优先级发现（摘要）
 
 | # | 发现 | 严重度 | 可能性 | 置信度 |
@@ -118,7 +120,9 @@
 
 ## 下一步检查清单
 
-1. 干净环境执行 `pip install -e ".[full]"`（闭合 R3 复现证据，1 分钟）。
-2. 杀掉 writing-midway 进程模拟，验证 engagement 文件留存形态（闭合 R4 行为证据）。
-3. `--host 0.0.0.0` 启动后从另一台设备 curl `/api/engagements`（量化 R2 实际暴露面）。
-4. 阅读 [`remediation-plan.md`](remediation-plan.md) 按 P0 → P2 执行；完成一项勾一项，每项自带验收标准。
+> 2026-08-27 状态更新：1、2 已随 P0 验收闭合；3 因 A2 门禁落地而降级为可选；4 已启动（P0+B3 完成）。
+
+1. ✅ 干净环境安装 `-e ".[full]"` —— 已随 A1 验收完成：干净 uv venv（CPython 3.12）安装成功，`import asyncua, mysql.connector, fastapi` 全部通过（R3 复现证据随之失效）。
+2. ✅ 模拟 writing-midway 崩溃验证文件留存 —— 已以注入测试闭合：`tests/test_engagement.py::test_save_is_atomic_keeps_previous_version_on_failure`（monkeypatch `os.replace` 抛 OSError → 目标文件保留旧完整版、无 `.tmp-` 残留）。真机 kill -9 未单独演练，但崩溃窗口已由 os.replace 内核级原子语义消除。
+3. ⬇️（可选）`--host 0.0.0.0` 后从另一设备 curl `/api/engagements` 量化暴露面 —— A2 门禁已使未设 `FDE_SCOPE_ALLOW_REMOTE=1` 的非 loopback 绑定直接 exit 2，默认路径下不再可达；该验证仅在需要量化 opt-in 后的真实暴露面时才有意义。
+4. ▶ 阅读 [`remediation-plan.md`](remediation-plan.md) 按 P0 → P2 执行 —— P0（A1/A2/A3）+ B3 已完成并在文末「完成记录」留档；余下 B1/B2/B4（两周内）、C1–C4（按需）待办。

@@ -134,3 +134,18 @@ jobs:
       # skill_provider gap found during real-host verification).
       - name: Load pawapp through the real PluginLoader + smoke routes
         run: python scripts/verify_pawapp_host.py
+
+  skills-catalog:
+    name: skills-catalog consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Docs-only gate: page counts, five-section template, README index/status
+      # parity and relative links in docs/skills-catalog/.
+      - name: Check docs/skills-catalog
+        run: python scripts/check_skills_catalog.py

@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..fsutil import atomic_write_text
 from .phases import Zone, phases_for_profile
 
 
@@ -126,8 +127,7 @@ class EngagementContext(BaseModel):
     # -- persistence ------------------------------------------------------------
     def save(self, path: str | Path) -> Path:
         p = Path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        atomic_write_text(p, self.model_dump_json(indent=2))
         return p
 
     @classmethod

@@ -1,7 +1,7 @@
 # FDE Skills 手册库
 
 > 本地维护的 skill 档案库：**每个 skill 一页 Markdown**，记录基本信息、触发时机、最佳实践、在 fde-scope 项目中的应用位点。
-> 建档日期：2026-08-27 · **共 81 页**：Zone A 12 / Zone B 23 / Zone C 16 / Zone D 11 / 横切 19
+> 建档日期：2026-08-27 · **共 82 页**：Zone A 12 / Zone B 23 / Zone C 17 / Zone D 11 / 横切 19
 
 ## 目录结构
 
@@ -82,6 +82,7 @@ docs/skills-catalog/
 | [incident-response](zone-c-operationalization/incident-response.md) | 📦 | Anthropic 官方事件响应 |
 | [gke-observability](zone-c-operationalization/gke-observability.md) | 📦 | GKE/K8s 可观测性 |
 | [firecrawl-monitor](zone-c-operationalization/firecrawl-monitor.md) | ✅ | 网页变更监测告警 |
+| [deploy-checklist](zone-c-operationalization/deploy-checklist.md) | 📦 | 上线前核验清单（registry 真名 `knowledge-work-plugins@deploy-checklist`，已源码取证） |
 | [huggingface-llm-trainer](zone-c-operationalization/huggingface-llm-trainer.md) | ✅ | HF Jobs 上 SFT/DPO/GRPO |
 | [huggingface-vision-trainer](zone-c-operationalization/huggingface-vision-trainer.md) | ✅ | 检测/分类/分割训练 |
 | [trl-training](zone-c-operationalization/trl-training.md) | ✅ | TRL CLI 本地训练 |

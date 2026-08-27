@@ -7,11 +7,9 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
-from contextlib import suppress
 from pathlib import Path
 
+from ..fsutil import atomic_write_text
 from .models import SkillRecord
 
 
@@ -112,13 +110,4 @@ class SkillStore:
     # -- 原子写 --------------------------------------------------------------
     @staticmethod
     def _atomic_write(path: Path, content: str) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(content)
-            os.replace(tmp, path)
-        except BaseException:
-            with suppress(OSError):
-                os.unlink(tmp)
-            raise
+        atomic_write_text(path, content)

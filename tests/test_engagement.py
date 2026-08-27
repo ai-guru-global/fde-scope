@@ -216,3 +216,33 @@ def test_legacy_context_json_without_journal_loads(tmp_path) -> None:
     p.write_text(json.dumps({"id": "e-old", "customer": "OldCo"}), encoding="utf-8")
     ctx = EngagementContext.load(p)
     assert ctx.journal == []
+
+
+def test_save_is_atomic_keeps_previous_version_on_failure(tmp_path, monkeypatch) -> None:
+    """A failed write leaves the previous complete JSON in place — never a
+    truncated mix (architecture risk R4 / action A3)."""
+    import fde_scope.fsutil as fsutil
+
+    ctx = EngagementContext(id="e-atomic", customer="Acme")
+    target = tmp_path / "eng" / "e-atomic.json"
+    ctx.save(target)
+    old = target.read_text(encoding="utf-8")
+
+    def _boom(src: str, dst: str) -> None:
+        raise OSError("simulated crash mid-replace")
+
+    monkeypatch.setattr(fsutil.os, "replace", _boom)
+    with pytest.raises(OSError):
+        ctx.save(target)
+    # previous version intact; no .tmp-* residue left behind
+    assert target.read_text(encoding="utf-8") == old
+    assert list((tmp_path / "eng").glob(".tmp-*")) == []
+
+
+def test_save_roundtrip_after_atomic_write(tmp_path) -> None:
+    ctx = EngagementContext(id="e2", customer="Acme")
+    target = tmp_path / "nested" / "dir" / "e.json"
+    assert ctx.save(target) == target
+    ctx.customer = "Acme 2"
+    ctx.save(target)
+    assert EngagementContext.load(target).customer == "Acme 2"

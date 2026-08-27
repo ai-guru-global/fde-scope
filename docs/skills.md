@@ -101,7 +101,7 @@ GET    /api/workbench                                # 统计含 draft/total ski
 
 本文件描述的是**项目内的沉淀机制**（现场经验 → `.fde_scope/skills/` → 导出给 Agent）；
 外部生态（Qoder 已装/可装的 skills、插件、MCP）另有手册库：
-[skills-catalog/](skills-catalog/README.md)（81 页，按 FDE 4 Zones + 横切分类，每页五段：元信息/能力/时机/最佳实践/应用位点）。
+[skills-catalog/](skills-catalog/README.md)（82 页，按 FDE 4 Zones + 横切分类，每页五段：元信息/能力/时机/最佳实践/应用位点）。
 
 两者互不覆盖：`fde-scope skill export` 的产物**不写进** catalog；catalog 的 📦 项安装后若需现场复用，
 再按本文件的 `skill review` 流程人工入库。

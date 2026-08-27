@@ -44,6 +44,15 @@ dev = [
     "python-multipart>=0.0.9",
     "httpx>=0.27",
 ]
+# Meta-extra: the documented "everything" profile. Kept in sync with README,
+# Makefile install-full and tests/test_architecture_guard.py.
+full = [
+    "fde-scope[dev]",
+    "fde-scope[agentscope]",
+    "fde-scope[mysql]",
+    "fde-scope[opcua]",
+    "fde-scope[web]",
+]
 
 [project.scripts]
 fde-scope = "fde_scope.cli:app"

@@ -1,4 +1,4 @@
-.PHONY: install install-dev test run clean lint help
+.PHONY: install install-dev test run clean lint help check-catalog
 
 PYTHON ?= python3
 PIP ?= pip
@@ -12,14 +12,17 @@ install: ## Install package (core data layer only)
 install-dev: ## Install with dev + test deps
 	$(PIP) install -e ".[dev]"
 
-install-full: ## Install everything including agentscope + mysql extras
-	$(PIP) install -e ".[dev,agentscope,mysql]"
+install-full: ## Install everything (dev + agentscope + mysql + opcua + web)
+	$(PIP) install -e ".[full]"
 
 test: ## Run the test suite (core layer needs no agentscope)
 	$(PYTHON) -m pytest
 
 test-cov: ## Run tests with coverage
 	$(PYTHON) -m pytest --cov=fde_scope --cov-report=term-missing
+
+check-catalog: ## Validate docs/skills-catalog (counts, sections, index, links)
+	$(PYTHON) scripts/check_skills_catalog.py
 
 run: ## Print CLI help (entrypoint)
 	$(PYTHON) -m fde_scope.cli --help

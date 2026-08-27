@@ -8,9 +8,9 @@
 
 | ID | 动作 | 关联风险 | 量 | 验收标准 |
 |---|---|---|---|---|
-| A1 | pyproject 增加 `full = ["dev","agentscope","mysql","opcua","web"]` extra，README:326 与 Makefile:15 三处口径对齐（Makefile 含 opcua+web） | R3 | S | 干净 venv `pip install -e ".[full]"` 成功；`tests/test_architecture_guard.py`（见 A4）守护 extras 集合 |
-| A2 | `cli.py web()` 当 host 非 loopback 时打印红色警示并要求 `FDE_SCOPE_ALLOW_REMOTE=1` 才放行 | R2 | XS | 本地 loopback 启动不受影响；绑 0.0.0.0 且未设 env → exit 2 带 README 链接提示 |
-| A3 | `EngagementContext.save()` 改为临时文件 + `os.replace`（复用 `skills/store.py:_atomic_write` 模式，抽公共 helper 即可） | R4 | S | QAV-DUR-1 注入测试通过；同步把 [`macos_app_packaging.md`](../macos_app_packaging.md) 「写入均为原子写」一句的适用范围改为与实现一致 |
+| A1 ✅ | pyproject 增加 `full = ["dev","agentscope","mysql","opcua","web"]` extra，README:326 与 Makefile:15 三处口径对齐（Makefile 含 opcua+web） | R3 | S | 干净 venv `pip install -e ".[full]"` 成功；`tests/test_architecture_guard.py`（见 A4）守护 extras 集合 |
+| A2 ✅ | `cli.py web()` 当 host 非 loopback 时打印红色警示并要求 `FDE_SCOPE_ALLOW_REMOTE=1` 才放行 | R2 | XS | 本地 loopback 启动不受影响；绑 0.0.0.0 且未设 env → exit 2 带 README 链接提示 |
+| A3 ✅ | `EngagementContext.save()` 改为临时文件 + `os.replace`（复用 `skills/store.py:_atomic_write` 模式，抽公共 helper 即可） | R4 | S | QAV-DUR-1 注入测试通过；同步把 [`macos_app_packaging.md`](../macos_app_packaging.md) 「写入均为原子写」一句的适用范围改为与实现一致 |
 
 ## P1 — 两周内
 
@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | B1 | 新建 `fde_scope/paths.py`：单一函数解析根目录（`FDE_SCOPE_HOME` > App 目录约定 > cwd 兜底），connectors/corpus 输出、engagements、skills、reports、uploads 全部收口；launcher 改为只设该 env | R1 | M | 三入口在同一 `FDE_SCOPE_HOME` 下看到同一份 engagements；README 迁移段落说明旧目录一次性搬运方式 |
 | B2 | 提交 `uv.lock`（或最小 constraints.txt），`agentscope>=2.0.4,<3`；CI 安装步骤改走 lock 并断言关键包版本号打印 | R7 | S/M | CI 中出现版本断言步骤；模拟"上游发新版"演练时 CI 安装结果不变 |
-| B3 | 落地 `tests/test_architecture_guard.py`（health-report #40 建议）：18 phases、10 gate 注册数、connector registry slugs、extras 集合、README `[full]` 存在性断言 | R3/R6 | S | 人为改坏任一契约 → 该测试红 |
+| B3 ✅ | 落地 `tests/test_architecture_guard.py`（health-report #40 建议）：18 phases、10 gate 注册数、connector registry slugs、extras 集合、README `[full]` 存在性断言 | R3/R6 | S | 人为改坏任一契约 → 该测试红 |
 | B4 | 最小 `AGENTS.md`（机器可读）：列出关键不变量（gate 实时重评语义、id 服务端生成、凭据仅 env、原子写约定）、危险操作区（state machine 相关字段直接赋值）、回归锚点（跑哪些测试） | BAF「Agent 指令使用」缺口 | XS | AI 协作者据此能在不读全文档的情况下避开三类高风险修改 |
 
 ## P2 — 按需（机会成本驱动，不设死线）
@@ -39,3 +39,8 @@
 ## 完成记录
 
 <!-- 格式：日期 · ID · 证据（提交哈希/测试名/截图路径） -->
+
+- 2026-08-27 · A1 · pyproject.toml 新增 `full` meta-extra（self-referential extras 全覆盖 dev/agentscope/mysql/opcua/web）；Makefile install-full 改用 `".[full]"`；README 本就宣导 `.[full]`，无需改。**验收**：干净 venv（uv, CPython 3.12）安装 `-e ".[full]"` 成功，`import asyncua, mysql.connector, fastapi` 全部 OK，`fde-scope profiles` 正常输出。
+- 2026-08-27 · A2 · `cli.py` 新增 `_host_is_loopback()`（IPv6 loopback 一并处理）+ web 命令门禁：非 loopback 且未设 `FDE_SCOPE_ALLOW_REMOTE=1` → 红字说明风险后 exit 2。Mac App launcher 固定 127.0.0.1 直启 uvicorn，不经此路径，不受影响。
+- 2026-08-27 · A3 · 新共享模块 `fde_scope/fsutil.py::atomic_write_text()`（mkstemp + os.replace + 失败回滚临时文件）；`EngagementContext.save()` 与 `SkillStore._atomic_write()` 均收口至该实现 —— CLI/Web/PawApp 三入口持久化自动受益（pawapp 的保存同样委托 ctx.save）。
+- 2026-08-27 · B3 · 新增 tests/test_architecture_guard.py（5 例：18 phases/10 gates/registry 卫生/extras 契约/三处文档一致）与 test_engagement.py 原子写注入+往返 2 例。**回归**：新增 7 例全部通过（0.18s）；全量 pytest exit 0（仅原有 3 个集成跳过）；ruff check/format 全绿。注：`docs/superpowers/plans/…skills.md` 的未提交 diff 为本轮之前的遗留工作区变更，与本整改无关。
