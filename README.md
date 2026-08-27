@@ -239,7 +239,7 @@ FDE 在现场的每一步（调研、实施、调优、方法论）都可以沉�
 
 **生命周期：** draft → published → archived。`skill review` 审阅草稿队列 → `skill publish` → 可检索、可导出。
 
-**导出给 Agent：** 支持 AgentScope 2.0 与 QwenPaw 两种格式（Anthropic Agent Skills 规范：`<skill-name>/SKILL.md`，frontmatter 含 `name` + `description`）。导出目录可直接交给 AgentScope `Toolkit.register_agent_skill()`，或放入 QwenPaw 的 `customized_skills` 目录自动发现。
+**导出给 Agent：** 支持 AgentScope 2.0 与 QwenPaw 两种格式（Anthropic Agent Skills 规范：`<skill-name>/SKILL.md`，frontmatter 含 `name` + `description`）。AgentScope 侧经 ``Toolkit(skills_or_loaders=[...])``（部署装配的 `AgentSpec.toolkit.skills_dirs`）注册进真实 Toolkit；QwenPaw 侧放入 `customized_skills` 目录自动发现。
 
 ```bash
 fde-scope skill add --title "OPC UA 连接踩坑" --category implementation --tags opcua --body "# 步骤..."
@@ -303,8 +303,10 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 333 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
-                       # no agentscope/mysql/opcua/LLM-key/QwenPaw needed (skips are integration-only)
+pytest                 # 388 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
+                       # no agentscope/mysql/opcua/LLM-key/QwenPaw needed (skips are integration-only);
+                       # real-AgentScope runtime tests live under the `agentscope` marker (CI runs them in a dedicated job)
+pytest -m agentscope   # 仅真库运行时测试（需 pip install -e ".[agentscope]"）
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```
 

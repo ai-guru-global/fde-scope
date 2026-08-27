@@ -50,7 +50,9 @@
   };
 
   function api(path, opts) {
-    return fetch("/" + APP + path, opts).then(function (r) {
+    // The host mounts PawApp routers under /api/<app_id> (PluginRegistry
+    // contract) — NOT /<app_id>; the latter resolves to the SPA shell HTML.
+    return fetch("/api/" + APP + path, opts).then(function (r) {
       if (!r.ok) {
         return r.text().then(function (t) {
           throw new Error(t || r.status);
@@ -662,6 +664,10 @@
   QwenPaw.registerRoutes(APP, [
     {
       path: "/apps/fde-scope",
+      // The host's registerRoutes reads `component` (confirmed against the
+      // console bundle: add({id, path, component})); `element` is kept as a
+      // harmless alias for hosts using the React-style name.
+      component: FdeScopePage,
       element: FdeScopePage,
     },
   ]);

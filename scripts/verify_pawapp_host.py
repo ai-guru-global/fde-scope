@@ -84,6 +84,19 @@ async def main() -> int:
     h = client.post(f"/api/fde-scope/handoff/{eid}", data={"accept": "false"})
     assert h.status_code == 200, h.text[:300]
 
+    # deploy plan: shares fde_scope.deploy.build_deploy_plan with the CLI/console
+    dp = client.post(
+        "/api/fde-scope/deploy/plan",
+        json={
+            "tenant": "cihost",
+            "sources": {"csv": "data/t.csv"},
+            "agents": [{"name": "analyst", "role": "数据分析"}],
+        },
+    )
+    assert dp.status_code == 200, dp.text[:300]
+    assert "csv_schema" in dp.json()["summary"]["bound_tools"], dp.text[:300]
+    assert client.post("/api/fde-scope/deploy/plan", json={"agents": [{"role": "x"}]}).status_code == 422
+
     print(f"pawapp host verification OK: {rec.manifest.id} loaded, all routes 200")
     return 0
 

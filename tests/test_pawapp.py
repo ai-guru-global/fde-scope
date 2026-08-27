@@ -65,7 +65,9 @@ def _load_pawapp_main(monkeypatch):
 
 def _client(main_module) -> TestClient:
     app = FastAPI()
-    app.include_router(main_module.router, prefix="/fde-scope")
+    # Same prefix the QwenPaw host really registers (see scripts/verify_pawapp_host.py);
+    # mounting under a different one here would let the two drift apart.
+    app.include_router(main_module.router, prefix="/api/fde-scope")
     return TestClient(app)
 
 
@@ -78,19 +80,55 @@ def test_pawapp_routes_end_to_end(tmp_path: Path, monkeypatch) -> None:
     main = _load_pawapp_main(monkeypatch)
     client = _client(main)
 
-    assert client.get("/fde-scope/health").status_code == 200
-    profiles = client.get("/fde-scope/profiles").json()
+    assert client.get("/api/fde-scope/health").status_code == 200
+    profiles = client.get("/api/fde-scope/profiles").json()
     assert len(profiles) >= 2  # ticket + manufacturing
-    assert client.get("/fde-scope/phases").status_code == 200
+    assert client.get("/api/fde-scope/phases").status_code == 200
 
-    r = client.post("/fde-scope/engagements", data={"customer": "SmokeCo", "profile": "ticket"})
+    r = client.post("/api/fde-scope/engagements", data={"customer": "SmokeCo", "profile": "ticket"})
     assert r.status_code == 200, r.text
     eid = r.json()["engagement_id"]
 
-    assert client.get(f"/fde-scope/engagements/{eid}").status_code == 200
-    assert client.get(f"/fde-scope/engagements/{eid}/gates").status_code == 200
-    assert client.post(f"/fde-scope/engagements/{eid}/advance").status_code == 200
-    assert client.get("/fde-scope/skills").status_code == 200
+    assert client.get(f"/api/fde-scope/engagements/{eid}").status_code == 200
+    assert client.get(f"/api/fde-scope/engagements/{eid}/gates").status_code == 200
+    assert client.post(f"/api/fde-scope/engagements/{eid}/advance").status_code == 200
+    assert client.get("/api/fde-scope/skills").status_code == 200
+
+
+def test_pawapp_deploy_plan_route_matches_the_deployer(tmp_path: Path, monkeypatch) -> None:
+    """The desktop route answers from ``build_deploy_plan``, including its 422s."""
+    monkeypatch.chdir(tmp_path)
+    main = _load_pawapp_main(monkeypatch)
+    client = _client(main)
+
+    r = client.post(
+        "/api/fde-scope/deploy/plan",
+        json={
+            "tenant": "faw",
+            "sources": {"csv": "data/t.csv"},
+            "agents": [{"name": "a", "role": "数据分析"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+    summary = r.json()["summary"]
+    assert "csv_schema" in summary["bound_tools"]
+    assert "mysql_schema" in summary["unbound_tools"]  # same role, source unknown
+    assert client.post("/api/fde-scope/deploy/plan", json={"agents": [{"role": "x"}]}).status_code == 422
+
+
+def test_pawapp_deploy_plan_tool_reads_roles_and_sources(tmp_path: Path, monkeypatch) -> None:
+    """The host-agent tool must answer without AgentScope, Docker, or a model."""
+    import asyncio
+
+    monkeypatch.chdir(tmp_path)
+    main = _load_pawapp_main(monkeypatch)
+    out = asyncio.run(
+        main.fde_deploy_plan("guming", "数据分析,文件分析", '{"documents": "docs/"}'),
+    )
+    assert out["summary"]["agents"] == 2
+    assert out["summary"]["bound_tools"] == ["documents_sample", "documents_schema"]
+    assert "TODO " in out["plan"]  # unbound sources stay visible, never faked
+    assert "not valid JSON" in asyncio.run(main.fde_deploy_plan("x", sources_json="[")).get("error", "")
 
 
 def test_pawapp_eng_path_rejects_traversal(tmp_path: Path, monkeypatch) -> None:

@@ -478,3 +478,44 @@ def test_console_has_workbench_and_skills_views(client) -> None:
     assert "现场记录" in r.text
     assert "沉淀为技能" in r.text
     assert "草稿审阅队列" in r.text
+
+
+# ---------------------------------------------------------------------------
+# deploy plan API（角色 → 连接器 → 工具绑定）
+# ---------------------------------------------------------------------------
+def test_deploy_plan_binds_configured_sources(client) -> None:
+    """配了源的角色拿到工具，没配的诚实标 unbound，并进入 ALLOW 规则。"""
+    r = client.post(
+        "/api/deploy/plan",
+        json={
+            "tenant": "caocao",
+            "name": "曹操出行",
+            "sources": {"csv": "data/t.csv", "documents": "docs/"},
+            "agents": [{"name": "analyst", "role": "数据分析"}, {"name": "archivist", "role": "文件分析"}],
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["summary"] == {
+        "bound_tools": ["csv_sample", "csv_schema", "documents_sample", "documents_schema"],
+        "unbound_tools": ["mes_sample", "mes_schema", "mysql_sample", "mysql_schema"],
+        "agents": 2,
+    }
+    agents = body["manifest"]["agents"]
+    assert [a["role_bucket"] for a in agents] == ["data", "files"]
+    allowed = {tool for tool, _ in body["manifest"]["permissions"]["allow"]}
+    assert "csv_sample" in allowed and "mes_sample" not in allowed
+
+
+def test_deploy_plan_defaults_to_single_agent(client) -> None:
+    """不声明 agents 时回退单 Agent（角色 = 租户名 → 不绑任何连接器）。"""
+    body = client.post("/api/deploy/plan", json={"tenant": "acme"}).json()
+    assert body["summary"]["agents"] == 1
+    assert body["manifest"]["agents"][0]["name"] == "acme_agent"
+    assert body["summary"]["bound_tools"] == []
+    assert body["summary"]["unbound_tools"] == []
+
+
+def test_deploy_plan_rejects_bad_agent_spec(client) -> None:
+    r = client.post("/api/deploy/plan", json={"tenant": "acme", "agents": [{"role": "缺名字"}]})
+    assert r.status_code == 422

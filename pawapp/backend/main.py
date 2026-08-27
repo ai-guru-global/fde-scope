@@ -2,8 +2,8 @@
 
 Bridges the fde_scope engagement/corpus/eval/skills engine into QwenPaw as a
 PawApp. All heavy lifting stays in the ``fde_scope`` package; this module only
-exposes it over the PawApp HTTP router (mounted at ``/fde-scope``) and wires a
-couple of agent tools so the host agent can drive the SOP.
+exposes it over the PawApp HTTP router (mounted by the host at
+``/api/fde-scope/*``) and wires agent tools so the host agent can drive the SOP.
 
 Storage layout (relative to the QwenPaw working dir, same convention as the
 standalone web console):
@@ -22,6 +22,18 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from qwenpaw.pawapp import PawApp, get_ctx
+
+try:
+    import fde_scope  # noqa: F401
+except ModuleNotFoundError as exc:  # pragma: no cover — env guard
+    raise ModuleNotFoundError(
+        "fde_scope is not importable from the QwenPaw host process. "
+        "Install it into QwenPaw's Python environment: "
+        "'pip install /path/to/fde-scope' (or 'pip install -e .'). "
+        "macOS note: if an editable install silently stops working, the "
+        ".venv's .pth files may carry a hidden flag — run "
+        "'chflags -R nohidden .venv' and retry."
+    ) from exc
 
 logger = logging.getLogger("qwenpaw.fde_scope")
 
@@ -388,6 +400,28 @@ def handoff_package(eid: str, accept: bool = Form(False)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# deploy (Layer 3): role → connector → tool plan, dry-run only
+# ---------------------------------------------------------------------------
+@router.post("/deploy/plan")
+def deploy_plan(body: dict | None = None) -> dict:
+    """Plan a tenant deployment: which role agent gets which connector tool.
+
+    Shares :func:`fde_scope.deploy.build_deploy_plan` with the standalone web
+    console and ``fde-scope deploy``, so the desktop app can never show a plan
+    the deployer would not produce. Pure data: nothing is assembled and no
+    model is called.
+    """
+    from pydantic import ValidationError
+
+    from fde_scope.deploy import build_deploy_plan
+
+    try:
+        return build_deploy_plan(body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+
+# ---------------------------------------------------------------------------
 # PawApp definition + agent tools
 # ---------------------------------------------------------------------------
 app = PawApp(name="FDE Scope", app_id="fde-scope")
@@ -437,6 +471,45 @@ async def fde_sop_advance(engagement_id: str, force: bool = False) -> dict:
         return {"advanced": False, "reason": "complete"}
     await run_in_threadpool(_save_engagement, eng)
     return {"advanced": True, "status": eng.status()}
+
+
+@app.tool(
+    "fde_deploy_plan",
+    description="Plan an FDE tenant deployment: which role agent (data / log / file analyst) "
+    "gets which connector tool, against which source, and which sources are still missing.",
+    icon="🧭",
+)
+async def fde_deploy_plan(
+    tenant: str,
+    roles: str = "数据分析,日志分析,文件分析",
+    sources_json: str = "{}",
+) -> dict:
+    """Tool: answer "will this tenant's agents actually reach their systems?".
+
+    ``sources_json`` maps a connector slug to its physical source, e.g.
+    ``{"csv": "data/tickets.csv", "documents": "docs/"}``.
+    """
+    import json
+
+    from fde_scope.deploy import build_deploy_plan, summarize_deploy_plan
+
+    try:
+        sources = json.loads(sources_json or "{}")
+    except json.JSONDecodeError as exc:
+        return {"error": f"sources_json is not valid JSON: {exc}"}
+    if not isinstance(sources, dict):
+        return {"error": 'sources_json must be a {"slug": "source"} object'}
+    agents = [
+        {"name": f"{tenant}_{i}", "role": r.strip()} for i, r in enumerate(roles.split(","), 1) if r.strip()
+    ]
+    plan = await run_in_threadpool(
+        build_deploy_plan,
+        {"tenant": tenant, "sources": sources, "agents": agents},
+    )
+    return {
+        "summary": plan["summary"],
+        "plan": summarize_deploy_plan(plan),
+    }
 
 
 @app.on_launch

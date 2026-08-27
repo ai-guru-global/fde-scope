@@ -19,6 +19,7 @@ from rich.table import Table
 from . import __version__
 
 if TYPE_CHECKING:
+    from .config import TenantConfig
     from .skills.service import SkillService
 
 app = typer.Typer(
@@ -186,7 +187,18 @@ def deploy(
     agent_specs: list[str] | None = typer.Option(
         None, "--agent", "-a", help="Agent spec 'name:role[:model]' (repeatable)"
     ),
+    sources: list[str] | None = typer.Option(
+        None,
+        "--connector-source",
+        help="Bind a role connector to its physical source 'slug=value' (repeatable), "
+        "e.g. --connector-source csv=data/t.csv --connector-source documents=docs/",
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't assemble/start"),
+    serve: bool = typer.Option(
+        False,
+        "--serve",
+        help="Opt-in runtime: build the real AgentScope app and serve it (needs agentscope + Redis + a reachable model)",
+    ),
 ) -> None:
     """[Layer 3] Assemble (and optionally start) a multi-tenant agent."""
     _banner(f"deploy · {tenant}")
@@ -204,7 +216,10 @@ def deploy(
             console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
             raise typer.Exit(2)
         agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
-    cfg = TenantConfig(id=tenant, name=name, model=model, corpus_path=corpus, agents=agents or None)
+    source_map = _parse_kv_list(sources, "--connector-source", "slug=value")
+    cfg = TenantConfig(
+        id=tenant, name=name, model=model, corpus_path=corpus, agents=agents or None, sources=source_map
+    )
     corpus_report = None
     if corpus:
         from .corpus import CorpusReport
@@ -235,8 +250,53 @@ def deploy(
     else:
         console.print("✅ Deployment plan assembled (dry-run / core-only)")
     for a in deployed.manifest.get("agents") or []:
-        console.print(f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'}")
+        console.print(
+            f"🔄 Agent: [bold]{a['name']}[/bold] · {a['role']} · model={a['model'] or 'runtime'} · connectors={a.get('connectors')}"
+        )
+        for tool in a.get("tools") or []:
+            mark = "[green]✓[/green]" if tool["bound"] else "[yellow]·[/yellow]"
+            console.print(f"   {mark} {tool['tool']:24s} {tool['note']}")
     console.print(f"📋 Manifest → [green]{json.dumps(deployed.manifest, ensure_ascii=False)}[/green]")
+
+    if serve:
+        _serve_app(cfg)
+
+
+def _parse_kv_list(values: list[str] | None, flag: str, shape: str) -> dict[str, str]:
+    """Parse repeatable ``--flag key=value`` options into a dict (exit 2 on junk)."""
+    out: dict[str, str] = {}
+    for v in values or []:
+        key, sep, val = v.partition("=")
+        if not sep or not key.strip() or not val.strip():
+            console.print(f"[red]Invalid {flag}:[/red] {v} (expected {shape})")
+            raise typer.Exit(2)
+        out[key.strip()] = val.strip()
+    return out
+
+
+def _serve_app(cfg: TenantConfig) -> None:
+    """Build the real AgentScope app for ``cfg`` and serve it (opt-in runtime).
+
+    Kept out of the default path: constructing needs the agentscope extra, and
+    serving requires a reachable Redis + model. This is the explicit
+    ``deploy --serve`` step that goes beyond assembly.
+    """
+    from .deploy import build_app
+
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]--serve 需要 uvicorn[/red]：pip install 'fde-scope[web]' 后重试")
+        raise typer.Exit(2) from None
+    try:
+        as_app = build_app(cfg)
+    except ImportError as exc:
+        console.print(
+            f"[red]--serve 需要 agentscope extra[/red]：pip install 'fde-scope[agentscope]'（{exc}）"
+        )
+        raise typer.Exit(2) from exc
+    console.print("🚀 Serving AgentScope app (Ctrl-C to stop) — needs Redis + model at run time")
+    uvicorn.run(as_app, host="127.0.0.1", port=8000)
 
 
 # ---------------------------------------------------------------------------

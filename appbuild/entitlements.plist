@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened-runtime entitlements for the frozen CPython bundle.
+     Applied by appbuild/build_release.sh at codesign time.
+     - allow-unsigned-executable-memory / allow-jit: CPython & pypy-style
+       allocators need writable-executable pages under the hardened runtime.
+     - disable-library-validation: the bundle loads many third-party .so
+       (pydantic-core, uvloop, httptools …) that are only ad-hoc signed. -->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

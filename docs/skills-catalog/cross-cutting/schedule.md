@@ -1,0 +1,37 @@
+# schedule
+
+> 状态：✅ 平台内置（随 Qoder 客户端注入，**不在** `~/.qoder/skills/` 下，无本地文件可改）· 类型：定时/周期任务 · FDE 位点：横切（Zone C 运维节奏）
+
+## 能做什么
+用**唯一一套调度引擎**创建、更新、列出、推进、取消计划任务。四类语义：
+- `at` —— 一次性，未来某具体时刻（必须给具体 datetime + 时区）
+- `every` —— 固定间隔重复
+- `cron` —— cron 表达式周期
+- `until` —— 有明确终止条件的每日唤醒（"直到 X 完成为止，每天看一次"）
+
+时间戳由模型自己换算，不接受"明天下午吧"这种模糊表达直接落库。**关键纪律：任何"稍后 / 定时 / 周期 / 到点做 X"的需求都走这里，不要自己写 cron、不要造 in-agent 轮询循环。**
+
+## 何时使用
+- 每日/每周交付节奏物：日报、周度指标巡检、gate 状态提醒
+- 有终点的持续观察：客户系统上线后"连续 7 天每天检查错误率，达标即停"
+- 把一次性任务变成周期巡检：季度 catalog 巡检（本手册库维护规约第 2 条）就该挂 `cron`
+- 长任务托管的本地触发端：到点后由 agent 去做，而不是人守着
+
+**不用于**：**网页内容变更监测** → [firecrawl-monitor](../zone-c-operationalization/firecrawl-monitor.md)（它自带 diff + AI judge + webhook 告警，比"定时抓一遍再人看"省得多）；**需要合上笔记本仍然继续跑**的任务 → [cloud-agents](cloud-agents.md)（本地调度依赖客户端在线，云端 agent 才与本机解耦）；单纯记录一个提醒（用日历，别占用 agent 额度）。
+
+## 最佳实践
+- **先问终止条件**：周期任务默认要有退出标准和复查日期，否则就是永动的 token 黑洞
+- 时区写死在任务里（客户在 UTC+8 还是 UTC+1 车间班表，直接影响告警是否有意义）
+- 一个任务只做一件事、只发一份产出；把"检查 + 判断 + 通知"三段都写清，避免每次自由发挥
+- 与 goal 的配合：创建成功后可以把当前目标置为 paused，唤醒时再恢复——不要同时挂多个语义重叠的周期任务
+- 成本护栏：`every` 间隔小于 10 分钟要质疑必要性；巡检类宁可 cron 定时点，不要高频轮询
+- 失败可见：任务产出要落到能被看见的地方（文档/表格/工单），而不是只在会话里说过一次
+- 变更走 `update`，不要"取消 + 新建"，否则丢失历史执行记录
+
+## 项目应用位点
+- Zone C：SLO 达成周期复查、飞轮数据回流（`fde_scope/flywheel/`）的定期 reflow
+- Zone A/B：gate 临期提醒（10 个 gate 中若干需要客户方书面回复，需要盯时限）
+- 本 catalog 维护：季度 `npx skills check` 巡检、📦 项审计复核，都应成为带终止条件的周期任务而不是"想起来再做"
+
+## 相关
+[cloud-agents](cloud-agents.md) · [firecrawl-monitor](../zone-c-operationalization/firecrawl-monitor.md) · [sre-runbooks](../zone-c-operationalization/sre-runbooks.md) · [dispatching-parallel-agents](dispatching-parallel-agents.md)

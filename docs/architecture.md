@@ -34,7 +34,8 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 │  └─────────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  Layer 3: Deploy（多租户部署）              [延迟导入 as] │    │
-│  │  DockerWorkspace · PermissionEngine · KnowledgeBase       │    │
+│  │  Workspace 沙箱 · PermissionContext · Toolkit 工具绑定    │    │
+│  │  SubAgentTemplate 蓝图 · deploy plan（web/PawApp 共享）   │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │  Layer 2: Corpus Engine（语料引擎）★核心     [无 as]      │    │
@@ -93,7 +94,7 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 
 ### 4. 依赖分层 → 零配置可跑
 - 核心数据层 + SOP 层 + Profiles 层 + Web 层**完全不依赖 agentscope**。
-- 仅 deploy / flywall 延迟导入 agentscope（optional extra）。
+- 仅 deploy 延迟导入 agentscope（optional extra）；flywheel 为纯规则实现。
 - `pip install -e ".[dev]"` + `pytest` 全绿，不需要 LLM key / docker / agentscope。
 
 ### 5. Corpus Engine 规则为底、LLM 可选增强
@@ -121,20 +122,22 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 - 三种自动/半自动沉淀入口（gate 阻塞提示、操作自动捕获、现场记录桥接）都产出草稿，
   `skill review` 人工审阅后才发布，保证信噪比；
 - 导出遵循 Anthropic Agent Skills 规范（SKILL.md + frontmatter），
-  AgentScope `Toolkit.register_agent_skill()` 与 QwenPaw `customized_skills` 双兼容。
+  AgentScope `Toolkit(skills_or_loaders=[...])`（部署装配的
+  `AgentSpec.toolkit.skills_dirs`）与 QwenPaw `customized_skills` 双兼容。
 详见 [`skills.md`](skills.md)。
 
 ### 9. 多 Agent 拓扑（AgentScope 2.0 真实机制）
 `deploy` 支持多 Agent：`tenant_config.yaml` 的 `agents` 段（或 CLI `--agent
 name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 官方
 `SubAgentTemplate` 蓝图 + leader agent 的 `AgentCreate`/`TeamSay` 协调。
-本期交付蓝图导出 + 拓扑声明（manifest 携带 `agents` + `subagent_templates`），
-真实 app 服务（storage/message_bus/workspace_manager）需要独立后端，不虚构 API。
+已交付：蓝图导出进真实 `create_app(custom_subagent_templates=...)`
+（`deploy --serve` / `build_app` 已可用，CI 有真库测试）；leader 的运行时
+协调仍需独立后端（storage/message_bus），不虚构 API。
 
 ### 10. QwenPaw 桌面形态（PawApp）
 `pawapp/` 把整个引擎做成 QwenPaw 的 PawApp（App Center 插件应用）：
-- 后端薄封装 `fde_scope`（17 路由挂载到 `/api/fde-scope`）+ 2 个 Agent 工具
-  （`fde_sop_status` / `fde_sop_advance`）；
+- 后端薄封装 `fde_scope`（18 路由由宿主挂载到 `/api/fde-scope`）+ 3 个 Agent 工具
+  （`fde_sop_status` / `fde_sop_advance` / `fde_deploy_plan`）；
 - runbook 起草用宿主 `ctx.chat()`（不再需要外部 LLM key）；
 - `ctx.storage` 同步 engagement 快照（文件仍为唯一事实源）；
 - `skill_provider()` 把导出的技能目录直接注册给宿主 Agent（技能即能力）。
@@ -149,7 +152,7 @@ name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 �
 [raw rows] → corpus forge（可选 LLM 合成/评分，`--llm`）→ [CorpusReport] → HTML 报告
    │  deploy (FAT→SAT→commissioning，工业 gate 守卫；manifest 可选携带 llm 段)
    ▼
-[DockerWorkspace + PermissionEngine + KnowledgeBase + Agent]
+[Workspace 沙箱 + PermissionContext(经 AgentState 注入) + Toolkit 绑定角色连接器/语料工具 + Agent]
    │  eval (ticket 指标 或 制造业 KPI；被测 Agent 可用 mock 或 MiMo)
    ▼
 [EvalReport + bad cases + 建议]
@@ -166,9 +169,9 @@ name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 �
 
 | 层 | 机制 | AgentScope 2.0 真实类型 |
 |---|---|---|
-| 执行隔离 | 容器沙箱 | `DockerWorkspace` / `E2BWorkspace` / `K8sWorkspace` |
-| 数据隔离 | 每租户独立 collection | `KnowledgeBase(collection=f"corpus_{tenant_id}")` |
-| 权限隔离 | 静态+动态规则引擎 | `PermissionEngine` + `PermissionRule`（ALLOW/DENY/ASK） |
+| 执行隔离 | 容器沙箱 | `DockerWorkspace` / `LocalWorkspace`（经 `SandboxSpec` 组装） |
+| 数据隔离 | 租户专属 collection 命名空间；语料检索为绑定该 corpus 的关键词工具 | collection 名 `corpus_{tenant_id}`；`agentscope.rag.KnowledgeBase` 需 embedding model，见路线图 |
+| 权限隔离 | 规则上下文随 `AgentState` 注入 agent（bound 工具自动 ALLOW，未匹配按审批策略 ASK/DENY） | `PermissionContext` + `PermissionRule`（ALLOW/DENY/ASK） |
 
 ## 当前状态 vs 路线图
 

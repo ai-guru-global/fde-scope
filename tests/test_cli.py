@@ -296,6 +296,38 @@ def test_deploy_invalid_agent_spec_exits_2(tmp_path: Path, monkeypatch) -> None:
     assert r.exit_code == 2
 
 
+def test_deploy_binds_connector_sources_per_role(tmp_path: Path, monkeypatch, sample_csv: Path) -> None:
+    """--connector-source 把角色连接器绑到真实源，manifest 里逐工具标 bound/unbound。"""
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(
+        app,
+        [
+            "deploy",
+            "--tenant",
+            "acme",
+            "--dry-run",
+            "--agent",
+            "analyst:数据分析",
+            "--connector-source",
+            f"csv={sample_csv}",
+        ],
+    )
+    assert r.exit_code == 0, r.stdout
+    assert '"csv_schema"' in r.stdout and '"csv_sample"' in r.stdout
+    assert "unbound: no source for connector 'mysql'" in r.stdout
+    assert "✓" in r.stdout  # bound tools are marked live
+
+
+def test_deploy_invalid_connector_source_exits_2(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(
+        app,
+        ["deploy", "--tenant", "acme", "--dry-run", "--connector-source", "no-equals-sign"],
+    )
+    assert r.exit_code == 2
+    assert "Invalid --connector-source" in r.stdout
+
+
 def test_qwenpaw_export_and_validate(tmp_path: Path, monkeypatch) -> None:
     """qwenpaw export 产出可被 qwenpaw validate 验证通过。"""
     monkeypatch.chdir(tmp_path)

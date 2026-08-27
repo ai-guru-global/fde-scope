@@ -22,6 +22,8 @@ _MODULE_BY_TYPE: dict[str, str] = {
     "zammad": "zammad",
     "salesforce": "salesforce",
     "mysql": "mysql_generic",
+    # documents (AgentScope rag parsers, imported lazily)
+    "documents": "documents",
     # manufacturing / industrial
     "opcua": "opcua",
     "mqtt_sparkplug": "mqtt_sparkplug",

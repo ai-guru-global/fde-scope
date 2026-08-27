@@ -31,7 +31,8 @@ dependencies = [
 
 [project.optional-dependencies]
 # Runtime layer unlocks deploy/flywheel real-type assembly.
-agentscope = ["agentscope>=2.0.5"]
+# Floor = the oldest version CI verifies against (tests/test_agentscope_runtime.py).
+agentscope = ["agentscope>=2.0.4"]
 mysql = ["mysql-connector-python>=8.3"]
 opcua = ["asyncua>=1.0,<3"]
 web = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"]

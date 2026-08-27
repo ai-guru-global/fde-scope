@@ -102,6 +102,11 @@ class AgentSpec(BaseModel):
 
     ``model`` is the agentscope model config name; ``None`` means the
     runtime injects it (matches tenant-level model semantics).
+
+    ``toolkit`` overrides the derived tool plan. The recognised key is
+    ``sources`` — a ``{connector_slug: source}`` map that lets one agent read a
+    different system than its tenant default (e.g. the log analyst reads the
+    historian, the file analyst reads the document dump).
     """
 
     name: str
@@ -124,6 +129,10 @@ class TenantConfig(BaseModel):
     model: str = "qwen-max"
     corpus_path: str | None = None
     ticket_api: str | None = None
+    #: connector slug -> physical source (file path, broker URL, DSN, endpoint).
+    #: A role agent only gets a connector's tools when its source is known here
+    #: (or overridden per agent in ``AgentSpec.toolkit["sources"]``).
+    sources: dict[str, str] = Field(default_factory=dict)
     resource_quota: str = "2cpu-4gb"
     profile: str = "ticket"  # ticket | manufacturing
     agents: list[AgentSpec] | None = None

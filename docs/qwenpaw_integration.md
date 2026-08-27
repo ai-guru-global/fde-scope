@@ -138,7 +138,23 @@ stdio 协议实现、真实 runner 对接不在本期（spec §5.2 占位条款�
 分支才有），代码用 `hasattr` 探测降级：新宿主自动注册，2.1.0 上导出文件留在
 磁盘供手动发现。
 
-**验证**：真实 QwenPaw 2.1.0 `PluginLoader` 管线加载通过（manifest 解析 →
-模块加载 → `register(PluginApi)` → 17 路由挂载 + 工具注册），全部路由 HTTP
-冒烟 200。自动化回归：`tests/test_pawapp.py`（stub `qwenpaw.pawapp` SDK，
-无需安装 QwenPaw）。
+**验证**：
+- 离线：`tests/test_pawapp.py`（stub SDK）+ `scripts/verify_pawapp_host.py`
+  （真实 `PluginLoader` 管线：manifest 解析 → 模块加载 → `register(PluginApi)`
+  → 17 路由挂载 + 全部路由 HTTP 冒烟 200，已接入 CI `pawapp-host` job）。
+- 真机（2026-08-26，QwenPaw 2.1.0 桌面宿主）：`qwenpaw plugin install ./pawapp`
+  → `qwenpaw app`，Console App Center 中 FDE Scope 页面渲染成功：5 Tab、
+  跨项目矩阵 7 行（含真实 engagement）、技能库 4 个 published 技能，
+  全部 `/api/fde-scope/*` 请求 200，console 无 JS 错误；`ctx.storage`
+  快照持久化到 `~/.qwenpaw/pawapp--fde-scope.json` 实证有效。
+
+**真机踩坑记录（已修）**：
+1. `qwenpaw plugin validate/install` 要求后端导出名为 `plugin` 的实例
+   （runtime loader 也接受 `app`）——main.py 同时导出两者；
+2. 宿主 `registerRoutes` 读 `component` 字段（不是 React 风格的 `element`），
+   传错字段会导致 App Center 永远显示 "not loaded" 占位符；
+3. 前端 `fetch` 必须打 `/api/<app_id>/*`（PluginRegistry 挂载契约），
+   打 `/<app_id>/*` 会命中 SPA 壳 HTML 导致 JSON 解析失败；
+4. macOS：editable 安装的 `.pth` 会被文件系统反复打上 hidden flag 导致
+   `fde_scope` 静默不可导入（宿主路由 500）——`chflags -R nohidden .venv`
+   修复；main.py 顶部已加导入预检与修复指引。

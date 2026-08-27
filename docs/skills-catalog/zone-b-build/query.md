@@ -1,0 +1,25 @@
+# query
+
+> 状态：✅ 已安装（duckdb-skills 系）· 类型：工具/数据 · FDE 位点：Zone B · 分析主力
+
+## 能做什么
+对挂载的 DuckDB 库或**临时对文件**跑 SQL：接受原生 SQL 或自然语言问题（"上周告警最多的设备"），用 DuckDB 方言习惯写法。覆盖 CSV/Parquet/Excel/JSON 直查。
+
+## 何时使用
+- 数据画像、聚合统计、异常切片、覆盖率分析
+- 语料盘点（多少条、类别分布、重复率）与 eval 结果分析
+
+**不用于**：源数据文件先要看结构（→ read-file / attach-db）；写操作类生产库（本技能偏只读分析）。
+
+## 最佳实践
+- Do：大 CSV 不导入，直接 `SELECT ... FROM 'file.csv'` 查——DuckDB 的杀手锏
+- Do：分析结论落成 SQL 文件归档，移交时客户可复跑
+- Don't：不要在自然语言模式下问跨越多个语义域的大杂问，拆成多查询
+- 组合：query + coverage_analyzer 思路可以给 `fde_scope.corpus` 报告做二次挖掘
+
+## 项目应用位点
+- Zone B `corpus` 后的语料质量复盘；Zone C KPI（OEE/MTBF）临时口径计算
+- examples/manufacturing 场景数据的即席分析
+
+## 相关
+[attach-db](attach-db.md) · [convert-file](convert-file.md) · [spatial](spatial.md)

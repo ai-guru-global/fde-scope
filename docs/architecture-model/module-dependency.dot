@@ -1,0 +1,106 @@
+// FDE Scope 模块依赖图（current-state）
+// 证据：fde_scope/ 与 pawapp/backend/ 全部 import 语句（2026-08-26 静态扫描）
+// 边语义：import-dependency（静态/延迟导入均标注）；虚线 = 可选/延迟导入
+// 查看：Qoder Canvas DOT 预览 或 `dot -Tsvg module-dependency.dot -o module-dependency.svg`
+digraph fde_scope_modules {
+    rankdir=TB;
+    nodesep=0.35;
+    ranksep=0.6;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11];
+    edge [fontname="Helvetica", fontsize=9, color="#555555"];
+
+    // ---------- UI 层 ----------
+    subgraph cluster_ui {
+        label="UI 层（零 agentscope）"; style=rounded; color="#2563EB"; bgcolor="#EFF6FF";
+        cli        [label="cli.py\n(Typer 入口)", fillcolor="#DBEAFE"];
+        web        [label="web/app.py\n(FastAPI, 26 routes)", fillcolor="#DBEAFE"];
+        pawapp     [label="pawapp/backend/main.py\n(PawApp, 17 routes\n@api/fde-scope)", fillcolor="#DBEAFE"];
+    }
+
+    // ---------- SOP 层 ----------
+    subgraph cluster_sop {
+        label="SOP 层"; style=rounded; color="#059669"; bgcolor="#ECFDF5";
+        engagement [label="engagement/\n18 阶段 4 zones 状态机\n+ 10 gate + handoff", fillcolor="#D1FAE5"];
+        profiles   [label="profiles/\nticket · manufacturing", fillcolor="#D1FAE5"];
+    }
+
+    // ---------- 能力层 ----------
+    subgraph cluster_core {
+        label="能力层（核心数据管线）"; style=rounded; color="#D97706"; bgcolor="#FFFBEB";
+        connectors [label="connectors/\n10 连接器 + 注册表", fillcolor="#FEF3C7"];
+        corpus     [label="corpus/\n语料引擎(规则为底,\nLLM 可选增强)", fillcolor="#FEF3C7"];
+        eval       [label="eval/\nticket 指标 + 制造业 KPI\n+ bad case", fillcolor="#FEF3C7"];
+        deploy     [label="deploy/\n多租户组装(唯一真实\nimport agentscope 处)", fillcolor="#FEF3C7"];
+        flywheel   [label="flywheel/\n事件映射 + 回流", fillcolor="#FEF3C7"];
+        integrations [label="integrations/\nQwenPaw 导出 + ACP\n+ validate", fillcolor="#FEF3C7"];
+        skills     [label="skills/\n技能沉淀库\n(draft→published→archived)", fillcolor="#FEF3C7"];
+    }
+
+    // ---------- 横切层 ----------
+    subgraph cluster_cross {
+        label="横切"; style=rounded; color="#7C3AED"; bgcolor="#F5F3FF";
+        llm    [label="llm.py\nMiMoClient(可选,\n标准库, 失败回退)", fillcolor="#EDE9FE"];
+        config [label="config.py\nTenantConfig/AgentSpec\n/CorpusConfig", fillcolor="#EDE9FE"];
+        templates [label="templates/\nJinja 报告与 runbook", fillcolor="#EDE9FE"];
+    }
+
+    // ---------- 外部 ----------
+    subgraph cluster_ext {
+        label="外部系统"; style=rounded; color="#DC2626"; bgcolor="#FEF2F2";
+        agentscope [label="AgentScope 2.0.5\n(optional extra)", shape=ellipse, fillcolor="#FEE2E2"];
+        mimo       [label="MiMo Token Plan\n(LLM API)", shape=ellipse, fillcolor="#FEE2E2"];
+        datasource [label="客户数据源\nCSV/MySQL/OPC UA/\nMQTT/ROS2/MES/…", shape=cylinder, fillcolor="#FEE2E2"];
+        qwenpaw    [label="QwenPaw 宿主", shape=ellipse, fillcolor="#FEE2E2"];
+    }
+
+    // ---------- UI → 能力（全部函数内延迟导入）----------
+    cli -> engagement [style=dashed, label="lazy"];
+    cli -> connectors [style=dashed];
+    cli -> corpus [style=dashed];
+    cli -> deploy [style=dashed];
+    cli -> eval [style=dashed];
+    cli -> flywheel [style=dashed];
+    cli -> integrations [style=dashed];
+    cli -> profiles [style=dashed];
+    cli -> skills [style=dashed];
+    cli -> llm [style=dashed];
+    cli -> config [style=dashed];
+
+    web -> engagement [label="顶层导入"];
+    web -> profiles [label="顶层导入"];
+    web -> skills;
+    web -> corpus [style=dashed];
+    web -> connectors [style=dashed];
+    web -> llm [style=dashed];
+    web -> config [style=dashed];
+
+    pawapp -> engagement [style=dashed];
+    pawapp -> profiles [style=dashed];
+    pawapp -> skills [style=dashed];
+    pawapp -> corpus [style=dashed];
+    pawapp -> connectors [style=dashed];
+    pawapp -> llm [style=dashed];
+
+    // ---------- 能力层内部 ----------
+    corpus -> connectors [style=dashed, label="TYPE_CHECKING"];
+    corpus -> llm [style=dashed, label="可选合成/评分"];
+    corpus -> config [style=dashed];
+    eval -> corpus [style=dashed, label="CorpusReport"];
+    eval -> llm [style=dashed, label="MiMoReplyFn"];
+    deploy -> config;
+    deploy -> corpus [style=dashed];
+    deploy -> agentscope [style=dashed, label="函数内延迟导入", color="#DC2626"];
+    flywheel -> corpus [label="CorpusItem/Provenance"];
+    integrations -> config;
+    integrations -> corpus [label="CorpusReport"];
+    integrations -> skills [label="SkillRecord/导出"];
+    profiles -> eval [label="manufacturing_metrics\n(跨层边，见报告)"];
+    engagement -> llm [style=dashed, label="runbook 起草"];
+    engagement -> templates [style=dashed, label="runbook.md.j2"];
+
+    // ---------- 外部 ----------
+    connectors -> datasource [label="读取"];
+    llm -> mimo [style=dashed, label="urllib, 无 key 回退"];
+    pawapp -> qwenpaw [label="宿主 LLM/存储/沙箱"];
+    integrations -> qwenpaw [style=dashed, label="导出蓝图/技能"];
+}

@@ -1,0 +1,75 @@
+// Risk map — FDE Scope architecture risk & quality review (2026-08-27)
+// Producer skill: risk-quality-reviewer (+ graphviz format foundation).
+// View question: "which risks touch which runtime assets, and how?"
+// State: current-state only; no runtime telemetry was available.
+// Regenerate guidance lives in system-model.evidence.md#再生成方式.
+digraph fde_scope_risk_map {
+  rankdir = TB;
+  graph  [fontname="Helvetica", fontsize=11, labelloc=t,
+          label="FDE Scope risk map · master@0547c59 · 2026-08-27\n(confidence suffix per finding)"];
+  node   [fontname="Helvetica", fontsize=10];
+
+  // ---- risks ----
+  subgraph cluster_risks {
+    label="Confirmed risks (evidence-backed)";
+    style=dashed; color="#666666";
+
+    r4 [shape=box, style="filled", fillcolor="#e06666",
+        label="R4 non-atomic engagement save\n(crash ⇒ truncated JSON)\n[conf: high]"];
+    r2 [shape=box, style="filled", fillcolor="#e69138",
+        label="R2 unauthenticated Web API\n+ arbitrary --host bind\n[conf: high]"];
+    r3 [shape=box, style="filled", fillcolor="#e69138",
+        label="R3 contract drift:\nREADME '[full]' extra missing,\nMakefile divergent\n[conf: high]"];
+    r1 [shape=box, style="filled", fillcolor="#f1c232",
+        label="R1 three entrypoints share\ncwd-relative '.fde_scope/'\n[conf: high]"];
+    r7 [shape=box, style="filled", fillcolor="#f1c232",
+        label="R7 no lockfile,\nagentscope float pin >=2.0.4\n[conf: high]"];
+    r6 [shape=box, style="filled", fillcolor="#f1c232",
+        label="R6 test blind spots:\ncross-process writes,\npackaging not in CI\n[conf: high]"];
+    r5 [shape=box, style="filled", fillcolor="#9fc5e8",
+        label="R5 god-files: web/app.py 1244L,\ncli.py 1043L [conf: high]"];
+  }
+
+  // ---- assets ----
+  subgraph cluster_assets {
+    label="Affected assets";
+    style=solid; color="#999999";
+
+    store  [shape=cylinder, label="engagement JSON store\n(.fde_scope/engagements/)"];
+    console[shape=component, label="Web console\n(fde_scope/web/app.py)"];
+    cli    [shape=component, label="CLI entrypoint\n(fde_scope/cli.py)"];
+    pawapp [shape=component, label="PawApp backend\n(pawapp/backend/main.py)"];
+    skills [shape=cylinder, style=filled, fillcolor="#b6d7a8",
+            label="skills store\n(atomic writes ✓)"];
+    docs   [shape=note, label="install/docs contract\n(README, Makefile, pyproject)"];
+    supply [shape=note, label="Python supply chain\n(pyproject deps, CI installs)"];
+    tests  [shape=note, label="test suite & CI gates"];
+  }
+
+  // ---- edges: risk -> asset impact paths ----
+  r4 -> store   [label="direct write_text\nmid-crash truncates"];
+  r4 -> console [style=dashed, label="corrupt entry silently\nskipped in list view"];
+
+  r1 -> store   [label="location depends on cwd"];
+  r1 -> cli     [label="repo-cwd data"];
+  r1 -> pawapp  [label="host-cwd data"];
+  r1 -> console [label="launcher-cwd data"];
+
+  r2 -> console [label="no auth on all routes"];
+  r2 -> pawapp  [style=dashed, label="mitigated by QwenPaw session scope"];
+
+  r3 -> docs    [label="'pip install .[full]' fails"];
+
+  r7 -> supply  [label="upstream breaking change\nreaches users unpinned"];
+  r6 -> tests   [label="structural coverage gaps"];
+  r6 -> store   [style=dotted, label="concurrency unverified"];
+
+  r5 -> console [label="change amplification"];
+  r5 -> cli     [label="change amplification"];
+
+  store -> console [dir=both, label="read / persist"];
+  skills -> console [style=invis]; // keep clusters compact
+
+  // keep risks above assets
+  { rank=same; r4; r2; r3 }
+}

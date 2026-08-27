@@ -338,6 +338,26 @@ async def compute_kpis(
 
 
 # ---------------------------------------------------------------------------
+# deploy API（Layer 3 装配计划：角色 → 连接器 → 工具绑定，dry-run，不碰运行时）
+# ---------------------------------------------------------------------------
+@app.post("/api/deploy/plan")
+def deploy_plan(body: dict | None = None) -> dict:
+    """Dry-run ``fde-scope deploy`` for a tenant payload and return the manifest.
+
+    The point is the tool plan: which role agent gets which connector tool,
+    against which physical source — and which ones are still waiting for one.
+    Delegates to :func:`fde_scope.deploy.build_deploy_plan` so the console, the
+    PawApp backend and the CLI can never disagree. No AgentScope, no model.
+    """
+    from ..deploy import build_deploy_plan
+
+    try:
+        return build_deploy_plan(body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+
+# ---------------------------------------------------------------------------
 # workbench API（工作台聚合：全局统计 + 跨项目矩阵 + 最近沉淀）
 # ---------------------------------------------------------------------------
 @app.get("/api/workbench")
@@ -630,7 +650,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 <div class="grid cols-3">
   <div class="tile"><div class="icon">🔬</div><div class="name">Corpus Engine</div><div class="desc">脱敏→去重→质量门→覆盖度分析→缺口检测→针对性合成→报告。<b>核心差异化</b>：合成是补盲区不是凑数量。</div></div>
   <div class="tile"><div class="icon">📊</div><div class="name">Eval 评估</div><div class="desc">ticket 指标 + 制造业 KPI（OEE/MTBF/抓取率/碰撞率）+ bad case 挖掘 + 自动建议。</div></div>
-  <div class="tile"><div class="icon">🚀</div><div class="name">Deploy 部署</div><div class="desc">DockerWorkspace + PermissionEngine + KnowledgeBase 三层隔离，对齐真实 AgentScope 2.0 API。</div></div>
+  <div class="tile"><div class="icon">🚀</div><div class="name">Deploy 部署</div><div class="desc">角色 Agent 真实装配：沙箱 workspace + 权限上下文（经 AgentState 注入）+ Toolkit 工具绑定 + SubAgentTemplate 蓝图，全部真实 AgentScope 2.0 API。</div></div>
   <div class="tile"><div class="icon">🔄</div><div class="name">Flywheel 飞轮</div><div class="desc">概念事件→真实事件映射 + 语料回流 + 周度增量重训。</div></div>
   <div class="tile"><div class="icon">🗂</div><div class="name">SOP 状态机</div><div class="desc">18 阶段推进/回滚，gate 不通过即拦截。</div></div>
   <div class="tile"><div class="icon">🌐</div><div class="name">Web 控制台</div><div class="desc">交互式 engagement 仪表盘 + gate + forge + KPI。</div></div>
@@ -696,7 +716,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 
 <footer>
   FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
-  333 tests passed · 69 source files · 零配置可跑
+  391 tests collected · 388 passed + 3 env-skipped · 73 source files · 零配置可跑
 </footer>
 
 </div>

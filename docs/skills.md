@@ -61,7 +61,9 @@ description: OPC UA 连接踩坑
 ```
 
 - `name` 为标题 slugify（保留 CJK 以避免导出碰撞）
-- **AgentScope**：导出目录交给 `Toolkit.register_agent_skill()`
+- **AgentScope 2.0**：每个导出目录（`<name>/SKILL.md`）传入部署装配的
+  ``Toolkit(skills_or_loaders=[...])``——即 ``AgentSpec.toolkit.skills_dirs``；
+  loader 只认单技能目录，不递归父目录（2.0 没有 ``register_agent_skill()`` 方法）
 - **QwenPaw**：放入 `customized_skills` 目录自动发现；或经 PawApp 的
   `skill_provider()` 注册（见 [`qwenpaw_integration.md`](qwenpaw_integration.md)）
 
@@ -94,3 +96,12 @@ GET    /api/workbench                                # 统计含 draft/total ski
 | `fde_scope/skills/exporters.py` | SKILL.md 渲染（agentscope / qwenpaw） |
 
 测试：`tests/test_skills.py`（26 用例）+ `tests/test_web.py` 中的 skills API 覆盖。
+
+## 与外部 skill 生态的边界
+
+本文件描述的是**项目内的沉淀机制**（现场经验 → `.fde_scope/skills/` → 导出给 Agent）；
+外部生态（Qoder 已装/可装的 skills、插件、MCP）另有手册库：
+[skills-catalog/](skills-catalog/README.md)（81 页，按 FDE 4 Zones + 横切分类，每页五段：元信息/能力/时机/最佳实践/应用位点）。
+
+两者互不覆盖：`fde-scope skill export` 的产物**不写进** catalog；catalog 的 📦 项安装后若需现场复用，
+再按本文件的 `skill review` 流程人工入库。

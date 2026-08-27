@@ -2,10 +2,26 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Auto-skip ``@pytest.mark.agentscope`` tests when the optional extra is absent.
+
+    The core matrix (CI) installs no agentscope, so those tests must skip rather
+    than error; the agentscope matrix runs them for real against the library —
+    that is where the actual 2.0 signatures get verified.
+    """
+    if importlib.util.find_spec("agentscope") is not None:
+        return
+    skip = pytest.mark.skip(reason="agentscope extra not installed")
+    for item in items:
+        if "agentscope" in item.keywords:
+            item.add_marker(skip)
 
 
 @pytest.fixture(autouse=True)

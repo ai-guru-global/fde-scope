@@ -24,6 +24,7 @@ MANIFEST
 
 # Virtual environments
 .venv/
+.venv-build*/
 venv/
 env/
 ENV/
@@ -62,3 +63,16 @@ samples/preview.json
 reports/
 corpus_store/
 .fde_scope/
+.probe/
+
+# Locally vendored third-party deps (not project code; keeps `ruff .` aligned with CI)
+.pydeps/
+
+# macOS app bundle build intermediates (appbuild/*.spec, launcher.py, icns are tracked)
+appbuild/FDEScope.iconset/
+appbuild/build/
+appbuild/dist/
+appbuild/build_info.json
+
+# Locally generated design assets (exported to appbuild/*.icns; source art stays local)
+vibe_images/
