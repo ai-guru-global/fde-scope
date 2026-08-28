@@ -36,6 +36,20 @@ def _no_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin every test's data root to a per-test directory.
+
+    ``paths.data_root`` falls back to ``~/Documents/FDE Scope`` when that
+    directory exists (the macOS app's footprint), which silently defeats
+    ``monkeypatch.chdir`` isolation on any dev machine where the app has been
+    run — tests would then read and write the real app data. An explicit
+    ``FDE_SCOPE_HOME`` makes resolution deterministic; precedence tests
+    re-set the env var themselves.
+    """
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+
+
 SAMPLE_ROWS = [
     {
         "id": "t-001",

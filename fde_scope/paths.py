@@ -6,12 +6,15 @@ an engagement created by double-clicking the app was invisible to a terminal
 run of the CLI (review risk R1). Every entry point now resolves data
 locations through :func:`data_root`:
 
-1. ``FDE_SCOPE_HOME`` when set — what the macOS app exports at startup;
-2. ``~/Documents/FDE Scope`` when that directory already exists — the app's
-   install footprint, so a CLI on an app-installed machine sees app data;
-3. the process CWD otherwise, deliberately kept as a *relative* path so that
-   per-use resolution keeps tracking ``chdir`` (test isolation and the
-   per-project CLI workflow both rely on that).
+1. ``FDE_SCOPE_HOME`` when set — what the macOS app exports at startup, and
+   what tests pin for isolation;
+2. the process CWD when it already carries its own ``.fde_scope`` — a project
+   directory keeps its own engagement/skill data even on a machine where the
+   app is installed (per-project CLI workflow);
+3. ``~/Documents/FDE Scope`` when that directory exists — the app's install
+   footprint, so a CLI run *outside* any project still sees app data;
+4. the process CWD, kept as a *relative* path so per-use resolution keeps
+   tracking ``chdir``.
 
 Helpers re-resolve on every call: the environment may legitimately change
 between module import and use (tests monkeypatch it), so nothing here is
@@ -32,14 +35,17 @@ def app_data_dir() -> Path:
 
 
 def data_root() -> Path:
-    """``FDE_SCOPE_HOME`` > app dir (if present) > CWD (kept relative)."""
+    """``FDE_SCOPE_HOME`` > CWD with data > app dir (if present) > CWD."""
     override = os.environ.get("FDE_SCOPE_HOME")
     if override:
         return Path(override).expanduser()
+    cwd = Path()
+    if (cwd / DATA_SUBDIR).is_dir():
+        return cwd
     home = app_data_dir()
     if home.is_dir():
         return home
-    return Path()  # CWD, relative on purpose — see module docstring
+    return cwd  # relative on purpose — see module docstring
 
 
 def _under_root(*parts: str, create: bool = False) -> Path:
