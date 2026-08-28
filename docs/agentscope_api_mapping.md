@@ -106,20 +106,20 @@
 ## 安装 / 版本
 - PyPI 最新：**2.0.7.post1**（2.0.7 传于 2026-08-24；本文旧版写 “2.0.5（2026-07-23）” 已过期）。
   `pip install agentscope`。导入根：`agentscope`。均 `requires-python >=3.11`，无 yank。
-- **本项目真正验证过的窗口只有一个版本：2.0.4.post1**。`pyproject.toml` 因此封为
-  `agentscope[ollama,service]>=2.0.4.post1,<2.0.5`。下面是逐版本实跑结果（隔离环境跑
-  `pytest -m agentscope` 12 例，2026-08-28），不是推论：
+- **本项目实测的兼容窗口：`agentscope[ollama,service]>=2.0.4.post1,<3`**（B5 适配后，见下表）。
+  下面是逐版本实跑结果（隔离环境跑 agentscope real-runtime 测试，2026-08-28 复测），
+  不是推论：
 
-  | 版本 | 12 例 real-runtime | 关键差异 |
+  | 版本 | real-runtime | 关键差异 |
   |---|---|---|
   | 2.0.4 | ❌ | `agentscope.rag` 无 `ExcelParser`（`deploy/app_service.py` 导入即炸） |
-  | 2.0.4.post1 | ✅ 12/12 | 唯一全绿；本文写的 API 形状以此为准 |
-  | 2.0.5 / 2.0.6 | ❌ | **无规则命中的工具兜底变 `allow`** |
-  | 2.0.7 / 2.0.7.post1 | ❌ | 同上；且 ChatModel 构造签名改为 `credential` 必传，只有 `OllamaChatModel` 的 `credential` 带默认值（所以 `tenant_manager` 拿它当零配置占位模型） |
+  | 2.0.4.post1 | ✅ | 基准；本文写的 API 形状以此为准 |
+  | 2.0.5 / 2.0.6 | ✅（B5 后） | 新增 **read-only fast path**：`is_read_only=True` 的无规则工具先于 allow 规则被放行（DEFAULT 与 DONT_ASK 皆是）；非 read-only 无规则工具仍走 mode 兜底（ASK/DENY，源码逐行一致）。`build_toolkit` 已一律 `is_read_only=False`，显式规则是唯一授权通道 |
+  | 2.0.7 / 2.0.7.post1 | ✅（B5 后，实测 `.post1`） | fast path 同上；且 ChatModel 构造签名改为 `credential` 必传，只有 `OllamaChatModel` 的 `credential` 带默认值（所以 `tenant_manager` 拿它当零配置占位模型） |
 
-  2.0.5+ 那一行是**安全语义**而非 API 形状：`PermissionContext` 只带 `mode` + 三类规则时，
-  上游把“没匹配到规则”的默认处理从按 mode 升级/拒绝改成了直接放行，HITL 门禁会静默失效。
-  适配动作记在 [`architecture-model/remediation-plan.md`](architecture-model/remediation-plan.md) 的 B5。
+  read-only fast path 是**安全语义**变化而非 API 形状变化：无规则工具若带只读标志会被
+  直接放行。适配（remediation-plan B5，已落地）：`build_toolkit` 从不声明 read-only；
+  `test_read_only_flag_is_never_a_permission_grant` 按版本锁定该上游差异，再变即红。
 - 主要 extras：`model-gemini/ollama/xai`, `workspace-docker/e2b/k8s/...`,
   `vdb-milvus/mongodb/elasticsearch/qdrant`, `memory-mem0/reme`, 以及大包 `[full]`。
   对本项目而言两个是必需品：`service`（→ `apscheduler`，`create_app` 的调度工具）、

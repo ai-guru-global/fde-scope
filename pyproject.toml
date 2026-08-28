@@ -32,18 +32,20 @@ dependencies = [
 [project.optional-dependencies]
 # Runtime layer unlocks deploy/flywheel real-type assembly.
 # The window below is *measured*, not aspirational (each row = the 12 tests
-# marked `agentscope` run against that version in an isolated env, 2026-08-27):
+# marked `agentscope` run against that version in an isolated env):
 #   2.0.4          ImportError: agentscope.rag has no ExcelParser (app_service.py)
-#   2.0.4.post1    green — the only version our verified behaviour holds
-#   2.0.5/.6/.7    unmatched tools fall back to ALLOW, so HITL/UNATTENDED deny
-#                  and ask policies silently stop firing
-# Adapting build_context to state that fallback explicitly (instead of relying
-# on the upstream default) is tracked in docs/architecture-model/remediation-plan.md B5.
+#   2.0.4.post1    green — unmatched tools follow the mode fallback (ASK/DENY)
+#   2.0.5 - 2.0.7  green since B5: upstream added a read-only fast path (ALLOW
+#                  before allow rules), so build_toolkit never flags a deployed
+#                  tool read-only and rule grants stay the only permission
+#                  channel. The mode fallback itself (non-read-only unmatched
+#                  → ASK/DENY) is line-identical across the window (verified
+#                  against 2.0.7 sources, 2026-08-28).
 # Sub-extras are required, not cosmetic: on 2.0.7 `OllamaChatModel.__init__`
 # (the placeholder tenant_manager builds) imports `ollama`, and the app scheduler
 # tools create_app registers import `apscheduler`. `ollama` is the extra name on
 # 2.0.4.post1 and stays a valid alias of `model-ollama` on newer releases.
-agentscope = ["agentscope[ollama,service]>=2.0.4.post1,<2.0.5"]
+agentscope = ["agentscope[ollama,service]>=2.0.4.post1,<3"]
 mysql = ["mysql-connector-python>=8.3"]
 opcua = ["asyncua>=1.0,<3"]
 web = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"]

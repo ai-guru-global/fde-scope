@@ -23,13 +23,15 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import TypeAdapter, ValidationError
 
+from .. import paths
 from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
 from ..profiles import all_profiles, get_profile
 
-_ENGAGEMENTS_DIR = Path(".fde_scope/engagements")
-_REPORTS_DIR = Path("reports")
-_REPORTS_DIR.mkdir(exist_ok=True)
+# Import-time resolution is safe here: under the CWD fallback reports_dir()
+# stays RELATIVE, so every use re-resolves against the current CWD (test
+# isolation via chdir keeps working — see fde_scope.paths).
+_REPORTS_DIR = paths.reports_dir(create=True)
 
 #: Upload cap for /api/forge and /api/kpi (10 MiB). Read with a bounded
 #: read so an oversized body is refused before it is fully buffered.
@@ -58,8 +60,9 @@ def _slugify(value: str) -> str:
 
 
 def _eng_path(eid: str) -> Path:
-    path = (_ENGAGEMENTS_DIR / f"{eid}.json").resolve()
-    base = _ENGAGEMENTS_DIR.resolve()
+    eng_dir = paths.engagements_dir()
+    path = (eng_dir / f"{eid}.json").resolve()
+    base = eng_dir.resolve()
     if not path.is_relative_to(base):
         raise HTTPException(status_code=400, detail=f"invalid engagement id: {eid!r}")
     return path
@@ -78,10 +81,11 @@ def _save(eng: Engagement) -> None:
 
 
 def _all_engagements() -> list[Engagement]:
-    if not _ENGAGEMENTS_DIR.exists():
+    eng_dir = paths.engagements_dir()
+    if not eng_dir.exists():
         return []
     out = []
-    for p in sorted(_ENGAGEMENTS_DIR.glob("*.json")):
+    for p in sorted(eng_dir.glob("*.json")):
         try:
             out.append(Engagement(EngagementContext.load(p)))
         except ValueError:
@@ -285,8 +289,7 @@ async def forge_corpus(
         raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
     # never trust the client-supplied name: basename only, uuid fallback
     safe_name = Path(file.filename or "").name or f"{uuid.uuid4().hex}.csv"
-    tmp = Path(f".fde_scope/uploads/{safe_name}")
-    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp = paths.uploads_dir(create=True) / safe_name
     tmp.write_text(content, encoding="utf-8")
 
     from fastapi.concurrency import run_in_threadpool
@@ -302,8 +305,8 @@ async def forge_corpus(
     # worker thread so the event loop (and every other endpoint) stays live.
     report = await run_in_threadpool(CorpusForge(cfg, llm=MiMoClient()).forge_rows, rows)
     report_id = uuid.uuid4().hex[:8]
-    out_html = _REPORTS_DIR / f"corpus_report_{report_id}.html"
-    out_json = _REPORTS_DIR / f"corpus_report_{report_id}.json"
+    out_html = paths.reports_dir() / f"corpus_report_{report_id}.html"
+    out_json = paths.reports_dir() / f"corpus_report_{report_id}.json"
     save_html(report, out_html)
     out_json.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     return {
@@ -395,8 +398,8 @@ def _skill_service():
     from ..skills.service import SkillService
     from ..skills.store import SkillStore
 
-    # 与 _ENGAGEMENTS_DIR 同约定：相对 cwd，测试经 chdir 隔离
-    return SkillService(SkillStore(Path(".fde_scope/skills")))
+    # 与 engagements 同约定：经 fde_scope.paths 解析数据根（B1）
+    return SkillService(SkillStore(paths.skills_dir()))
 
 
 @app.get("/api/skills")

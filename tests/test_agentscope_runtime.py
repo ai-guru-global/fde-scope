@@ -212,6 +212,16 @@ def test_deployed_agent_registers_exported_skills(
     assert "Refund escalation" in instructions
 
 
+def _agentscope_at_least(version: str) -> bool:
+    """Tuple-compare the installed agentscope version against *version*."""
+    import agentscope
+
+    def _key(v: str) -> tuple[int, ...]:
+        return tuple(int(p) for p in v.split(".post")[0].split(".")[:3])
+
+    return _key(agentscope.__version__) >= _key(version)
+
+
 @pytest.mark.parametrize(
     ("mode", "expected"),
     [("conservative", "ask"), ("autonomous", "deny")],
@@ -220,7 +230,10 @@ def test_deployed_agent_registers_exported_skills(
 def test_approval_policy_decides_the_fate_of_an_unmatched_tool(
     tmp_path: Path, mode: str, expected: str
 ) -> None:
-    """Bound reads are ALLOWed; anything else follows the tenant's approval policy."""
+    """Bound reads are ALLOWed via their rules; anything else follows the
+    tenant's approval policy. Deployed tools are never flagged read-only
+    (build_toolkit), so upstream's 2.0.5+ read-only fast path cannot hijack
+    the verdict — see test_read_only_flag_is_never_a_permission_grant."""
     from agentscope.permission import PermissionEngine
     from agentscope.tool import FunctionTool
 
@@ -239,10 +252,42 @@ def test_approval_policy_decides_the_fate_of_an_unmatched_tool(
     deployed = TenantDeployer().deploy(tenant)
     engine = PermissionEngine(deployed.engine)
 
-    mystery = FunctionTool(_mystery, name="mystery_tool", description="unmatched", is_read_only=True)
-    read = FunctionTool(_mystery, name="csv_sample", description="bound read", is_read_only=True)
+    mystery = FunctionTool(_mystery, name="mystery_tool", description="unmatched", is_read_only=False)
+    read = FunctionTool(_mystery, name="csv_sample", description="bound read", is_read_only=False)
     assert asyncio.run(engine.check_permission(read, {})).behavior.value == "allow"
     assert asyncio.run(engine.check_permission(mystery, {})).behavior.value == expected
+
+
+def test_read_only_flag_is_never_a_permission_grant(tmp_path: Path) -> None:
+    """The ``is_read_only`` flag alone must not grant unmatched tools.
+
+    Upstream 2.0.5 added a read-only fast path (ALLOW before allow rules),
+    so an unmatched *flagged* tool is allowed there — a documented upstream
+    divergence pinned here so any future shift turns red. Our deployed
+    toolkits never set the flag (build_toolkit), keeping explicit rules the
+    only grant channel (remediation-plan B5)."""
+    from agentscope.permission import PermissionEngine
+    from agentscope.tool import FunctionTool
+
+    async def _mystery() -> str:
+        """A tool no rule mentions."""
+        return "nope"
+
+    tenant = TenantConfig(
+        id="acme",
+        name="Acme",
+        sources={"csv": "data/t.csv"},
+        agents=[{"name": "analyst", "role": "数据分析"}],
+        approval_policy={"mode": "conservative"},
+    )
+    engine = PermissionEngine(TenantDeployer().deploy(tenant).engine)
+
+    flagged = FunctionTool(_mystery, name="flagged_ro", description="unmatched, read-only", is_read_only=True)
+    unflagged = FunctionTool(_mystery, name="flagged_rw", description="unmatched", is_read_only=False)
+
+    assert asyncio.run(engine.check_permission(unflagged, {})).behavior.value == "ask"
+    flagged_verdict = asyncio.run(engine.check_permission(flagged, {})).behavior.value
+    assert flagged_verdict == ("allow" if _agentscope_at_least("2.0.5") else "ask")
 
 
 # ---------------------------------------------------------------------------

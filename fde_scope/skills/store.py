@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .. import paths
 from ..fsutil import atomic_write_text
 from .models import SkillRecord
 
@@ -16,8 +17,10 @@ from .models import SkillRecord
 class SkillStore:
     """按 skill 目录组织的本地文件库。"""
 
-    def __init__(self, root: Path = Path(".fde_scope/skills")) -> None:
-        self.root = Path(root)
+    def __init__(self, root: Path | str | None = None) -> None:
+        # Default resolves lazily through fde_scope.paths (B1) — never cache
+        # a data-root decision at import time.
+        self.root = Path(root) if root is not None else paths.skills_dir()
         self._index_path = self.root / "index.json"
 
     # -- 路径 ---------------------------------------------------------------

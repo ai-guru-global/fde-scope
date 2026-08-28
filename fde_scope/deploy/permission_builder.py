@@ -10,6 +10,13 @@ Three isolation layers (the FDE's data-leakage defense):
     1. Sandbox        — execution isolation (workspace backend)
     2. Collection     — data isolation (per-tenant vector collection)
     3. PermissionEngine — capability isolation (rule-based allow/deny/ask)
+
+Unmatched-tool fallback is *our* contract, not the upstream default
+(remediation-plan B5): a tool call no rule mentions follows the tenant's
+approval mode — ``DEFAULT`` → ASK (HITL), ``DONT_ASK`` → DENY. Upstream
+2.0.5+ additionally auto-allows read-only invocations before allow rules,
+so :mod:`fde_scope.deploy.toolkit` never flags a deployed tool read-only:
+explicit rules stay the only grant channel across the supported window.
 """
 
 from __future__ import annotations
@@ -18,7 +25,8 @@ from dataclasses import dataclass, field
 
 #: ``ApprovalPolicy.mode`` -> AgentScope 2.0 ``PermissionMode`` value. The real
 #: enum is imported lazily, so this maps by name and ``permission_mode`` falls
-#: back to DEFAULT for anything unknown.
+#: back to DEFAULT for anything unknown. The mode also fixes the unmatched-tool
+#: verdict (see module docstring): DEFAULT escalates to a human, DONT_ASK denies.
 _MODE_NAMES = {
     "conservative": "DEFAULT",  # unmatched calls escalate to a human (ASK)
     "balanced": "DEFAULT",

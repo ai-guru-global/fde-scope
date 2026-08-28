@@ -3,8 +3,9 @@
 Origin: docs/architecture-model/architecture-health-report.md suggestion +
 risk review action B3. These tests fail when the *documented* contract drifts
 from the code: the 18-phase SOP shape, the 10-gate registry, connector
-registry hygiene, and the ``[full]`` install extra that README, Makefile and
-pyproject.toml must all agree on.
+registry hygiene, the ``[full]`` install extra that README, Makefile and
+pyproject.toml must all agree on, and the measured AgentScope window that
+pyproject and docs/agentscope_api_mapping.md must quote identically.
 """
 
 from __future__ import annotations
@@ -56,3 +57,16 @@ def test_install_docs_agree_on_full_extra() -> None:
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     assert ".[full]" in readme
     assert '".[full]"' in makefile
+
+
+def test_measured_agentscope_window_is_documented() -> None:
+    """The AgentScope window in pyproject is *measured* (2.0.4 fails on
+    `agentscope.rag.ExcelParser`; 2.0.5+ add a read-only fast path that would
+    bypass rule grants — adapted in B5, see build_toolkit), so it is not a
+    constraint to edit casually. docs/agentscope_api_mapping.md must quote
+    the same specifier verbatim: re-measure → update both, or this fails."""
+    data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    (requirement,) = data["project"]["optional-dependencies"]["agentscope"]
+    doc = (REPO_ROOT / "docs" / "agentscope_api_mapping.md").read_text(encoding="utf-8")
+    assert requirement in doc
+    assert "2.0.4.post1" in doc

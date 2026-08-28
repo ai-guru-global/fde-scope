@@ -2,9 +2,10 @@
 """FDE Scope.app launcher — double-click to run the Web workbench locally.
 
 Behaviour (designed for a PyInstaller ``--windowed`` bundle, no terminal):
-  1. Switch CWD to a persistent user data dir (``~/Documents/FDE Scope`` —
-     engagement JSON, skill library and reports live there, visible to the
-     user; override with ``FDE_SCOPE_HOME``).
+  1. Export the persistent user data dir as ``FDE_SCOPE_HOME``
+     (``~/Documents/FDE Scope`` unless overridden) — engagement JSON, the
+     skill library and reports live there, visible to the user; every
+     entry point resolves them through fde_scope.paths (B1), so no chdir.
   2. Start the FastAPI workbench (uvicorn, in-process, 127.0.0.1 only).
   3. Wait for ``/api/health`` then open the browser at ``/console``.
 
@@ -37,10 +38,16 @@ HOST = "127.0.0.1"
 LOG_MAX_BYTES = 2_000_000
 
 
-def _data_dir() -> Path:
+def _ensure_data_home() -> Path:
+    """Resolve/create the data home and export it as ``FDE_SCOPE_HOME`` (B1).
+
+    The app does NOT chdir anymore: every entry point resolves data
+    locations through fde_scope.paths, which reads this env var first.
+    """
     override = os.environ.get("FDE_SCOPE_HOME")
     path = Path(override).expanduser() if override else Path.home() / "Documents" / "FDE Scope"
     path.mkdir(parents=True, exist_ok=True)
+    os.environ["FDE_SCOPE_HOME"] = str(path)
     return path
 
 
@@ -117,8 +124,7 @@ def main() -> int:
     import logging
     import signal
 
-    data = _data_dir()
-    os.chdir(data)
+    data = _ensure_data_home()
 
     log_file = data / "fde-scope-app.log"
     _rotate_log(log_file)

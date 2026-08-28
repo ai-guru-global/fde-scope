@@ -68,25 +68,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
 
       # The core matrix above deliberately installs no AgentScope, so only this
       # job verifies the real 2.0 signatures: Toolkit/FunctionTool wiring,
       # PermissionContext enforcement and create_app blueprint registration.
-      - name: Install (core + dev + agentscope)
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,agentscope]"
+      # R7/B2: installs are locked through the committed uv.lock; `--locked`
+      # fails when pyproject and the lockfile disagree, so an upgraded upstream
+      # release can never silently change what CI tests. The lock pins the
+      # measured baseline (2.0.4.post1); to move it: `uv lock --upgrade`, then
+      # re-run the per-version matrix in docs/agentscope_api_mapping.md.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
-      - name: Show the AgentScope version under test
-        run: python -c "import agentscope; print(agentscope.__version__)"
+      - name: Install (locked) core + dev + agentscope
+        run: uv sync --locked --extra dev --extra agentscope
+
+      - name: Assert the AgentScope version matches uv.lock
+        run: |
+          locked=$(python -c "import tomllib; print(next(p['version'] for p in tomllib.load(open('uv.lock', 'rb'))['package'] if p['name'] == 'agentscope'))")
+          installed=$(uv run --no-sync python -c "import agentscope; print(agentscope.__version__)")
+          echo "uv.lock=$locked installed=$installed"
+          test "$locked" = "$installed"
 
       - name: Real-library runtime tests (must not be empty, must not skip)
-        run: pytest -q -m agentscope
+        run: uv run --no-sync pytest -q -m agentscope
 
       - name: Full suite with the extra present
-        run: pytest -q
+        run: uv run --no-sync pytest -q
 
   build:
     name: Build sdist + wheel

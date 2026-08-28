@@ -17,7 +17,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from . import __version__
+from . import __version__, paths
 
 if TYPE_CHECKING:
     from .config import TenantConfig
@@ -117,7 +117,9 @@ def corpus(
     config: str = typer.Option(
         "fde_scope/templates/corpus_config.yaml", "--config", "-c", help="CorpusConfig YAML"
     ),
-    out: str = typer.Option("reports/corpus_report.html", "--out", "-o", help="Output HTML report path"),
+    out: str | None = typer.Option(
+        None, "--out", "-o", help="Output HTML report path (default: <data root>/reports/corpus_report.html)"
+    ),
     llm: bool = typer.Option(
         False, "--llm", help="Synthesize gap-filling samples with MiMo (needs FDE_SCOPE_MIMO_API_KEY)"
     ),
@@ -132,6 +134,7 @@ def corpus(
     from .config import CorpusConfig
     from .corpus import CorpusForge, save_html, save_report_json
 
+    out = out or str(paths.reports_dir() / "corpus_report.html")
     client = _maybe_llm(require=llm) if llm else None
     cfg = CorpusConfig.from_yaml(config) if Path(config).exists() else CorpusConfig()
     rows = _load_rows(input)
@@ -401,11 +404,9 @@ gate_app = typer.Typer(name="gate", help="[SOP] Phase-gate校验器.", no_args_i
 app.add_typer(engage_app)
 app.add_typer(gate_app)
 
-_ENGAGEMENTS_DIR = Path(".fde_scope/engagements")
-
 
 def _engagement_path(engagement_id: str) -> Path:
-    return _ENGAGEMENTS_DIR / f"{engagement_id}.json"
+    return paths.engagements_dir() / f"{engagement_id}.json"
 
 
 def _load_engagement(engagement_id: str):
@@ -523,13 +524,14 @@ def engage_rollback(
 def engage_list() -> None:
     """List all local engagements."""
     _banner("engagements")
-    if not _ENGAGEMENTS_DIR.exists():
+    eng_dir = paths.engagements_dir()
+    if not eng_dir.exists():
         console.print("[yellow]No engagements yet.[/yellow]")
         return
     table = Table(title="Engagements")
     for col in ("id", "customer", "profile", "phase", "zone"):
         table.add_column(col)
-    for p in sorted(_ENGAGEMENTS_DIR.glob("*.json")):
+    for p in sorted(eng_dir.glob("*.json")):
         from .engagement import Engagement, EngagementContext
 
         eng = Engagement(EngagementContext.load(p))
@@ -638,8 +640,8 @@ def handoff(
     from .engagement.operationalization import llm_runbook, render_runbook
 
     eng = _load_engagement(engagement_id)
-    runbook_path = f"reports/runbook_{engagement_id}.md"
-    Path(runbook_path).parent.mkdir(parents=True, exist_ok=True)
+    runbook_path = paths.reports_dir() / f"runbook_{engagement_id}.md"
+    runbook_path.parent.mkdir(parents=True, exist_ok=True)
     model_name = ""
     if llm:
         client = _maybe_llm(require=True)
@@ -647,14 +649,14 @@ def handoff(
         runbook_md, used_llm = llm_runbook(eng.ctx, client)
     else:
         runbook_md, used_llm = render_runbook(eng.ctx), False
-    Path(runbook_path).write_text(runbook_md, encoding="utf-8")
+    runbook_path.write_text(runbook_md, encoding="utf-8")
     if used_llm:
         console.print(f"🤖 Runbook drafted by MiMo ({model_name})")
     elif llm:
         console.print("[yellow]Runbook rendered from template (MiMo draft failed)[/yellow]")
     build_handoff_package(
         eng.ctx,
-        runbook_path=runbook_path,
+        runbook_path=str(runbook_path),
         eval_report_path=eval_report,
         training_material=training,
         customer_accepted=accept,
@@ -856,7 +858,7 @@ def _skill_service() -> SkillService:
     from .skills.service import SkillService
     from .skills.store import SkillStore
 
-    return SkillService(SkillStore(Path(".fde_scope/skills")))
+    return SkillService(SkillStore(paths.skills_dir()))
 
 
 def _maybe_suggest_skill(engagement_id: str, gate_slug: str, blockers: list[str]) -> None:
@@ -1059,7 +1061,9 @@ def skill_review(limit: int = typer.Option(20, "--limit")) -> None:
 def skill_export(
     skill_id: str = typer.Argument(...),
     fmt: str = typer.Option(..., "--format", help="agentscope|qwenpaw"),
-    out: str = typer.Option("exports", "--out", help="输出目录"),
+    out: str | None = typer.Option(
+        None, "--out", help="输出目录（默认 <data root>/.fde_scope/skills/export）"
+    ),
 ) -> None:
     """导出技能为 AgentScope / QwenPaw 格式。"""
     from .skills.exporters import export_skill
@@ -1073,6 +1077,7 @@ def skill_export(
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from None
+    out = out or str(paths.skills_export_dir())
     out_dir = Path(out)
     for f in files:
         p = out_dir / f.name

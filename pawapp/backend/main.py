@@ -5,8 +5,9 @@ PawApp. All heavy lifting stays in the ``fde_scope`` package; this module only
 exposes it over the PawApp HTTP router (mounted by the host at
 ``/api/fde-scope/*``) and wires agent tools so the host agent can drive the SOP.
 
-Storage layout (relative to the QwenPaw working dir, same convention as the
-standalone web console):
+Storage layout resolves through ``fde_scope.paths`` (remediation-plan B1):
+``FDE_SCOPE_HOME`` > ``~/Documents/FDE Scope`` (when present) > the host
+process CWD — the same root the standalone web console and CLI use:
     .fde_scope/engagements/*.json   — engagement state
     .fde_scope/skills/              — skill library
     reports/                        — generated runbooks / corpus reports
@@ -25,6 +26,7 @@ from qwenpaw.pawapp import PawApp, get_ctx
 
 try:
     import fde_scope  # noqa: F401
+    from fde_scope import paths
 except ModuleNotFoundError as exc:  # pragma: no cover — env guard
     raise ModuleNotFoundError(
         "fde_scope is not importable from the QwenPaw host process. "
@@ -37,10 +39,6 @@ except ModuleNotFoundError as exc:  # pragma: no cover — env guard
 
 logger = logging.getLogger("qwenpaw.fde_scope")
 
-_ENGAGEMENTS_DIR = Path(".fde_scope/engagements")
-_REPORTS_DIR = Path("reports")
-_SKILLS_DIR = Path(".fde_scope/skills")
-_SKILLS_EXPORT_DIR = _SKILLS_DIR / "export"  # QwenPaw skill_provider source
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MiB, same as the standalone console
 
 router = APIRouter()
@@ -54,8 +52,9 @@ def _slugify(value: str) -> str:
 
 
 def _eng_path(eid: str) -> Path:
-    path = (_ENGAGEMENTS_DIR / f"{eid}.json").resolve()
-    base = _ENGAGEMENTS_DIR.resolve()
+    eng_dir = paths.engagements_dir()
+    path = (eng_dir / f"{eid}.json").resolve()
+    base = eng_dir.resolve()
     if not path.is_relative_to(base):
         raise HTTPException(status_code=400, detail=f"invalid engagement id: {eid!r}")
     return path
@@ -78,10 +77,11 @@ def _save_engagement(eng) -> None:
 def _all_engagements() -> list:
     from fde_scope.engagement import Engagement, EngagementContext
 
-    if not _ENGAGEMENTS_DIR.exists():
+    eng_dir = paths.engagements_dir()
+    if not eng_dir.exists():
         return []
     out = []
-    for p in sorted(_ENGAGEMENTS_DIR.glob("*.json")):
+    for p in sorted(eng_dir.glob("*.json")):
         try:
             out.append(Engagement(EngagementContext.load(p)))
         except ValueError:
@@ -93,7 +93,7 @@ def _skill_service():
     from fde_scope.skills.service import SkillService
     from fde_scope.skills.store import SkillStore
 
-    return SkillService(SkillStore(_SKILLS_DIR))
+    return SkillService(SkillStore(paths.skills_dir()))
 
 
 async def _sync_storage_snapshot(ctx, engagements: list[dict]) -> None:
@@ -234,18 +234,17 @@ async def forge_corpus(
     except UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
     safe_name = Path(file.filename or "").name or f"{uuid.uuid4().hex}.csv"
-    tmp = Path(f".fde_scope/uploads/{safe_name}")
-    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp = paths.uploads_dir(create=True) / safe_name
     tmp.write_text(text, encoding="utf-8")
 
     rows = CSVConnector(str(tmp)).extract_sample(100000)
     cfg = CorpusConfig(min_samples_per_category=min_samples, synth_per_gap=synth_per_gap)
     report = await run_in_threadpool(CorpusForge(cfg, llm=MiMoClient()).forge_rows, rows)
     report_id = uuid.uuid4().hex[:8]
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_html = _REPORTS_DIR / f"corpus_report_{report_id}.html"
+    report_dir = paths.reports_dir(create=True)
+    out_html = report_dir / f"corpus_report_{report_id}.html"
     save_html(report, out_html)
-    (_REPORTS_DIR / f"corpus_report_{report_id}.json").write_text(
+    (report_dir / f"corpus_report_{report_id}.json").write_text(
         report.model_dump_json(indent=2), encoding="utf-8"
     )
     return {
@@ -334,7 +333,7 @@ def export_skill(sid: str, fmt: str = Form("qwenpaw")) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from None
     out = []
     for f in files:
-        dest = _SKILLS_EXPORT_DIR / f.name
+        dest = paths.skills_export_dir() / f.name
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(f.content, encoding="utf-8")
         out.append({"name": f.name, "content": f.content, "path": str(dest)})
@@ -376,8 +375,8 @@ async def draft_runbook(eid: str, ctx=Depends(get_ctx)) -> dict:
     except Exception:  # no workspace / model error → honest fallback
         logger.debug("LLM runbook draft failed; using template", exc_info=True)
         runbook_md = await run_in_threadpool(render_runbook, c)
-    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = _REPORTS_DIR / f"runbook_{eid}.md"
+    runbook_dir = paths.reports_dir(create=True)
+    path = runbook_dir / f"runbook_{eid}.md"
     path.write_text(runbook_md, encoding="utf-8")
     return {"engagement_id": eid, "used_llm": used_llm, "path": str(path)}
 
@@ -389,7 +388,7 @@ def handoff_package(eid: str, accept: bool = Form(False)) -> dict:
     from fde_scope.engagement import build_handoff_package
 
     eng = _load_engagement(eid)
-    runbook = _REPORTS_DIR / f"runbook_{eid}.md"
+    runbook = paths.reports_dir() / f"runbook_{eid}.md"
     package = build_handoff_package(
         eng.ctx,
         runbook_path=str(runbook) if runbook.exists() else None,
@@ -431,7 +430,7 @@ app.include_router(router)
 # QwenPaw agent — FDE field experience captured here becomes agent capability.
 # skill_provider() landed on main after the 2.1.0 PyPI release: detect and
 # degrade gracefully so the app still loads on older hosts.
-_SKILLS_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+_SKILLS_EXPORT_DIR = paths.skills_export_dir(create=True)  # QwenPaw skill_provider source
 if hasattr(app, "skill_provider"):
     app.skill_provider(_SKILLS_EXPORT_DIR)
 else:  # pragma: no cover — host-side discovery only
@@ -514,7 +513,7 @@ async def fde_deploy_plan(
 
 @app.on_launch
 async def _on_launch() -> None:
-    logger.info("FDE Scope PawApp launched (engagements dir: %s)", _ENGAGEMENTS_DIR.resolve())
+    logger.info("FDE Scope PawApp launched (engagements dir: %s)", paths.engagements_dir().resolve())
 
 
 # QwenPaw 2.1.0 contract: the runtime loader accepts a PawApp exported as

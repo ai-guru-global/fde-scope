@@ -299,6 +299,12 @@ def build_toolkit(
 
     tools: list[Any] = []
     made: set[str] = set()
+    # Deployed tools are NEVER flagged read-only: upstream 2.0.5+ auto-allows
+    # read-only invocations *before* allow rules are consulted, which would
+    # make the flag itself a permission grant. Every bound tool also carries
+    # an explicit ALLOW rule (see default_blueprint's allow_tools), so
+    # behaviour is unchanged — but revoking the rule now really revokes access
+    # (remediation-plan B5).
     for binding in bindings:
         if not binding.bound or binding.name in made:
             continue
@@ -306,7 +312,7 @@ def build_toolkit(
             func = make_corpus_search() if binding.name == "corpus_search" else make_corpus_coverage()
             tools.append(
                 FunctionTool(
-                    func, name=binding.name, description=func.__doc__.splitlines()[0], is_read_only=True
+                    func, name=binding.name, description=func.__doc__.splitlines()[0], is_read_only=False
                 )
             )
         else:
@@ -317,7 +323,7 @@ def build_toolkit(
                         schema_func,
                         name=binding.name,
                         description=schema_func.__doc__.splitlines()[0],
-                        is_read_only=True,
+                        is_read_only=False,
                     )
                 )
             else:
@@ -326,7 +332,7 @@ def build_toolkit(
                         sample_func,
                         name=binding.name,
                         description=sample_func.__doc__.splitlines()[0],
-                        is_read_only=True,
+                        is_read_only=False,
                     )
                 )
         made.add(binding.name)

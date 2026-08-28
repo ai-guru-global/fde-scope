@@ -46,8 +46,9 @@ coverage.xml
 .dmypy.json
 dmypy.json
 
-# uv
-uv.lock
+# uv — uv.lock is committed on purpose (remediation-plan B2): CI installs
+# through `uv sync --locked`, so an upstream release can't silently change
+# what gets tested.
 
 # IDE
 .idea/
