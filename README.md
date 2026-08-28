@@ -53,9 +53,9 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
    (embodied-robotics factory) share one engine but differ in connectors, KPIs,
    and which gates apply. Manufacturing reports real production KPIs: OEE, MTBF/
    MTTR, FPY/DPMO, grasp success rate, collision/intervention rate.
-4. **Built on real AgentScope 2.0.** The runtime layer maps to the *actual* 2.0.5
-   API — not the fictional `HarnessAgent`/`SequentialPipeline`/`EventSystem.on`
-   that appear in many design docs. See
+4. **Built on real AgentScope 2.0.** The runtime layer maps to the *actual*
+   `2.0.4.post1`–`2.0.x` API — not the fictional `HarnessAgent`/`SequentialPipeline`/
+   `EventSystem.on` that appear in many design docs. See
    [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md).
 5. **Zero-config runnable.** The core data + engagement layers have **no**
    AgentScope dependency — no LLM key, no Docker. `pip install -e ".[dev]"` and
@@ -303,9 +303,10 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 400 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
-                       # no agentscope/mysql/opcua/LLM-key/QwenPaw needed (skips are integration-only);
-                       # real-AgentScope runtime tests live under the `agentscope` marker (CI runs them in a dedicated job)
+pytest                 # CI badge (top) shows current pass/skip status.
+                       # Coverage: core + engagement + gates + skills + web + integrations + LLM mock + PawApp.
+                       # No agentscope/mysql/opcua/LLM-key/QwenPaw needed locally (skips are integration-only);
+                       # real-AgentScope runtime tests live under the `agentscope` marker (CI dedicated job).
 pytest -m agentscope   # 仅真库运行时测试（需 pip install -e ".[agentscope]"）
 pytest --cov=fde_scope --cov-report=term-missing   # ~89% coverage
 ```
@@ -342,7 +343,7 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 - [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md) — QwenPaw 集成：配置两层结构 / 导出与校验 / PawApp 桌面形态
 - [`pawapp/README.md`](pawapp/README.md) — QwenPaw PawApp 安装/开发/API 契约
 - [`docs/code_review_checklist.md`](docs/code_review_checklist.md) — repeatable review workflow + bug case library
-- [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.5 API
+- [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.x API (measured version matrix)
 - [`docs/fde_playbook.md`](docs/fde_playbook.md) — on-site 72h playbook
 - [`examples/README.md`](examples/README.md) — CSV cold-start walkthrough (quickstart data included)
 

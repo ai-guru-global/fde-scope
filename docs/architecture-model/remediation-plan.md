@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | C1 | `web/app.py` 按资源族拆 router、公共助手下沉；`cli.py` 同策略（接触时顺手做） | R5 | M | 任一文件 ≤400 行；现有测试全绿 |
 | C2 | 可选 macOS runner 定期 job：跑 `build_release.sh --arch arm64 --no-dmg` 冒烟（签名降级 ad-hoc 分支即可） | R6 | L | schedule job 周级运行；失败通知维护者 |
-| C3 | README 测试数字改为不含硬计数的措辞（或由 CI 徽章承载），消除人工同步点 | R6 | XS | grep README 不再出现裸数字 "333" |
+| C3 ✅ | README 测试数字改为不含硬计数的措辞（或由 CI 徽章承载），消除人工同步点 | R6 | XS | grep README 不再出现裸数字 "333" |
 | C4 | engagement 冲突检测：save 前 mtime 校验，冲突则报错引导刷新（配合 B1 一并设计） | R1/R6 | M | QAV-CON-1 双进程测试通过 |
 
 ## 明确不做（有意决策，防范围蔓延）
@@ -50,3 +50,4 @@
 - 2026-08-28 · B2 · `uv.lock` 解除 gitignore 并入库，锁定实测基线 agentscope 2.0.4.post1（与本地 .venv、文档基准三者一致）；CI agentscope job 从裸 pip 改为 `uv sync --locked --extra dev --extra agentscope`（lock 与 pyproject 不一致即红——上游发新版不可能再静默改变 CI 被测对象），新增「安装版本 == uv.lock 版本」断言步骤；升级协议写入 CI 注释（`uv lock --upgrade` + 逐版本矩阵复测）。**验收**：`UV_PROJECT_ENVIRONMENT` 隔离演练 `uv sync --locked` 安装成功、版本断言逻辑通过；ci.yml YAML 语法校验通过。
 - 2026-08-28 · B4 · 新增根目录 `AGENTS.md`（机器可读）：6 条关键不变量（gate 实时重评、id 服务端生成、凭据仅 env、原子写约定、规则是唯一授权通道、agentscope 窗口 measured）、4 类危险操作区（state machine 字段直赋/相位与 gate 注册表/权限管线/窗口放宽）、4 个回归锚点（全量 pytest / `-m agentscope` / 守护测试 / ruff）。
 - 2026-08-28 · B1 · 新建 `fde_scope/paths.py`：`data_root()` 按优先级 （`FDE_SCOPE_HOME` env > `~/Documents/FDE Scope` 已存在时 > CWD 保持相对路径）解析单一数据根；提供 `engagements_dir()`/`skills_dir()`/`skills_export_dir()`/`uploads_dir()`/`reports_dir()` 五个辅助函数（每次重新解析，不缓存），connectors/corpus 输出、engagements、skills、reports、uploads 全部收口。`cli.py`/`web/app.py`/`pawapp/backend/main.py`/`appbuild/launcher.py` 四处硬编码路径均改为经 `paths` 访问（去掉各模块顶层的 `_ENGAGEMENTS_DIR`/`_REPORTS_DIR`/`_SKILLS_DIR` 常量），launcher 从 `chdir` 改为 `os.environ['FDE_SCOPE_HOME']=...`。三入口在同一 `FDE_SCOPE_HOME` 下看到同一份 engagements（验收：全量 pytest 400 绿；ruff/mypy 全绿；check-catalog/check-local 全绿）。
+- 2026-08-28 · C3 · README:306 的 pytest 注释改为「CI badge (top) shows current pass/skip status」——CI badge 已在行 7，无需新增；同步修正行 56 的 stale "2.0.5 API" → "2.0.4.post1–2.0.x API"，行 346 文档节 "2.0.5" → "2.0.x（measured version matrix）"。**验收**：`grep -E "[0-9]+ passed" README.md` 无结果（0 条硬计数）。
