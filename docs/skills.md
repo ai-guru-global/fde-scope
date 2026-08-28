@@ -105,3 +105,6 @@ GET    /api/workbench                                # 统计含 draft/total ski
 
 两者互不覆盖：`fde-scope skill export` 的产物**不写进** catalog；catalog 的 📦 项安装后若需现场复用，
 再按本文件的 `skill review` 流程人工入库。
+
+catalog 的一致性由脚本守住，不靠人脑：`make check-catalog`（`scripts/check_skills_catalog.py`，
+已挂 CI），校验页数声明、每页五段结构、索引与页面双向对应、📦/✅ 状态一致、目录内相对链接无断链。

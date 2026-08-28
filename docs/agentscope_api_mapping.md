@@ -104,9 +104,29 @@
 ---
 
 ## 安装 / 版本
-- PyPI 最新：**2.0.5**（2026-07-23）。`pip install agentscope`。导入根：`agentscope`。
+- PyPI 最新：**2.0.7.post1**（2.0.7 传于 2026-08-24；本文旧版写 “2.0.5（2026-07-23）” 已过期）。
+  `pip install agentscope`。导入根：`agentscope`。均 `requires-python >=3.11`，无 yank。
+- **本项目真正验证过的窗口只有一个版本：2.0.4.post1**。`pyproject.toml` 因此封为
+  `agentscope[ollama,service]>=2.0.4.post1,<2.0.5`。下面是逐版本实跑结果（隔离环境跑
+  `pytest -m agentscope` 12 例，2026-08-28），不是推论：
+
+  | 版本 | 12 例 real-runtime | 关键差异 |
+  |---|---|---|
+  | 2.0.4 | ❌ | `agentscope.rag` 无 `ExcelParser`（`deploy/app_service.py` 导入即炸） |
+  | 2.0.4.post1 | ✅ 12/12 | 唯一全绿；本文写的 API 形状以此为准 |
+  | 2.0.5 / 2.0.6 | ❌ | **无规则命中的工具兜底变 `allow`** |
+  | 2.0.7 / 2.0.7.post1 | ❌ | 同上；且 ChatModel 构造签名改为 `credential` 必传，只有 `OllamaChatModel` 的 `credential` 带默认值（所以 `tenant_manager` 拿它当零配置占位模型） |
+
+  2.0.5+ 那一行是**安全语义**而非 API 形状：`PermissionContext` 只带 `mode` + 三类规则时，
+  上游把“没匹配到规则”的默认处理从按 mode 升级/拒绝改成了直接放行，HITL 门禁会静默失效。
+  适配动作记在 [`architecture-model/remediation-plan.md`](architecture-model/remediation-plan.md) 的 B5。
 - 主要 extras：`model-gemini/ollama/xai`, `workspace-docker/e2b/k8s/...`,
   `vdb-milvus/mongodb/elasticsearch/qdrant`, `memory-mem0/reme`, 以及大包 `[full]`。
+  对本项目而言两个是必需品：`service`（→ `apscheduler`，`create_app` 的调度工具）、
+  `ollama`（→ `ollama>=0.5.4`，占位模型；2.0.7 起规范名为 `model-ollama`，`ollama` 仍作别名保留）。
+- 本地与 CI 解差异一个坑：`uv` 在有已缓存版本时不带 specifier 可能解到旧版，而 CI 用 pip
+  总是解到最新（2026-08-27 那次 CI 就是 pip 解到 2.0.7、本地 `.venv` 停在 2.0.4.post1，
+  所以“本地全绿 / CI 红”）。要复现 CI 的版本，显式写 `--with agentscope==<版本>`。
 
 ## 本项目如何落地
 - **核心数据层**（connectors / corpus / eval）**完全不依赖 agentscope**——所以零配置可跑。

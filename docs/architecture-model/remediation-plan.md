@@ -20,6 +20,7 @@
 | B2 | 提交 `uv.lock`（或最小 constraints.txt），`agentscope>=2.0.4,<3`；CI 安装步骤改走 lock 并断言关键包版本号打印 | R7 | S/M | CI 中出现版本断言步骤；模拟"上游发新版"演练时 CI 安装结果不变 |
 | B3 ✅ | 落地 `tests/test_architecture_guard.py`（health-report #40 建议）：18 phases、10 gate 注册数、connector registry slugs、extras 集合、README `[full]` 存在性断言 | R3/R6 | S | 人为改坏任一契约 → 该测试红 |
 | B4 | 最小 `AGENTS.md`（机器可读）：列出关键不变量（gate 实时重评语义、id 服务端生成、凭据仅 env、原子写约定）、危险操作区（state machine 相关字段直接赋值）、回归锚点（跑哪些测试） | BAF「Agent 指令使用」缺口 | XS | AI 协作者据此能在不读全文档的情况下避开三类高风险修改 |
+| B5 | 适配 AgentScope 2.0.5+ 的权限兜底语义：`deploy/permission_builder.py::build_context()` 不再把「无规则命中」的处理交给上游默认值，显式固化（HITL→ASK、UNATTENDED→DENY），再放宽 `pyproject.toml` 的 `<2.0.5` 窗口 | R7（已实测，见完成记录 2026-08-28） | M | `pytest -m agentscope` 在 2.0.4.post1 与 2.0.5+ 上均绿；窗口放宽后 CI 仍绿 |
 
 ## P2 — 按需（机会成本驱动，不设死线）
 
@@ -44,3 +45,4 @@
 - 2026-08-27 · A2 · `cli.py` 新增 `_host_is_loopback()`（IPv6 loopback 一并处理）+ web 命令门禁：非 loopback 且未设 `FDE_SCOPE_ALLOW_REMOTE=1` → 红字说明风险后 exit 2。Mac App launcher 固定 127.0.0.1 直启 uvicorn，不经此路径，不受影响。
 - 2026-08-27 · A3 · 新共享模块 `fde_scope/fsutil.py::atomic_write_text()`（mkstemp + os.replace + 失败回滚临时文件）；`EngagementContext.save()` 与 `SkillStore._atomic_write()` 均收口至该实现 —— CLI/Web/PawApp 三入口持久化自动受益（pawapp 的保存同样委托 ctx.save）。
 - 2026-08-27 · B3 · 新增 tests/test_architecture_guard.py（5 例：18 phases/10 gates/registry 卫生/extras 契约/三处文档一致）与 test_engagement.py 原子写注入+往返 2 例。**回归**：新增 7 例全部通过（0.18s）；全量 pytest exit 0（仅原有 3 个集成跳过）；ruff check/format 全绿。注：`docs/superpowers/plans/…skills.md` 的未提交 diff 为本轮之前的遗留工作区变更，与本整改无关。
+- 2026-08-28 · B2 部分 + B5 前置 · 实测 AgentScope 兼容窗口（隔离环境逐版本跑 `-m agentscope` 12 例）：`2.0.4` ❌ `agentscope.rag` 无 `ExcelParser`（`deploy/app_service.py:41` ImportError）；`2.0.4.post1` ✅ 12/12；`2.0.5 / 2.0.6 / 2.0.7` ❌ 无规则命中的工具兜底变成 `allow`，`test_approval_policy_decides_the_fate_of_an_unmatched_tool[hitl_escalates|unattended_refuses]` 期望 ask/deny 却拿到 allow。据此把 `agentscope` extra 从浮动的 `>=2.0.4`（该 floor 从未成立）改为实测窗口 `agentscope[ollama,service]>=2.0.4.post1,<2.0.5`：`ollama`（新版别名 `model-ollama`）与 `service`→`apscheduler` 是真实运行时的硬需求（2.0.7 起 `OllamaChatModel.__init__` 与 create_app 的调度工具在导入期就要它们），CI 的 `Real-library runtime tests` 步骤此前正因缺这两个包而假红。本机 `uv.lock`（未纳入版本控制）随 `uv lock` 重解析为 2.0.4.post1。**遗留**：uv.lock 仍未提交、CI 仍走 pip 解析，B2 的「lock 入库 + 版本断言」未做；2.0.5+ 语义适配转 B5。

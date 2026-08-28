@@ -2,6 +2,7 @@
 
 > 本地维护的 skill 档案库：**每个 skill 一页 Markdown**，记录基本信息、触发时机、最佳实践、在 fde-scope 项目中的应用位点。
 > 建档日期：2026-08-27 · **共 82 页**：Zone A 12 / Zone B 23 / Zone C 17 / Zone D 11 / 横切 19
+> 一致性门禁：`make check-catalog`（当前全绿）
 
 ## 目录结构
 
@@ -13,6 +14,9 @@ docs/skills-catalog/
 ├── zone-c-operationalization/       # SLO、runbook、监控漂移、变更、飞轮重训
 ├── zone-d-handoff/                  # 文档产出、培训、移交演示
 └── cross-cutting/                   # skill 工程、评审、计划、架构、调度
+
+校验脚本（不在本目录，但属于本库的维护面）：
+scripts/check_skills_catalog.py      # 页数/五段/索引/状态/断链 + （--local）与本机安装对账
 ```
 
 ## 页面模板（每页固定五段）
@@ -138,3 +142,5 @@ docs/skills-catalog/
 3. **装前门禁**：所有 📦 项先用 `skill-criticagent`（skill）或 `mcp-criticagent`（MCP）评估，通过才安装，评估结论写进该页"最佳实践"段。
 4. **删除/降级**：skill 卸载或失效时不删页，改状态为 `⚰️ 已移除` 并注明原因——保留决策记录。
 5. **与 fde_scope/skills/ 的关系**：本目录是**外部生态**的手册；现场经验沉淀产物走 `.fde_scope/skills/` 文件库，二者互不覆盖。
+6. **机器校验（改完必跑）**：`make check-catalog`（等价 `python3 scripts/check_skills_catalog.py`）。它校验五件事：README 头部页数 vs 磁盘实际、每页五段结构与「> 状态：」行齐全、README 索引与页面一一对应且不重复、页内状态与 README 行一致、catalog 内相对链接无断链。该校验已挂进 CI（`.github/workflows/ci.yml` 的 `skills-catalog` job），所以**断链或漏登记会让 PR 变红**，不靠人脑记。
+7. **本地对账（季度巡检、装/卸后跑）**：`make check-local`。它扫 `~/.qoder/skills/` 与 `~/.qoder/plugins/cache/`，把页内状态与真实安装对齐：标 ✅ 但盘上找不到 = 硬错；标 📦 但已装 = 提醒回填 ✅ + 安装日期；页内声明的插件版本与实装版本不一致也会提醒。仅本地跑（CI 上无 `~/.qoder`）。“建档名 ≠ 安装名”与套件页已在脚本的 `IDENTITY` 表里登记（如 `sre-runbooks`→`runbook`、`skill-discovery`→`find-skills`、`vercel-deploy`→`deployments-cicd`）；**新建页若 slug 与真实目录名不同，记得同步补一行**。（2026-08-27 首次对账：68 个 ✅ 页中 66 页已在盘上核实、两个是客户端内置无文件可核（create-skill / schedule）、 0 页漂移。）

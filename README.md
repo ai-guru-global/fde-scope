@@ -303,7 +303,7 @@ export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 388 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
+pytest                 # 398 passed, 3 skipped — core + engagement + gates + skills + web + integrations + LLM mock + PawApp,
                        # no agentscope/mysql/opcua/LLM-key/QwenPaw needed (skips are integration-only);
                        # real-AgentScope runtime tests live under the `agentscope` marker (CI runs them in a dedicated job)
 pytest -m agentscope   # 仅真库运行时测试（需 pip install -e ".[agentscope]"）
