@@ -86,6 +86,7 @@ jobs:
           name: fde-scope-macos
           path: |
             ${{ env.DMG }}
+            appbuild/dist/*.zip
             appbuild/dist/manifest.json
             appbuild/dist/SHA256SUMS
 
@@ -94,6 +95,7 @@ jobs:
         with:
           files: |
             ${{ env.DMG }}
+            appbuild/dist/*.zip
             appbuild/dist/manifest.json
             appbuild/dist/SHA256SUMS
           generate_release_notes: true

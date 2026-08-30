@@ -93,8 +93,9 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 - **manufacturing**：OPC UA/MQTT/ROS2/MES/Historian + OEE/MTBF/FPY/DPMO/抓取率/碰撞率 + 工业 gate
 
 ### 4. 依赖分层 → 零配置可跑
-- 核心数据层 + SOP 层 + Profiles 层 + Web 层**完全不依赖 agentscope**。
-- 仅 deploy 延迟导入 agentscope（optional extra）；flywheel 为纯规则实现。
+- 核心数据层 + SOP 层 + Profiles 层 + Web 层零**顶层** agentscope 依赖（唯一例外见下：connectors/documents.py 的延迟 rag 导入）。
+- 仅 deploy/（三支柱 5 模块）与 connectors/documents.py（rag 解析器）延迟导入 agentscope
+  （optional extra，实测窗口 `>=2.0.4.post1,<3`）；flywheel 为纯规则实现。
 - `pip install -e ".[dev]"` + `pytest` 全绿，不需要 LLM key / docker / agentscope。
 
 ### 5. Corpus Engine 规则为底、LLM 可选增强
@@ -105,7 +106,7 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 ### 6. AgentScope API 真实化
 见 `docs/agentscope_api_mapping.md`：把设计文档里的虚构 API
 （`HarnessAgent`/`SequentialPipeline`/`EventSystem.on`/`HumanInTheLoop`/`VectorStore`）
-逐条对齐到真实 2.0.5 API。
+逐条对齐到真实 2.0.x API（实测窗口 `>=2.0.4.post1,<3`）。
 
 ### 7. LLM 横切层（可选、可回退、零依赖）
 `fde_scope/llm.py` 是唯一的 LLM 出口（MiMo Token Plan，OpenAI 兼容，标准库 urllib）：

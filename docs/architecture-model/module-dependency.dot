@@ -1,5 +1,5 @@
 // FDE Scope 模块依赖图（current-state）
-// 证据：fde_scope/ 与 pawapp/backend/ 全部 import 语句（2026-08-26 静态扫描）
+// 证据：fde_scope/ 与 pawapp/backend/ 全部 import 语句（2026-08-26 静态扫描，2026-08-28 复核修正）
 // 边语义：import-dependency（静态/延迟导入均标注）；虚线 = 可选/延迟导入
 // 查看：Qoder Canvas DOT 预览 或 `dot -Tsvg module-dependency.dot -o module-dependency.svg`
 digraph fde_scope_modules {
@@ -13,8 +13,8 @@ digraph fde_scope_modules {
     subgraph cluster_ui {
         label="UI 层（零 agentscope）"; style=rounded; color="#2563EB"; bgcolor="#EFF6FF";
         cli        [label="cli.py\n(Typer 入口)", fillcolor="#DBEAFE"];
-        web        [label="web/app.py\n(FastAPI, 26 routes)", fillcolor="#DBEAFE"];
-        pawapp     [label="pawapp/backend/main.py\n(PawApp, 17 routes\n@api/fde-scope)", fillcolor="#DBEAFE"];
+        web        [label="web/app.py\n(FastAPI, 27 routes)", fillcolor="#DBEAFE"];
+        pawapp     [label="pawapp/backend/main.py\n(PawApp, 18 routes\n@api/fde-scope)", fillcolor="#DBEAFE"];
     }
 
     // ---------- SOP 层 ----------
@@ -27,10 +27,10 @@ digraph fde_scope_modules {
     // ---------- 能力层 ----------
     subgraph cluster_core {
         label="能力层（核心数据管线）"; style=rounded; color="#D97706"; bgcolor="#FFFBEB";
-        connectors [label="connectors/\n10 连接器 + 注册表", fillcolor="#FEF3C7"];
+        connectors [label="connectors/\n10 连接器 + 注册表\n(documents.py 延迟用\nagentscope.rag)", fillcolor="#FEF3C7"];
         corpus     [label="corpus/\n语料引擎(规则为底,\nLLM 可选增强)", fillcolor="#FEF3C7"];
         eval       [label="eval/\nticket 指标 + 制造业 KPI\n+ bad case", fillcolor="#FEF3C7"];
-        deploy     [label="deploy/\n多租户组装(唯一真实\nimport agentscope 处)", fillcolor="#FEF3C7"];
+        deploy     [label="deploy/\n三支柱运行时组装\n(延迟 import agentscope:\n5 模块)", fillcolor="#FEF3C7"];
         flywheel   [label="flywheel/\n事件映射 + 回流", fillcolor="#FEF3C7"];
         integrations [label="integrations/\nQwenPaw 导出 + ACP\n+ validate", fillcolor="#FEF3C7"];
         skills     [label="skills/\n技能沉淀库\n(draft→published→archived)", fillcolor="#FEF3C7"];
@@ -47,7 +47,7 @@ digraph fde_scope_modules {
     // ---------- 外部 ----------
     subgraph cluster_ext {
         label="外部系统"; style=rounded; color="#DC2626"; bgcolor="#FEF2F2";
-        agentscope [label="AgentScope 2.0.5\n(optional extra)", shape=ellipse, fillcolor="#FEE2E2"];
+        agentscope [label="AgentScope 2.0.x\n(optional extra\n>=2.0.4.post1,<3)", shape=ellipse, fillcolor="#FEE2E2"];
         mimo       [label="MiMo Token Plan\n(LLM API)", shape=ellipse, fillcolor="#FEE2E2"];
         datasource [label="客户数据源\nCSV/MySQL/OPC UA/\nMQTT/ROS2/MES/…", shape=cylinder, fillcolor="#FEE2E2"];
         qwenpaw    [label="QwenPaw 宿主", shape=ellipse, fillcolor="#FEE2E2"];
@@ -90,6 +90,7 @@ digraph fde_scope_modules {
     deploy -> config;
     deploy -> corpus [style=dashed];
     deploy -> agentscope [style=dashed, label="函数内延迟导入", color="#DC2626"];
+    connectors -> agentscope [style=dashed, label="documents.py\nrag parsers 延迟导入", color="#DC2626"];
     flywheel -> corpus [label="CorpusItem/Provenance"];
     integrations -> config;
     integrations -> corpus [label="CorpusReport"];

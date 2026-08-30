@@ -74,6 +74,10 @@ IDENTITY: dict[str, str] = {
     "create-skill": "builtin",
     "schedule": "builtin",
     "security-scan": "plugin:security-scan",
+    "postman": "plugin:postman",  # 页代表插件（skill 为 postman-knowledge/routing/agent-ready-apis）
+    "datadog": "plugin:datadog",  # skill 为 ddsetup/ddconfig/ddtoolsets
+    "alibabacloud-core-suite": "plugin:alibabacloud-core",
+    "alibabacloud-spec-ops-suite": "plugin:alibabacloud-spec-ops",
 }
 
 

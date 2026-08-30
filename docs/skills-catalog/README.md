@@ -1,8 +1,9 @@
 # FDE Skills 手册库
 
 > 本地维护的 skill 档案库：**每个 skill 一页 Markdown**，记录基本信息、触发时机、最佳实践、在 fde-scope 项目中的应用位点。
-> 建档日期：2026-08-27 · **共 82 页**：Zone A 12 / Zone B 23 / Zone C 17 / Zone D 11 / 横切 19
+> 建档日期：2026-08-27 · **共 89 页**：Zone A 12 / Zone B 29 / Zone C 18 / Zone D 11 / 横切 19
 > 一致性门禁：`make check-catalog`（当前全绿）
+> **门户主页**：`site/index.html` —— GTM 风格单文件导航（场景入口 + 全部页面跳转 + 搜索），双击即开；改完本库跑 `make build-site` 重新生成
 
 ## 目录结构
 
@@ -66,11 +67,17 @@ scripts/check_skills_catalog.py      # 页数/五段/索引/状态/断链 + （-
 | [kubernetes-specialist](zone-b-build/kubernetes-specialist.md) | 📦 | K8s 现场交付/排障 |
 | [docker-build-deploy](zone-b-build/docker-build-deploy.md) | 📦 | Docker 生产化 |
 | [alibabacloud-workbench-cli](zone-b-build/alibabacloud-workbench-cli.md) | ✅ | 无公网 IP 的 ECS 运维 |
+| [alibabacloud-core-suite](zone-b-build/alibabacloud-core-suite.md) | ✅ | 阿里云 OpenAPI/CLI 9 件套（跨账号查询/SDK 生成/TF 导入） |
+| [alibabacloud-spec-ops-suite](zone-b-build/alibabacloud-spec-ops-suite.md) | ✅ | 阿里云 IaC 流水线 6 件套（plan→codegen→validate→apply） |
 | [vllm-deploy-docker](zone-b-build/vllm-deploy-docker.md) | 📦 | vLLM 官方容器部署 |
 | [vllm-ascend](zone-b-build/vllm-ascend.md) | 📦 | 昇腾 vLLM 适配（registry 真名 `vllm-ascend-deploy`） |
+| [huggingface-local-models](zone-b-build/huggingface-local-models.md) | ✅ | llama.cpp+GGUF 本地推理（air-gap/内网/Mac 演示） |
+| [huggingface-best](zone-b-build/huggingface-best.md) | ✅ | 开源模型选型决策（与 bailian-model-recommend 互补） |
 | [huggingface-community-evals](zone-b-build/huggingface-community-evals.md) | ✅ | inspect-ai/lighteval 本地评估 |
 | [phoenix-evals](zone-b-build/phoenix-evals.md) | 📦 | Arize Phoenix 评估器开发（规则 + LLM judge） |
 | [evaluating-llms-harness](zone-b-build/evaluating-llms-harness.md) | 📦 | lm-evaluation-harness 封装 |
+| [huggingface-spaces](zone-b-build/huggingface-spaces.md) | ✅ | HF Spaces demo 托管（Gradio/Docker/ZeroGPU） |
+| [postman](zone-b-build/postman.md) | ✅ | Collection/Mock/agent-ready API 生命周期（3 skill） |
 
 ## Zone C · Operationalization
 
@@ -82,6 +89,7 @@ scripts/check_skills_catalog.py      # 页数/五段/索引/状态/断链 + （-
 | [troubleshooting](zone-c-operationalization/troubleshooting.md) | ✅ | 浏览器连接/目标问题 |
 | [chrome-devtools](zone-c-operationalization/chrome-devtools.md) | ✅ | DevTools 调试与自动化 |
 | [sentry-mcp](zone-c-operationalization/sentry-mcp.md) | ✅ | Sentry 错误/性能追踪 |
+| [datadog](zone-c-operationalization/datadog.md) | ✅ | Datadog 官方 MCP 可观测性（ddsetup/ddconfig/ddtoolsets） |
 | [sre-runbooks](zone-c-operationalization/sre-runbooks.md) | 📦 | SRE runbook 模板（registry 真名 `knowledge-work-plugins@runbook`） |
 | [incident-response](zone-c-operationalization/incident-response.md) | 📦 | Anthropic 官方事件响应 |
 | [gke-observability](zone-c-operationalization/gke-observability.md) | 📦 | GKE/K8s 可观测性 |
@@ -144,3 +152,14 @@ scripts/check_skills_catalog.py      # 页数/五段/索引/状态/断链 + （-
 5. **与 fde_scope/skills/ 的关系**：本目录是**外部生态**的手册；现场经验沉淀产物走 `.fde_scope/skills/` 文件库，二者互不覆盖。
 6. **机器校验（改完必跑）**：`make check-catalog`（等价 `python3 scripts/check_skills_catalog.py`）。它校验五件事：README 头部页数 vs 磁盘实际、每页五段结构与「> 状态：」行齐全、README 索引与页面一一对应且不重复、页内状态与 README 行一致、catalog 内相对链接无断链。该校验已挂进 CI（`.github/workflows/ci.yml` 的 `skills-catalog` job），所以**断链或漏登记会让 PR 变红**，不靠人脑记。
 7. **本地对账（季度巡检、装/卸后跑）**：`make check-local`。它扫 `~/.qoder/skills/` 与 `~/.qoder/plugins/cache/`，把页内状态与真实安装对齐：标 ✅ 但盘上找不到 = 硬错；标 📦 但已装 = 提醒回填 ✅ + 安装日期；页内声明的插件版本与实装版本不一致也会提醒。仅本地跑（CI 上无 `~/.qoder`）。“建档名 ≠ 安装名”与套件页已在脚本的 `IDENTITY` 表里登记（如 `sre-runbooks`→`runbook`、`skill-discovery`→`find-skills`、`vercel-deploy`→`deployments-cicd`）；**新建页若 slug 与真实目录名不同，记得同步补一行**。（2026-08-27 首次对账：68 个 ✅ 页中 66 页已在盘上核实、两个是客户端内置无文件可核（create-skill / schedule）、 0 页漂移。）
+
+## 审计排除清单（2026-08-27 全量盘点已核，非遗漏）
+
+以下已安装能力经盘点**有意不建档**，下次盘点不必重新纠结；若 FDE 场景变化可推翻：
+
+- **research-copilot 插件**（论文检索/学术写作/实验设计）：偏科研流程，Zone A 调研已由 firecrawl-\* / zread / qmind-knowledge 覆盖
+- **design-taste 系**（hallmark / impeccable / gpt-taste / brandkit / ui-ux-pro-max / industrial-brutalist-ui 等 10+ 件）：与已建档的 frontend-design / ui-designer / shadcn 同类，按需安装即可，不重复建档
+- **agent-browser**：与 chrome-devtools、gstack `browse`/`qa` 场景重叠
+- **数据库开发参考系**（mongodb-agent-skills / redis-development / polardb-\* / supabase）：数据接入面已由 connectors + DuckDB（attach-db / query）覆盖，这些是通用开发参考
+- **平台工作流件**（better-harness / qoder-canvas / record-and-replay / create-command / computer-use / qoder-find-extensions）：随客户端按需触发，非 FDE 交付技能
+- **个人向**（weread-skills / yeye / fomo / podcast 生成器之外的娱乐类）：与交付无关

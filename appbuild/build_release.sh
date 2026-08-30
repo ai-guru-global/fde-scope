@@ -191,6 +191,15 @@ case $ARCH in
       "$WORK/FDE Scope-arm64.app" \
       "$WORK/FDE Scope-x86_64.app" \
       "$WORK/FDE Scope.app"
+    # The merge starts from the arm64 tree, whose baked build_info says
+    # arch=arm64 — rewrite with the universal2 provenance before signing.
+    # PyInstaller onedir exposes datas under Contents/Frameworks (sys._MEIPASS);
+    # a Resources copy may exist too — overwrite both when present.
+    for bi in "Contents/Frameworks/build_info.json" "Contents/Resources/build_info.json"; do
+      if [ -f "$WORK/FDE Scope.app/$bi" ]; then
+        cp -f appbuild/build_info.json "$WORK/FDE Scope.app/$bi"
+      fi
+    done
     APP="$WORK/FDE Scope.app"
     rm -rf "$WORK/FDE Scope-arm64.app" "$WORK/FDE Scope-x86_64.app"
     FINAL_ARCH=universal2
@@ -224,7 +233,11 @@ fi
 # ran on /tmp before sealing); distribute the zip, not the folder.
 rm -rf "$DIST/FDE Scope.app"
 cp -R "$APP" "$DIST/"
-ditto -c -k --keepParent "$APP" "$WORK/FDE-Scope-$VERSION-$FINAL_ARCH.zip"
+# --norsrc: ditto otherwise packs AppleDouble (._*) entries into the zip;
+# extracting those makes codesign fail with "sealed resource ... invalid" and
+# Gatekeeper reports the app as damaged on the user's machine.
+xattr -cr "$APP" 2>/dev/null || true
+ditto -c -k --norsrc --keepParent "$APP" "$WORK/FDE-Scope-$VERSION-$FINAL_ARCH.zip"
 cp -f "$WORK/FDE-Scope-$VERSION-$FINAL_ARCH.zip" "$DIST/"
 ZIP="$DIST/FDE-Scope-$VERSION-$FINAL_ARCH.zip"
 

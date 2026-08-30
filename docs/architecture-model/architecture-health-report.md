@@ -40,3 +40,31 @@
 1. 将本次的计数命令（阶段数 / gate 数 / 路由数 / agentscope 导入位置）固化为 `tests/` 中的一个架构守护测试，防止文档再漂移。
 2. `docs/architecture-model/` 下的 DSL/DOT/evidence 三件套与 `docs/architecture.md` 同源维护：改模块结构时同步再生成（再生成命令见 [`system-model.evidence.md`](system-model.evidence.md#再生成方式)）。
 3. 若引入真实运行时观测（trace/日志），再补 runtime topology 视图，勿与静态结构混画。
+
+---
+
+## 复核附录（2026-08-28，基线 090ff68）
+
+- 触发：b24b714 之后的 7 个提交（deploy 三支柱、B1 数据根、B5 权限管线、agentscope 窗口实测、skills catalog 守护）未同步进架构产物。
+- 方法：全库 import 扫描 + 计数 grep + git log --follow 漂移窗口分析；整合结论沉淀于 [`architecture-map.md`](architecture-map.md)。
+
+### 发现并已修正（canonical 图源与文档同步回写）
+
+| # | 陈旧声明 | 现状 | 回写位置 |
+|---|---|---|---|
+| 1 | 仅 deploy/ 延迟导入 agentscope | deploy/ 5 模块（app_service/permission_builder/sandbox_config/tenant_manager/toolkit）+ **connectors/documents.py**（`agentscope.rag`，b24b714 引入），全为函数内延迟导入 | DSL、DOT、summary、architecture.md §4 |
+| 2 | "AgentScope 2.0.5" 硬编码 | 实测窗口 `agentscope[ollama,service]>=2.0.4.post1,<3`（2.0.4 缺 ExcelParser 不可用） | DSL、DOT、summary、architecture.md §6 |
+| 3 | Web 控制台 26 路由 | 27 路由 | DSL、DOT、summary |
+| 4 | PawApp 17 路由 | 18 路由 | DSL、DOT、summary |
+| 5 | 文件事实源位置未提解析语义 | `fde_scope/paths.py::data_root()` 四级解析（FDE_SCOPE_HOME > 项目 .fde_scope > ~/Documents/FDE Scope > CWD），tests/test_paths.py 钉契约 | DSL、architecture-map.md §6 |
+
+### 新增确认事实
+
+- 架构守护测试已落地：`tests/test_architecture_guard.py` 6 项（本报告 2026-08-26 版的建议 1 已完成）；复核当日 6/6 绿。
+- 技能目录一致性守护：`scripts/check_skills_catalog.py`；工作树含未提交的 zone-b/zone-c 目录扩充（docs 级）。
+- B5 权限管线行为（read-only 上游自动放行 → build_toolkit 不打 `is_read_only`）已进入 AGENTS.md 不变式。
+
+### 剩余待办
+
+- 连接器真机深度（`mysql`/`opcua` 标记测试）。
+- 引入运行时观测后再补 runtime topology 视图。

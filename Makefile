@@ -1,4 +1,4 @@
-.PHONY: install install-dev install-full test test-cov lint run clean help check-catalog check-local
+.PHONY: install install-dev install-full test test-cov lint run clean help check-catalog check-local build-site
 
 # Use the project venv when it exists. A bare `python3` on macOS resolves to
 # Homebrew's interpreter, which has none of the deps: `make test` died at
@@ -36,6 +36,9 @@ check-catalog: ## Validate docs/skills-catalog (counts, sections, index, links)
 
 check-local: ## Also reconcile catalog ✅/📦 status against ~/.qoder installs
 	$(PYTHON) scripts/check_skills_catalog.py --local
+
+build-site: ## Rebuild docs/skills-catalog/site/index.html portal (run after editing catalog)
+	$(PYTHON) scripts/build_catalog_site.py
 
 run: ## Print CLI help (entrypoint)
 	$(PYTHON) -m fde_scope.cli --help

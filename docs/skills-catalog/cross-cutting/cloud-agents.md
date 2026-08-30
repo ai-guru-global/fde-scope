@@ -2,7 +2,7 @@
 
 > 状态：✅ 已安装（**两个**插件并存，用途不同）· 类型：云端常驻 agent · FDE 位点：横切（Zone B 长任务 / Zone C 无人值守）
 > - `cloud-agents` v1.1.0（作者 Qoder）→ **REST / `bl`-style curl 直连** CAS API，PAT 鉴权 · `~/.qoder/plugins/cache/qoder-marketplace/cloud-agents/1.1.0`
-> - `qoder-cloud-agents` v0.1.0（作者 Qoder）→ **官方 MCP 连接器**驱动，51 个逻辑工具，身份由 Gateway 注入 · `~/.qoder/plugins/cache/qoder-marketplace/qoder-cloud-agents/0.1.0`（含 `mcp.json`）
+> - `qoder-cloud-agents` v0.1.0（作者 Qoder）→ **官方 MCP 连接器**驱动（本机会话实测 82 个工具，覆盖 agents/environments/sessions/files/vaults/memories/deployments/skills），身份由 Gateway 注入 · `~/.qoder/plugins/cache/qoder-marketplace/qoder-cloud-agents/0.1.0`（含 `mcp.json`）
 
 ## 能做什么
 在 Cloud Agents 平台的容器里创建并运行 agent，**与本地机器解耦**：合上笔记本它继续跑、可按计划跑、可被脚本与 CI 调起、可封装成团队共享的一个 API。核心资源模型：`agent_` / `sess_` / `env_` / `evt_` / `file_` / `mem_store_` / `skill_`，支持会话消息、SSE 事件流、文件/记忆/技能上传。
