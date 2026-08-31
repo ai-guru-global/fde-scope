@@ -8,6 +8,7 @@ from .validation import (
     ValidationReport,
     resolve_imports,
     validate_schema,
+    validate_store,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "ValidationReport",
     "resolve_imports",
     "validate_schema",
+    "validate_store",
 ]
