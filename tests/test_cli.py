@@ -446,3 +446,16 @@ def test_skill_export_with_ontology_writes_concepts_line(tmp_path: Path, monkeyp
     assert r.exit_code == 0, r.stdout
     content = (out / "billing" / "SKILL.md").read_text(encoding="utf-8")
     assert "concepts: fde:cat-implementation" in content
+
+
+def test_skill_export_ontology_missing_schema_exits_2(tmp_path: Path, monkeypatch) -> None:
+    from fde_scope.ontology.store import OntologyStore
+
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["skill", "add", "--title", "T1", "--category", "research"])
+    store = SkillStore(tmp_path / ".fde_scope" / "skills")
+    sid = store.load_all()[0].id
+    monkeypatch.setattr(OntologyStore, "load_schema", lambda self, schema_id: None)
+    r = runner.invoke(app, ["skill", "export", sid, "--format", "agentscope", "--ontology"])
+    assert r.exit_code == 2
+    assert "fde-core" in r.stdout
