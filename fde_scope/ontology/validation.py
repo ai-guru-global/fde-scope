@@ -75,10 +75,10 @@ def resolve_imports(schema: OntologySchema, loader: Loader) -> OntologySchema:
             merged_ns[ns.prefix] = ns.iri
         for c in cur.classes:
             classes[c.curie] = c
-        for p in cur.object_properties:
-            obj_props[p.curie] = p
-        for p in cur.data_properties:
-            data_props[p.curie] = p
+        for op in cur.object_properties:
+            obj_props[op.curie] = op
+        for dp in cur.data_properties:
+            data_props[dp.curie] = dp
         for s in cur.concept_schemes:
             schemes[s.curie] = s
 
@@ -144,21 +144,23 @@ def validate_schema(schema: OntologySchema, loader: Loader) -> ValidationReport:
         for parent in c.sub_class_of:
             check_class_ref(parent, c.curie, "sub_class_of")
 
-    for p in merged.object_properties:
-        check_curie(p.curie, p.curie, "property curie")
-        check_class_ref(p.domain, p.curie, "domain")
-        check_class_ref(p.range, p.curie, "range")
-        if p.sub_property_of is not None and p.sub_property_of not in obj_prop_curies:
+    for op in merged.object_properties:
+        check_curie(op.curie, op.curie, "property curie")
+        check_class_ref(op.domain, op.curie, "domain")
+        check_class_ref(op.range, op.curie, "range")
+        if op.sub_property_of is not None and op.sub_property_of not in obj_prop_curies:
             report.add(
                 "ONTO-011",
-                p.curie,
-                f"sub_property_of target {p.sub_property_of!r} is not a declared object property",
+                op.curie,
+                f"sub_property_of target {op.sub_property_of!r} is not a declared object property",
             )
-        if p.inverse is not None and p.inverse not in obj_prop_curies:
-            report.add("ONTO-011", p.curie, f"inverse target {p.inverse!r} is not a declared object property")
-    for p in merged.data_properties:
-        check_curie(p.curie, p.curie, "property curie")
-        check_class_ref(p.domain, p.curie, "domain")
+        if op.inverse is not None and op.inverse not in obj_prop_curies:
+            report.add(
+                "ONTO-011", op.curie, f"inverse target {op.inverse!r} is not a declared object property"
+            )
+    for dp in merged.data_properties:
+        check_curie(dp.curie, dp.curie, "property curie")
+        check_class_ref(dp.domain, dp.curie, "domain")
 
     # ONTO-001：sub_class_of 环（DFS 回到起点）
     parents = _class_parents(merged)
@@ -276,11 +278,11 @@ def validate_store(store: InstanceStore, loader: Loader) -> ValidationReport:
         for prop, targets in ind.object_assertions.items():
             if not check_property_curie(prop, ind.curie):
                 continue
-            p = obj_props.get(prop)
-            if p is None:
+            op = obj_props.get(prop)
+            if op is None:
                 report.add("ONTO-011", ind.curie, f"object assertion uses undeclared property {prop!r}")
                 continue
-            domain_ok(ind, p.domain, ind.curie, f"domain of {prop}")
+            domain_ok(ind, op.domain, ind.curie, f"domain of {prop}")
             for target in targets:
                 target_ind = individuals.get(target)
                 if target_ind is None:
@@ -290,22 +292,22 @@ def validate_store(store: InstanceStore, loader: Loader) -> ValidationReport:
                     report.add(
                         "ONTO-020",
                         ind.curie,
-                        f"{prop} target {target!r} has no declared type (range {p.range!r} unverifiable)",
+                        f"{prop} target {target!r} has no declared type (range {op.range!r} unverifiable)",
                     )
                 else:
-                    domain_ok(target_ind, p.range, ind.curie, f"range of {prop} (target {target})")
+                    domain_ok(target_ind, op.range, ind.curie, f"range of {prop} (target {target})")
 
         for prop, values in ind.data_assertions.items():
             if not check_property_curie(prop, ind.curie):
                 continue
-            p = data_props.get(prop)
-            if p is None:
+            dp = data_props.get(prop)
+            if dp is None:
                 report.add("ONTO-011", ind.curie, f"data assertion uses undeclared property {prop!r}")
                 continue
-            domain_ok(ind, p.domain, ind.curie, f"domain of {prop}")
+            domain_ok(ind, dp.domain, ind.curie, f"domain of {prop}")
             for value in values:
-                if not _LITERAL_CHECKS[p.range](value):
+                if not _LITERAL_CHECKS[dp.range](value):
                     report.add(
-                        "ONTO-020", ind.curie, f"{prop} value {value!r} does not match range {p.range!r}"
+                        "ONTO-020", ind.curie, f"{prop} value {value!r} does not match range {dp.range!r}"
                     )
     return report

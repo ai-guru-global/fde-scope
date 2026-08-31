@@ -71,27 +71,27 @@ def schema_to_jsonld(schema: OntologySchema) -> dict[str, Any]:
         if c.deprecated:
             node["owl:deprecated"] = True
         graph.append(node)
-    for p in schema.object_properties:
+    for op in schema.object_properties:
         node = {
-            "@id": _expand(schema, p.curie),
+            "@id": _expand(schema, op.curie),
             "@type": "rdf:Property",
-            "rdfs:label": _labels(p.label, None),
-            "rdfs:domain": {"@id": _expand(schema, p.domain)},
-            "rdfs:range": {"@id": _expand(schema, p.range)},
+            "rdfs:label": _labels(op.label, None),
+            "rdfs:domain": {"@id": _expand(schema, op.domain)},
+            "rdfs:range": {"@id": _expand(schema, op.range)},
         }
-        if p.inverse:
-            node["owl:inverseOf"] = {"@id": _expand(schema, p.inverse)}
-        if p.sub_property_of:
-            node["rdfs:subPropertyOf"] = {"@id": _expand(schema, p.sub_property_of)}
+        if op.inverse:
+            node["owl:inverseOf"] = {"@id": _expand(schema, op.inverse)}
+        if op.sub_property_of:
+            node["rdfs:subPropertyOf"] = {"@id": _expand(schema, op.sub_property_of)}
         graph.append(node)
-    for p in schema.data_properties:
+    for dp in schema.data_properties:
         graph.append(
             {
-                "@id": _expand(schema, p.curie),
+                "@id": _expand(schema, dp.curie),
                 "@type": "rdf:Property",
-                "rdfs:label": _labels(p.label, None),
-                "rdfs:domain": {"@id": _expand(schema, p.domain)},
-                "rdfs:range": {"@id": _expand(schema, XSD_MAP[p.range])},
+                "rdfs:label": _labels(dp.label, None),
+                "rdfs:domain": {"@id": _expand(schema, dp.domain)},
+                "rdfs:range": {"@id": _expand(schema, XSD_MAP[dp.range])},
             }
         )
     for scheme in schema.concept_schemes:
