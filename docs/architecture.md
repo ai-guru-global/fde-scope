@@ -57,6 +57,10 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 > （draft → published → archived），可导出为 AgentScope / QwenPaw 的 Agent
 > Skills。详见 [`skills.md`](skills.md)。
 >
+> **横切模块 `fde_scope/ontology/`（本体语义层）**：领域概念的形式化
+> TBox/ABox + SKOS 分类法 + JSON-LD 导出；P2/P3 将接入 corpus 覆盖度与
+> skills 检索。详见 [`ontology.md`](ontology.md)。
+>
 > **桌面形态 `pawapp/`（QwenPaw PawApp）**：把上述全部能力以插件应用形式嵌入
 > QwenPaw 桌面端（App Center），复用宿主 LLM/沙箱/记忆。详见
 > [`qwenpaw_integration.md`](qwenpaw_integration.md)。
@@ -178,6 +182,18 @@ extra + Redis + 可达模型。生命周期：2.0 无 `Agent.stop`，`TenantDepl
 - `ctx.storage` 同步 engagement 快照（文件仍为唯一事实源）；
 - `skill_provider()` 把导出的技能目录直接注册给宿主 Agent（技能即能力）。
 安装/契约详见 [`qwenpaw_integration.md`](qwenpaw_integration.md)。
+
+### 11. 本体语义层（ontology/）
+
+`fde_scope/ontology/` 把领域概念形式化为 TBox（`OntologySchema`：类层级、
+对象/数据属性、SKOS 概念体系、命名空间、版本）+ ABox（`InstanceStore`：
+个体与属性断言），零新依赖（pydantic + pyyaml）。内置 `fde-core` 与
+ISA-95 `mfg-overlay` 为包内只读 YAML（狗粮校验：内置本体必须通过自己的
+SHACL-lite 校验器）；用户本体/实例库在 `.fde_scope/ontology/` 工作区
+（工作区覆盖内置），全部写入走 `fsutil.atomic_write_text`。JSON-LD 1.1
+导出保证互操作（`ontology export`）。校验返回错误码报告（ONTO-xxx）而非
+异常——记录与谓词分离，与 gate 哲学一致。详见
+[`ontology.md`](ontology.md)。
 
 ## 数据流
 
