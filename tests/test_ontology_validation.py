@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from fde_scope.ontology.models import (
+    Concept,
+    ConceptScheme,
     DataProperty,
     Individual,
     InstanceStore,
@@ -57,6 +59,38 @@ def test_onto002_sub_property_missing_and_inverse_cycle() -> None:
     report = validate_schema(schema, loader={})
     got = codes(report)
     assert "ONTO-002" in got
+
+
+def test_onto012_broader_cycle() -> None:
+    schema = _minimal()
+    schema.concept_schemes.append(
+        ConceptScheme(
+            curie="t:Scheme",
+            label="Scheme",
+            concepts=[
+                Concept(curie="t:CA", label="CA", broader=["t:CB"]),
+                Concept(curie="t:CB", label="CB", broader=["t:CA"]),
+            ],
+        )
+    )
+    report = validate_schema(schema, loader={})
+    assert "ONTO-012" in codes(report)
+
+
+def test_onto012_acyclic_broader_passes() -> None:
+    schema = _minimal()
+    schema.concept_schemes.append(
+        ConceptScheme(
+            curie="t:Scheme",
+            label="Scheme",
+            concepts=[
+                Concept(curie="t:P", label="P"),
+                Concept(curie="t:C", label="C", broader=["t:P"]),
+            ],
+        )
+    )
+    report = validate_schema(schema, loader={})
+    assert report.ok, [e.model_dump() for e in report.errors]
 
 
 def test_onto010_undeclared_class_reference() -> None:

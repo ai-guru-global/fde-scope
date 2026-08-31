@@ -52,3 +52,26 @@ def test_expand_concept_narrower_closure() -> None:
 
 def test_expand_concept_unknown_returns_self() -> None:
     assert expand_concept("fde:cc-nothing", _schema("fde-corpus-taxonomy")) == {"fde:cc-nothing"}
+
+
+def test_expand_concept_terminates_on_broader_cycle() -> None:
+    # 环状分类法（A broader B, B broader A）：闭包有限终止而非死循环
+    from fde_scope.ontology.models import Concept, ConceptScheme, Namespace, OntologySchema
+
+    cyclic = OntologySchema(
+        id="cyclic",
+        version="1.0.0",
+        base_iri="https://example.com/o/",
+        namespaces=[Namespace(prefix="c", iri="https://example.com/o/c#")],
+        concept_schemes=[
+            ConceptScheme(
+                curie="c:Scheme",
+                label="Scheme",
+                concepts=[
+                    Concept(curie="c:A", label="A", broader=["c:B"]),
+                    Concept(curie="c:B", label="B", broader=["c:A"]),
+                ],
+            )
+        ],
+    )
+    assert expand_concept("c:A", cyclic) == {"c:A", "c:B"}

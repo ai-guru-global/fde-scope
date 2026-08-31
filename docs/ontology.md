@@ -28,6 +28,7 @@
 |---|---|
 | ONTO-001 | sub_class_of 层级含环 |
 | ONTO-002 | sub_property_of / inverse 引用含环或不存在 |
+| ONTO-012 | skos:broader 概念引用图含环（跨 concept scheme 合并检测） |
 | ONTO-010 | 引用未声明的类（sub_class_of / domain / range / rdf:type） |
 | ONTO-011 | 引用未声明的属性或概念（断言 / sub_property_of / inverse / skos:broader） |
 | ONTO-020 | 断言违反 domain/range（is-a 闭包判定）或字面量类型不符 |

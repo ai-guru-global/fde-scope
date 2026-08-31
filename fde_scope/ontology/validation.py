@@ -3,6 +3,7 @@
 错误码契约（规格 §8）：
 - ONTO-001  sub_class_of 层级含环
 - ONTO-002  sub_property_of / inverse 引用图含环
+- ONTO-012  skos:broader 概念引用图含环
 - ONTO-010  引用了未声明的类（sub_class_of / domain / range / rdf:type，封闭词表）
 - ONTO-011  引用了未声明的属性或概念（断言 / sub_property_of / inverse / skos:broader）
 - ONTO-020  对象/数据断言违反属性 domain/range
@@ -205,6 +206,24 @@ def validate_schema(schema: OntologySchema, loader: Loader) -> ValidationReport:
                         con.curie,
                         f"skos:broader target {b!r} is not a declared concept",
                     )
+
+    # ONTO-012：skos:broader 概念环（沿父方向 DFS 回到起点；跨 scheme 合并）
+    broader_map: dict[str, set[str]] = {}
+    for s in merged.concept_schemes:
+        for con in s.concepts:
+            broader_map.setdefault(con.curie, set()).update(con.broader)
+    for start, links in broader_map.items():
+        seen = set()
+        stack = [*links]
+        while stack:
+            cur = stack.pop()
+            if cur == start:
+                report.add("ONTO-012", start, "skos:broader concept graph contains a cycle")
+                break
+            if cur in seen or cur not in broader_map:
+                continue
+            seen.add(cur)
+            stack.extend(broader_map[cur])
     return report
 
 
