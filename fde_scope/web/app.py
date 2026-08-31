@@ -491,6 +491,36 @@ def api_skill_export(sid: str, body: dict) -> dict:
     return {"skill_id": sid, "format": fmt, "files": [{"name": f.name, "content": f.content} for f in files]}
 
 
+# ---------------------------------------------------------------------------
+# ontology（本体语义层：只读）
+# ---------------------------------------------------------------------------
+@app.get("/api/ontology/schemas")
+def api_ontology_schemas() -> list[dict]:
+    from ..ontology.store import OntologyStore
+
+    return OntologyStore().list_schemas()
+
+
+@app.get("/api/ontology/schema/{schema_id}")
+def api_ontology_schema(schema_id: str) -> dict:
+    from ..ontology.store import OntologyStore
+
+    schema = OntologyStore().load_schema(schema_id)
+    if schema is None:
+        raise HTTPException(status_code=404, detail=f"unknown ontology schema: {schema_id}")
+    return schema.model_dump()
+
+
+@app.get("/api/ontology/store/{store_id}")
+def api_ontology_store(store_id: str) -> dict:
+    from ..ontology.store import OntologyStore
+
+    store = OntologyStore().load_store(store_id)
+    if store is None:
+        raise HTTPException(status_code=404, detail=f"unknown ontology store: {store_id}")
+    return store.model_dump()
+
+
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")

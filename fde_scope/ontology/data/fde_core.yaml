@@ -1,0 +1,202 @@
+# FDE 基础本体（TBox）——建模项目现有领域概念，不发明新概念。
+# 校验契约：本文件必须通过 fde_scope.ontology.validation.validate_schema（狗粮测试）。
+id: fde-core
+version: 1.0.0
+base_iri: https://ai-guru-global.github.io/fde-scope/ontology/
+imports: []
+namespaces:
+  - prefix: fde
+    iri: https://ai-guru-global.github.io/fde-scope/ontology/core#
+  - prefix: skos
+    iri: http://www.w3.org/2004/02/skos/core#
+  - prefix: dcterms
+    iri: http://purl.org/dc/terms/
+classes:
+  # 顶层类
+  - curie: fde:Engagement
+    label: Engagement
+    label_zh: FDE 交付项目
+    comment: A customer engagement run by an FDE through the 18-phase SOP.
+  - curie: fde:Skill
+    label: Skill
+    label_zh: 技能
+  - curie: fde:DataSource
+    label: Data Source
+    label_zh: 数据源
+  # 超类
+  - curie: fde:Artifact
+    label: Artifact
+    label_zh: 交付工件
+  - curie: fde:Component
+    label: Component
+    label_zh: 系统组件
+  - curie: fde:ControlFlow
+    label: Control Flow Element
+    label_zh: 流程控制元素
+  - curie: fde:Evaluable
+    label: Evaluable
+    label_zh: 可评估对象
+  # ControlFlow 子类（对应 engagement/ 18 阶段状态机）
+  - curie: fde:Zone
+    label: Zone
+    label_zh: 区段
+    sub_class_of: [fde:ControlFlow]
+  - curie: fde:Phase
+    label: Phase
+    label_zh: 阶段
+    sub_class_of: [fde:ControlFlow]
+  - curie: fde:Gate
+    label: Gate
+    label_zh: 门禁
+    sub_class_of: [fde:ControlFlow]
+  - curie: fde:GateResult
+    label: Gate Result
+    label_zh: 门禁结果
+    sub_class_of: [fde:ControlFlow]
+  # Artifact 子类
+  - curie: fde:CorpusReport
+    label: Corpus Report
+    label_zh: 语料报告
+    sub_class_of: [fde:Artifact]
+  - curie: fde:EvalReport
+    label: Eval Report
+    label_zh: 评估报告
+    sub_class_of: [fde:Artifact]
+  - curie: fde:Runbook
+    label: Runbook
+    label_zh: 运维手册
+    sub_class_of: [fde:Artifact]
+  - curie: fde:HandoffPackage
+    label: Handoff Package
+    label_zh: 移交包
+    sub_class_of: [fde:Artifact]
+  # Component 子类（对应 deploy/ 多租户装配）
+  - curie: fde:Connector
+    label: Connector
+    label_zh: 数据连接器
+    sub_class_of: [fde:Component]
+  - curie: fde:AgentSpec
+    label: Agent Spec
+    label_zh: Agent 规格
+    sub_class_of: [fde:Component]
+  - curie: fde:Workspace
+    label: Workspace
+    label_zh: 执行沙箱
+    sub_class_of: [fde:Component]
+  - curie: fde:Tenant
+    label: Tenant
+    label_zh: 租户
+    sub_class_of: [fde:Component]
+  # Metric（对应 eval/）
+  - curie: fde:Metric
+    label: Metric
+    label_zh: 指标
+    sub_class_of: [fde:Evaluable]
+object_properties:
+  - curie: fde:has_phase
+    label: has phase
+    label_zh: 包含阶段
+    domain: fde:Engagement
+    range: fde:Phase
+  - curie: fde:has_zone
+    label: has zone
+    label_zh: 包含区段
+    domain: fde:Engagement
+    range: fde:Zone
+  - curie: fde:guarded_by
+    label: guarded by
+    label_zh: 受门禁约束
+    domain: fde:Phase
+    range: fde:Gate
+  - curie: fde:produces
+    label: produces
+    label_zh: 产出
+    domain: fde:Phase
+    range: fde:Artifact
+  - curie: fde:connects_source
+    label: connects source
+    label_zh: 连接数据源
+    domain: fde:Connector
+    range: fde:DataSource
+  - curie: fde:bound_to
+    label: bound to
+    label_zh: 绑定
+    domain: fde:AgentSpec
+    range: fde:Component
+  - curie: fde:runs_in
+    label: runs in
+    label_zh: 运行于
+    domain: fde:AgentSpec
+    range: fde:Workspace
+  - curie: fde:belongs_to
+    label: belongs to
+    label_zh: 隶属
+    domain: fde:Component
+    range: fde:Tenant
+  - curie: fde:evaluates
+    label: evaluates
+    label_zh: 评估
+    domain: fde:EvalReport
+    range: fde:Evaluable
+  - curie: fde:measures
+    label: measures
+    label_zh: 度量
+    domain: fde:Metric
+    range: fde:Engagement
+  - curie: fde:captures_experience
+    label: captures experience
+    label_zh: 沉淀经验
+    domain: fde:Skill
+    range: fde:Phase
+  - curie: fde:part_of
+    label: part of
+    label_zh: 属于（层级组装，工业 ISA-95 复用）
+    domain: fde:Component
+    range: fde:Component
+data_properties:
+  - curie: fde:slug
+    label: slug
+    domain: fde:ControlFlow
+  - curie: fde:status
+    label: status
+    domain: fde:Engagement
+  - curie: fde:display_name
+    label: display name
+    domain: fde:Component
+  - curie: fde:phase_index
+    label: phase index
+    domain: fde:Phase
+    range: integer
+  - curie: fde:quality_score
+    label: quality score
+    domain: fde:Evaluable
+    range: number
+  - curie: fde:passed
+    label: passed
+    domain: fde:GateResult
+    range: boolean
+  - curie: dcterms:created
+    label: created
+    domain: fde:Engagement
+    range: datetime
+  - curie: dcterms:title
+    label: title
+    domain: fde:Artifact
+concept_schemes:
+  # 对齐 fde_scope/skills/models.py 的 SkillCategory 四类枚举
+  - curie: fde:SkillCategoryScheme
+    label: FDE Skill Categories
+    label_zh: 技能四类分类
+    concepts:
+      - curie: fde:cat-research
+        label: research
+        label_zh: 调研
+      - curie: fde:cat-implementation
+        label: implementation
+        label_zh: 实施
+      - curie: fde:cat-optimization
+        label: optimization
+        label_zh: 调优
+      - curie: fde:cat-methodology
+        label: methodology
+        label_zh: 方法论
