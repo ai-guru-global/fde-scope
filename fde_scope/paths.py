@@ -70,6 +70,11 @@ def skills_export_dir(create: bool = False) -> Path:
     return _under_root("skills", "export", create=create)
 
 
+def ontology_dir(create: bool = False) -> Path:
+    """``<root>/.fde_scope/ontology`` — schemas/ + stores/（本体语义层）。"""
+    return _under_root("ontology", create=create)
+
+
 def uploads_dir(create: bool = False) -> Path:
     """``<root>/.fde_scope/uploads`` — uploaded raw files."""
     return _under_root("uploads", create=create)
