@@ -77,3 +77,8 @@ appbuild/build_info.json
 
 # Locally generated design assets (exported to appbuild/*.icns; source art stays local)
 vibe_images/
+
+# Local env files (never commit; credentials live in env vars only — AGENTS.md #3)
+.env
+*.env
+!.env.example
