@@ -11,10 +11,12 @@ function pipeline; the LLM v1 swaps stage internals, not the orchestration.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..ontology.extract import ConceptExtractor
 from .agents import QualityGate, SchemaNormalizer, build_stages
 from .coverage_analyzer import CoverageAnalyzer
 from .synthesizer import CorpusSynthesizer
@@ -24,13 +26,20 @@ if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
     from fde_scope.connectors import DataConnector
     from fde_scope.llm import MiMoClient
+    from fde_scope.ontology.models import OntologySchema
 
 
 class CorpusForge:
     """One-call forge: raw connector rows → a CorpusReport."""
 
-    def __init__(self, config: CorpusConfig, llm: MiMoClient | None = None) -> None:
+    def __init__(
+        self,
+        config: CorpusConfig,
+        llm: MiMoClient | None = None,
+        ontology: OntologySchema | None = None,
+    ) -> None:
         self.config = config
+        self._llm = llm
         self.normalizer = SchemaNormalizer(
             text_field=config.text_field,
             category_field=config.category_field,
@@ -42,6 +51,7 @@ class CorpusForge:
             quality_gate=QualityGate(config.synth_quality_min_score, llm=llm),
             llm=llm,
         )
+        self._extractor = ConceptExtractor(ontology) if ontology is not None else None
 
     # -- the main entry point ---------------------------------------------------
     def forge_rows(self, rows: Iterable[dict]) -> CorpusReport:
@@ -73,8 +83,13 @@ class CorpusForge:
         items = self.gate(items)
         real_items = items
 
+        # Step 1.5: ontology concept annotation (no-op when no ontology loaded)
+        concept_counts: dict[str, int] | None = None
+        if self._extractor is not None:
+            real_items, concept_counts = self._annotate(real_items)
+
         # Step 2: coverage analysis on the cleaned real data
-        coverage = self.analyzer.analyze(real_items)
+        coverage = self.analyzer.analyze(real_items, concept_counts=concept_counts)
 
         # Step 3: targeted synthesis to fill the gaps
         gaps = coverage.identify_gaps()
@@ -99,6 +114,22 @@ class CorpusForge:
         )
 
     # -- helpers ----------------------------------------------------------------
+    def _annotate(self, items: list[CorpusItem]) -> tuple[list[CorpusItem], dict[str, int]]:
+        """Annotate every item with ontology concepts (ancestors pre-merged)."""
+        assert self._extractor is not None
+        counts: Counter[str] = Counter()
+        out: list[CorpusItem] = []
+        for item in items:
+            curies, source = self._extractor.annotate(item.content, llm=self._llm)
+            counts.update(curies)
+            out.append(
+                item.with_trace(
+                    f"annotate:{source}",
+                    metadata={**item.metadata, "ontology_concepts": curies},
+                )
+            )
+        return out, dict(counts)
+
     def _split(
         self, items: list[CorpusItem], ratios: tuple[float, float, float]
     ) -> tuple[CorpusSplit, CorpusSplit, CorpusSplit]:

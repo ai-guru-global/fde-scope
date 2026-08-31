@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from fde_scope.config import CorpusConfig
 from fde_scope.corpus import (
     CorpusForge,
@@ -13,6 +15,7 @@ from fde_scope.corpus import (
     score_item,
 )
 from fde_scope.corpus.types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Provenance
+from fde_scope.ontology.models import OntologySchema
 
 
 def test_pii_scrub_masks_phone_and_email() -> None:
@@ -145,3 +148,62 @@ def test_forge_reuse_resets_stage_counters(sample_rows: list[dict]) -> None:
     assert first.dropped >= 1
     assert second.dropped == first.dropped
     assert second.pii_entities_masked == first.pii_entities_masked
+
+
+# -- P2.4 ontology concept annotation -----------------------------------------
+
+
+def _taxonomy() -> OntologySchema:
+    from fde_scope.ontology.store import OntologyStore
+
+    schema = OntologyStore().load_schema("fde-corpus-taxonomy")
+    assert schema is not None, "builtin fde-corpus-taxonomy missing"
+    return schema
+
+
+def test_forge_without_ontology_report_untouched(sample_rows: list[dict]) -> None:
+    """ontology=None keeps the report byte-shape identical to the legacy path."""
+    forge = CorpusForge(CorpusConfig(min_samples_per_category=2, synth_per_gap=1))
+    report = forge.forge_rows(sample_rows)
+    data = json.loads(report.model_dump_json(exclude_none=True))
+    assert "concept_counts" not in data["coverage"]
+    assert "concept_gaps" not in data["coverage"]
+    items = data["train"]["items"] + data["eval"]["items"] + data["test"]["items"]
+    assert all("ontology_concepts" not in i["metadata"] for i in items)
+    assert all(not any(t.startswith("annotate:") for t in i["trace"]) for i in items)
+
+
+def test_forge_with_ontology_annotates_real_items(sample_rows: list[dict]) -> None:
+    forge = CorpusForge(
+        CorpusConfig(min_samples_per_category=2, synth_per_gap=1),
+        ontology=_taxonomy(),
+    )
+    report = forge.forge_rows(sample_rows)
+    real = [
+        i
+        for i in report.train.items + report.eval.items + report.test.items
+        if i.provenance == Provenance.REAL
+    ]
+    assert real
+    assert all("ontology_concepts" in i.metadata for i in real)
+    assert all(any(t.startswith("annotate:") for t in i.trace) for i in real)
+
+    refund = next(i for i in real if "fde:cc-billing-refund" in i.metadata["ontology_concepts"])
+    assert "fde:cc-billing" in refund.metadata["ontology_concepts"]  # ancestor merged
+
+
+def test_forge_with_ontology_populates_concept_coverage(sample_rows: list[dict]) -> None:
+    forge = CorpusForge(
+        CorpusConfig(min_samples_per_category=2, synth_per_gap=1),
+        ontology=_taxonomy(),
+    )
+    report = forge.forge_rows(sample_rows)
+    cov = report.coverage
+    assert cov.concept_counts == {
+        "fde:cc-logistics": 2,
+        "fde:cc-billing": 2,
+        "fde:cc-billing-refund": 2,
+        "fde:cc-quality": 1,
+    }
+    assert cov.concept_gaps is not None
+    assert {g.concept for g in cov.concept_gaps} == {"fde:cc-quality"}
