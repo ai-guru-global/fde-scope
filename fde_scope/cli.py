@@ -123,6 +123,7 @@ def corpus(
     llm: bool = typer.Option(
         False, "--llm", help="Synthesize gap-filling samples with MiMo (needs FDE_SCOPE_MIMO_API_KEY)"
     ),
+    ontology: bool = typer.Option(False, "--ontology", help="启用本体概念注解与概念级覆盖"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only; don't forge"),
 ) -> None:
     """[Layer 2] Forge a raw sample into an auditable, gap-aware corpus."""
@@ -140,7 +141,17 @@ def corpus(
     rows = _load_rows(input)
     console.print(f"🔄 Loaded [bold]{len(rows)}[/bold] raw rows")
 
-    forge = CorpusForge(cfg, llm=client)
+    schema = None
+    if ontology:
+        from .ontology.store import OntologyStore
+
+        schema = OntologyStore().load_schema("fde-corpus-taxonomy")
+        if schema is None:
+            console.print("[red]Ontology schema not found:[/red] fde-corpus-taxonomy")
+            raise typer.Exit(2)
+        console.print(f"🧠 Ontology: [bold]{schema.id}[/bold] ({len(schema.concept_schemes)} schemes)")
+
+    forge = CorpusForge(cfg, llm=client, ontology=schema)
     report = forge.forge_rows(rows)
 
     console.print(f"✅ PII entities masked: [bold]{report.pii_entities_masked}[/bold]")
@@ -153,6 +164,10 @@ def corpus(
         console.print("[yellow]⚠ Coverage gaps:[/yellow]")
         for g in report.coverage.gaps:
             console.print(f"   • {g.category}: {g.current_count} (need ≥{g.target_count})")
+    if report.coverage.concept_counts is not None:
+        console.print(f"🧠 Concept coverage: [bold]{len(report.coverage.concept_counts)}[/bold] concepts")
+        for cg in report.coverage.concept_gaps or []:
+            console.print(f"   • {cg.concept}: {cg.current_count} (need ≥{cg.target_count})")
 
     save_html(report, out)
     json_out = str(Path(out).parent / "corpus_report.json")

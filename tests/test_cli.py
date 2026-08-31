@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from fde_scope.cli import app
@@ -376,3 +377,38 @@ def test_qwenpaw_export_pure_chinese_agent_name_exits_2(tmp_path: Path, monkeypa
     )
     assert r.exit_code == 2
     assert "agent id" in r.stdout
+
+
+# ---------------------------------------------------------------------------
+# corpus --ontology (P2.6)
+# ---------------------------------------------------------------------------
+def test_corpus_without_ontology_no_concept_output(tmp_path: Path, sample_csv: Path) -> None:
+    out = tmp_path / "report.html"
+    result = runner.invoke(app, ["corpus", "--input", str(sample_csv), "--out", str(out)])
+    assert result.exit_code == 0, result.stdout
+    assert "Concept" not in result.stdout
+    json_out = tmp_path / "corpus_report.json"
+    assert '"concept_counts"' not in json_out.read_text(encoding="utf-8")
+
+
+def test_corpus_with_ontology_reports_concept_coverage(tmp_path: Path, sample_csv: Path) -> None:
+    out = tmp_path / "report.html"
+    result = runner.invoke(app, ["corpus", "--input", str(sample_csv), "--out", str(out), "--ontology"])
+    assert result.exit_code == 0, result.stdout
+    assert "Concept" in result.stdout
+    json_out = tmp_path / "corpus_report.json"
+    assert '"concept_counts"' in json_out.read_text(encoding="utf-8")
+    assert '"concept_gaps"' in json_out.read_text(encoding="utf-8")
+
+
+def test_corpus_ontology_missing_schema_exits_2(
+    tmp_path: Path, sample_csv: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fde_scope.ontology.store import OntologyStore
+
+    monkeypatch.setattr(OntologyStore, "load_schema", lambda self, schema_id: None)
+    out = tmp_path / "report.html"
+    result = runner.invoke(app, ["corpus", "--input", str(sample_csv), "--out", str(out), "--ontology"])
+    assert result.exit_code == 2
+    assert "fde-corpus-taxonomy" in result.stdout
+    assert not out.exists()
