@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 from collections import Counter
 
-from .types import CorpusItem, CoverageReport
+from .types import ConceptGap, CorpusItem, CoverageReport
 
 
 class CoverageAnalyzer:
@@ -23,7 +23,9 @@ class CoverageAnalyzer:
     def __init__(self, min_samples_per_category: int = 100) -> None:
         self.min_samples = min_samples_per_category
 
-    def analyze(self, items: list[CorpusItem]) -> CoverageReport:
+    def analyze(
+        self, items: list[CorpusItem], concept_counts: dict[str, int] | None = None
+    ) -> CoverageReport:
         counts: Counter[str] = Counter(i.category for i in items)
         category_counts = dict(counts)
 
@@ -35,6 +37,13 @@ class CoverageAnalyzer:
             diversity_index=diversity,
         )
         report.identify_gaps()
+        if concept_counts is not None:
+            report.concept_counts = dict(concept_counts)
+            report.concept_gaps = [
+                ConceptGap(concept=c, current_count=n, target_count=self.min_samples)
+                for c, n in concept_counts.items()
+                if n < self.min_samples
+            ]
         return report
 
     @staticmethod

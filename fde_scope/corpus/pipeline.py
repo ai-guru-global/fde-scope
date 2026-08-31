@@ -142,7 +142,7 @@ def save_report_json(report: CorpusReport, path: str | Path) -> Path:
     """Write a CorpusReport to JSON for downstream tooling."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    p.write_text(report.model_dump_json(indent=2, exclude_none=True), encoding="utf-8")
     return p
 
 

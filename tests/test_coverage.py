@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from fde_scope.corpus import CorpusSynthesizer, CoverageAnalyzer
-from fde_scope.corpus.types import CategoryGap, CorpusItem
+from fde_scope.corpus.pipeline import save_report_json
+from fde_scope.corpus.types import (
+    CategoryGap,
+    ConceptGap,
+    CorpusItem,
+    CorpusReport,
+    CorpusSplit,
+    CoverageReport,
+)
 
 
 def test_coverage_analyzer_detects_gaps() -> None:
@@ -63,3 +73,40 @@ def test_synthesizer_trace_records_actual_strategy() -> None:
     out = synth.fill_gaps(seeds, gaps, per_gap_cap=3)
     assert len(out) == 3
     assert all(i.trace == ["synthesize:emotion_escalation"] for i in out)
+
+
+# -- P2.3 概念覆盖 ----------------------------------------------------------------
+
+
+def test_concept_counts_populate_fields_and_gaps() -> None:
+    items = [CorpusItem(id="1", content="a", category="退款")]
+    report = CoverageAnalyzer(min_samples_per_category=2).analyze(
+        items, concept_counts={"fde:cc-billing": 2, "fde:cc-outage": 1}
+    )
+    assert report.concept_counts == {"fde:cc-billing": 2, "fde:cc-outage": 1}
+    assert report.concept_gaps == [ConceptGap(concept="fde:cc-outage", current_count=1, target_count=2)]
+
+
+def test_concept_counts_none_leaves_fields_none_and_json_excludes() -> None:
+    items = [CorpusItem(id="1", content="a", category="退款")]
+    report = CoverageAnalyzer().analyze(items)
+    assert report.concept_counts is None
+    assert report.concept_gaps is None
+    assert "concept_counts" not in report.model_dump_json(exclude_none=True)
+    assert "concept_gaps" not in report.model_dump_json(exclude_none=True)
+
+
+def test_save_report_json_excludes_none_concept_fields(tmp_path: Path) -> None:
+    report = CorpusReport(
+        total=1,
+        real=1,
+        synthetic=0,
+        coverage=CoverageReport(category_counts={"退款": 1}, target_per_category=1),
+        train=CorpusSplit(name="train", items=[]),
+        eval=CorpusSplit(name="eval", items=[]),
+        test=CorpusSplit(name="test", items=[]),
+    )
+    path = save_report_json(report, tmp_path / "r.json")
+    text = path.read_text(encoding="utf-8")
+    assert "concept_counts" not in text
+    assert "concept_gaps" not in text

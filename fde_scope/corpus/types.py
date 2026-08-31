@@ -58,6 +58,18 @@ class CategoryGap(BaseModel):
         return max(self.target_count - self.current_count, 0)
 
 
+class ConceptGap(BaseModel):
+    """A coverage gap measured over ontology concepts (see ontology module)."""
+
+    concept: str
+    current_count: int
+    target_count: int
+
+    @property
+    def shortfall(self) -> int:
+        return max(self.target_count - self.current_count, 0)
+
+
 class CoverageReport(BaseModel):
     """Per-category distribution + identified gaps."""
 
@@ -65,6 +77,9 @@ class CoverageReport(BaseModel):
     target_per_category: int
     gaps: list[CategoryGap] = Field(default_factory=list)
     diversity_index: float = 0.0  # 0-1, normalized Shannon entropy
+    # None = ontology layer not in play for this run; only serialized when set
+    concept_counts: dict[str, int] | None = None
+    concept_gaps: list[ConceptGap] | None = None
 
     @property
     def total(self) -> int:
