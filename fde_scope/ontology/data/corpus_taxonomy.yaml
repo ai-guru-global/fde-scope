@@ -1,0 +1,69 @@
+# FDE 语料概念体系（SKOS）——P2 corpus --ontology 概念注解的内置词表。
+# 校验契约：本文件必须通过 fde_scope.ontology.validation.validate_schema（狗粮测试）。
+# 关键词约定：父概念收通用词、子概念收专指词；命中子概念时祖先链随注解并入，
+# 因此文本无需同时命中父子关键词。
+id: fde-corpus-taxonomy
+version: 1.0.0
+base_iri: https://ai-guru-global.github.io/fde-scope/ontology/
+imports: []
+namespaces:
+  - prefix: fde
+    iri: https://ai-guru-global.github.io/fde-scope/ontology/core#
+  - prefix: skos
+    iri: http://www.w3.org/2004/02/skos/core#
+concept_schemes:
+  # 对齐 fde_scope/corpus 六类语料首层：billing/outage/onboarding/quality/logistics/safety
+  - curie: fde:CorpusCategoryScheme
+    label: FDE Corpus Categories
+    label_zh: 语料六类分类
+    concepts:
+      # -- billing 计费 ------------------------------------------------------
+      - curie: fde:cc-billing
+        label: billing
+        label_zh: 计费
+        match_keywords: [计费, 账单, 扣费, 充值, billing, charge, payment]
+      - curie: fde:cc-billing-refund
+        label: refund
+        label_zh: 退款
+        broader: [fde:cc-billing]
+        match_keywords: [退款, 退货, refund, money back]
+      - curie: fde:cc-billing-invoice
+        label: invoice
+        label_zh: 发票
+        broader: [fde:cc-billing]
+        match_keywords: [发票, 开票, invoice, receipt]
+      # -- outage 故障停机 ---------------------------------------------------
+      - curie: fde:cc-outage
+        label: outage
+        label_zh: 故障停机
+        match_keywords: [宕机, 停机, 服务中断, 无法访问, outage, downtime, down]
+      - curie: fde:cc-outage-network
+        label: network issue
+        label_zh: 网络问题
+        broader: [fde:cc-outage]
+        match_keywords: [断网, 网络, 超时, network, timeout, connection]
+      - curie: fde:cc-outage-performance
+        label: performance degradation
+        label_zh: 性能劣化
+        broader: [fde:cc-outage]
+        match_keywords: [卡顿, 响应慢, 性能, slow, performance, latency]
+      # -- onboarding 开通引导 -----------------------------------------------
+      - curie: fde:cc-onboarding
+        label: onboarding
+        label_zh: 开通引导
+        match_keywords: [注册, 开户, 激活, 引导, signup, register, onboarding, activation]
+      # -- quality 质量 ------------------------------------------------------
+      - curie: fde:cc-quality
+        label: quality
+        label_zh: 质量
+        match_keywords: [质量, 差评, 投诉, bug, defect, quality, complaint]
+      # -- logistics 物流 ----------------------------------------------------
+      - curie: fde:cc-logistics
+        label: logistics
+        label_zh: 物流
+        match_keywords: [物流, 配送, 发货, 运输, delivery, shipping, logistics]
+      # -- safety 安全 -------------------------------------------------------
+      - curie: fde:cc-safety
+        label: safety
+        label_zh: 安全
+        match_keywords: [安全, 事故, 隐私, 泄露, safety, accident, privacy, leak]
