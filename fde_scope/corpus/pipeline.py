@@ -93,7 +93,13 @@ class CorpusForge:
 
         # Step 3: targeted synthesis to fill the gaps
         gaps = coverage.identify_gaps()
-        synthetic = self.synthesizer.fill_gaps(real_items, gaps, per_gap_cap=self.config.synth_per_gap)
+        synthetic = self.synthesizer.fill_gaps(
+            real_items,
+            gaps,
+            per_gap_cap=self.config.synth_per_gap,
+            concept_gaps=coverage.concept_gaps if self._extractor is not None else None,
+            extractor=self._extractor,
+        )
 
         # Step 4: merge + split
         full = real_items + synthetic

@@ -18,13 +18,15 @@ from __future__ import annotations
 import json
 import random
 import re
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from .agents import QualityGate
-from .types import CategoryGap, CorpusItem, Provenance
+from .types import CategoryGap, ConceptGap, CorpusItem, Provenance
 
 if TYPE_CHECKING:
     from fde_scope.llm import MiMoClient
+    from fde_scope.ontology.extract import ConceptExtractor
 
 
 # Tiny paraphrase dictionary — enough to produce genuinely varied samples in
@@ -85,22 +87,36 @@ class CorpusSynthesizer:
         real_items: list[CorpusItem],
         gaps: list[CategoryGap],
         per_gap_cap: int | None = None,
+        concept_gaps: list[ConceptGap] | None = None,
+        extractor: ConceptExtractor | None = None,
     ) -> list[CorpusItem]:
         """Synthesize enough items to close each gap, gated by quality.
 
         ``per_gap_cap`` bounds each gap's ``shortfall`` (useful to cap
         synthesis cost in v0) — it never synthesizes *more* than the gap
         actually needs.
-        """
-        if not gaps:
-            return []
 
+        ``concept_gaps`` (with an ``extractor`` for ancestor resolution)
+        enables ontology-aware synthesis: each concept gap is filled by
+        mutating the real items annotated with that concept. A concept gap
+        with no such anchor is skipped — no real evidence, no fabricated
+        samples.
+        """
         synthetic: list[CorpusItem] = []
         for gap in gaps:
             seeds = [i for i in real_items if i.category == gap.category]
             to_make = min(per_gap_cap, gap.shortfall) if per_gap_cap is not None else gap.shortfall
             made = self._synthesize_category(gap.category, seeds, to_make)
             synthetic.extend(made)
+        for cgap in concept_gaps or []:
+            if cgap.shortfall <= 0:
+                continue
+            seeds = [i for i in real_items if cgap.concept in i.metadata.get("ontology_concepts", [])]
+            if not seeds:
+                continue
+            to_make = min(per_gap_cap, cgap.shortfall) if per_gap_cap is not None else cgap.shortfall
+            ancestors = extractor.ancestors(cgap.concept) if extractor is not None else []
+            synthetic.extend(self._synthesize_concept(cgap, seeds, to_make, ancestors))
         return synthetic
 
     # -- internals --------------------------------------------------------------
@@ -176,6 +192,49 @@ class CorpusSynthesizer:
             # Only admit items that clear a lowered gate; v0 is permissive.
             if item.quality_score >= self.quality_gate.min_score:
                 out.append(item)
+        return out
+
+    def _synthesize_concept(
+        self,
+        gap: ConceptGap,
+        seeds: list[CorpusItem],
+        count: int,
+        ancestors: list[str],
+    ) -> list[CorpusItem]:
+        """Rule-only synthesis for one concept gap (deterministic, no LLM)."""
+        out: list[CorpusItem] = []
+        if count <= 0:
+            return out
+        categories: Counter[str] = Counter(s.category for s in seeds)
+        category = categories.most_common(1)[0][0]
+        concepts = [*ancestors, gap.concept]
+        base_texts = [s.content for s in seeds]
+        seen = set(base_texts)
+        attempts = 0
+        max_attempts = count * 5 + 10
+        while len(out) < count and attempts < max_attempts:
+            attempts += 1
+            base = self._rng.choice(base_texts)
+            strategy = self._rng.choice(self.strategies)
+            text = self._mutate(base, strategy=strategy)
+            if text in seen:
+                continue
+            seen.add(text)
+            score = self.quality_gate._score(CorpusItem(id="x", content=text, category=category))
+            if score < self.quality_gate.min_score:
+                continue
+            out.append(
+                CorpusItem(
+                    id=f"syn-{gap.concept.replace(':', '-')}-{len(out):04d}",
+                    content=text,
+                    category=category,
+                    channel=self._rng.choice(["email", "chat", "phone"]),
+                    quality_score=score,
+                    provenance=Provenance.SYNTHETIC,
+                    metadata={"ontology_concepts": concepts},
+                    trace=["synthesize:concept"],
+                )
+            )
         return out
 
     def _synthesize_llm(self, category: str, seeds: list[CorpusItem], count: int) -> list[str]:

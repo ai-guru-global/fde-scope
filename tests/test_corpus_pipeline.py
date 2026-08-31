@@ -14,7 +14,16 @@ from fde_scope.corpus import (
     render_html,
     score_item,
 )
-from fde_scope.corpus.types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Provenance
+from fde_scope.corpus.synthesizer import CorpusSynthesizer
+from fde_scope.corpus.types import (
+    ConceptGap,
+    CorpusItem,
+    CorpusReport,
+    CorpusSplit,
+    CoverageReport,
+    Provenance,
+)
+from fde_scope.ontology.extract import ConceptExtractor
 from fde_scope.ontology.models import OntologySchema
 
 
@@ -207,3 +216,96 @@ def test_forge_with_ontology_populates_concept_coverage(sample_rows: list[dict])
     }
     assert cov.concept_gaps is not None
     assert {g.concept for g in cov.concept_gaps} == {"fde:cc-quality"}
+
+
+# -- P2.5 concept-gap targeted synthesis ---------------------------------------
+
+
+def _concept_extractor() -> ConceptExtractor:
+    return ConceptExtractor(_taxonomy())
+
+
+def _refund_seeds() -> list[CorpusItem]:
+    return [
+        CorpusItem(
+            id="r1",
+            content="申请退款，商品质量有问题，已经拍照留存。希望尽快处理。",
+            category="退款",
+            metadata={"ontology_concepts": ["fde:cc-billing", "fde:cc-billing-refund", "fde:cc-quality"]},
+        ),
+        CorpusItem(
+            id="r2",
+            content="退款拖了一周还没到账，质量问题要求赔偿，麻烦处理一下。",
+            category="退款",
+            metadata={"ontology_concepts": ["fde:cc-billing", "fde:cc-billing-refund", "fde:cc-quality"]},
+        ),
+        CorpusItem(
+            id="r3",
+            content="商家说退款了但我一直没收到钱，订单还没发货。",
+            category="售后",
+            metadata={"ontology_concepts": ["fde:cc-billing", "fde:cc-billing-refund"]},
+        ),
+    ]
+
+
+def test_fill_gaps_concept_gap_synthesizes_anchored_items() -> None:
+    gap = ConceptGap(concept="fde:cc-billing-refund", current_count=1, target_count=3)
+    out = CorpusSynthesizer().fill_gaps(
+        _refund_seeds(), [], concept_gaps=[gap], extractor=_concept_extractor()
+    )
+    assert len(out) == 2  # shortfall, no cap
+    assert all(i.provenance == Provenance.SYNTHETIC for i in out)
+    assert all("synthesize:concept" in i.trace for i in out)
+    # concept + ancestors (ancestor order mirrors annotate)
+    assert all(i.metadata["ontology_concepts"] == ["fde:cc-billing", "fde:cc-billing-refund"] for i in out)
+    # category = mode of seed categories (退款 x2 beats 售后 x1)
+    assert all(i.category == "退款" for i in out)
+    assert all(i.content not in {s.content for s in _refund_seeds()} for i in out)
+
+
+def test_fill_gaps_concept_gap_respects_per_gap_cap() -> None:
+    gap = ConceptGap(concept="fde:cc-billing-refund", current_count=1, target_count=4)
+    out = CorpusSynthesizer().fill_gaps(
+        _refund_seeds(), [], concept_gaps=[gap], per_gap_cap=1, extractor=_concept_extractor()
+    )
+    assert len(out) == 1
+
+
+def test_fill_gaps_concept_gap_without_seeds_skips() -> None:
+    items = [CorpusItem(id="r1", content="你好，请问怎么修改收货地址？麻烦了。", category="订单修改")]
+    gap = ConceptGap(concept="fde:cc-safety", current_count=0, target_count=3)
+    out = CorpusSynthesizer().fill_gaps(items, [], concept_gaps=[gap], extractor=_concept_extractor())
+    assert out == []
+
+
+def test_fill_gaps_concept_gap_zero_shortfall_noop() -> None:
+    seeds = [
+        CorpusItem(
+            id="r1",
+            content="申请退款，麻烦尽快处理一下，谢谢。",
+            category="退款",
+            metadata={"ontology_concepts": ["fde:cc-billing", "fde:cc-billing-refund"]},
+        )
+    ]
+    gap = ConceptGap(concept="fde:cc-billing-refund", current_count=2, target_count=2)
+    out = CorpusSynthesizer().fill_gaps(seeds, [], concept_gaps=[gap], extractor=_concept_extractor())
+    assert out == []
+
+
+def test_forge_synthesizes_concept_gap_fill(sample_rows: list[dict]) -> None:
+    """fde:cc-quality is the sole concept gap and t-002 anchors it."""
+    forge = CorpusForge(
+        CorpusConfig(min_samples_per_category=2, synth_per_gap=1),
+        ontology=_taxonomy(),
+    )
+    report = forge.forge_rows(sample_rows)
+    concept_synth = [
+        i
+        for split in (report.train, report.eval, report.test)
+        for i in split.items
+        if "synthesize:concept" in i.trace
+    ]
+    assert len(concept_synth) == 1
+    item = concept_synth[0]
+    assert item.metadata["ontology_concepts"] == ["fde:cc-quality"]
+    assert item.provenance == Provenance.SYNTHETIC
