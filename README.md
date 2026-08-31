@@ -504,6 +504,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
 - [`docs/architecture-model/architecture-map.md`](docs/architecture-model/architecture-map.md) — evidence-backed architecture views (L1/L2/L3) + health report + canonical DSL/DOT sources
 - [`docs/skills.md`](docs/skills.md) — 技能沉淀系统：数据模型 / 生命周期 / 三种入口 / 双格式导出
+- [`docs/skills-catalog/README.md`](docs/skills-catalog/README.md) — 101 页 skill 手册库（Zone A–D + 横切 + MCP + 工具），门户 `site/index.html`，`make check-catalog` 门禁 / `make build-site` 重建
 - [`docs/llm_integration.md`](docs/llm_integration.md) — MiMo Token Plan integration: 6 touchpoints, fallback semantics, cost model, testing
 - [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md) — QwenPaw 集成：配置两层结构 / 导出与校验 / PawApp 桌面形态
 - [`pawapp/README.md`](pawapp/README.md) — QwenPaw PawApp 安装/开发/API 契约
@@ -520,6 +521,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [x] Category-stratified train/eval/test split（`CorpusReport.splits`）
 - [ ] MQTT-Sparkplug 真实 broker IO（paho-mqtt）
 - [ ] rosbag2 真实回放（rosbags）
+- [ ] Ontology 模块（横切语义层：TBox + ABox、JSON-LD 标准导出、零新依赖）— [设计已批准](docs/superpowers/specs/2026-08-31-ontology-module-design.md) · [P1 计划（TDD，9 任务）](docs/superpowers/plans/2026-08-31-ontology-module-p1.md)
 - [x] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
 - [x] 小米 MiMo Token Plan 接入（`fde_scope/llm.py`，env 配置，失败回退规则）
 - [x] Skill 沉淀库（四类分类 + 生命周期 + AgentScope/QwenPaw 双格式导出）
