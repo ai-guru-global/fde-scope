@@ -1,0 +1,92 @@
+# ISA-95 制造业 overlay——imports fde-core，建模企业层级 / 验收合规工件 / 工业 KPI。
+# 对齐 profiles/manufacturing.py 与 eval/manufacturing_metrics.py。
+id: mfg-overlay
+version: 1.0.0
+base_iri: https://ai-guru-global.github.io/fde-scope/ontology/
+imports: [fde-core]
+namespaces:
+  - prefix: mfg
+    iri: https://ai-guru-global.github.io/fde-scope/ontology/manufacturing#
+  - prefix: fde
+    iri: https://ai-guru-global.github.io/fde-scope/ontology/core#
+classes:
+  # ISA-95 企业层级（经 fde:part_of 组装）
+  - curie: mfg:Enterprise
+    label: Enterprise
+    label_zh: 企业（ISA-95）
+    sub_class_of: [fde:Component]
+  - curie: mfg:Site
+    label: Site
+    label_zh: 工厂场地（ISA-95）
+    sub_class_of: [fde:Component]
+  - curie: mfg:Area
+    label: Area
+    label_zh: 区域（ISA-95）
+    sub_class_of: [fde:Component]
+  - curie: mfg:WorkCenter
+    label: Work Center
+    label_zh: 工作中心（ISA-95）
+    sub_class_of: [fde:Component]
+  - curie: mfg:WorkUnit
+    label: Work Unit
+    label_zh: 工作单元（ISA-95）
+    sub_class_of: [fde:Component]
+  - curie: mfg:Equipment
+    label: Equipment
+    label_zh: 设备
+    sub_class_of: [fde:Component]
+  - curie: mfg:Sensor
+    label: Sensor
+    label_zh: 传感器
+    sub_class_of: [mfg:Equipment]
+  # 验收 / 安全 / 合规工件（对应 manufacturing gate overlay）
+  - curie: mfg:FATReport
+    label: FAT Report
+    label_zh: 工厂验收报告
+    sub_class_of: [fde:Artifact]
+  - curie: mfg:SATReport
+    label: SAT Report
+    label_zh: 现场验收报告
+    sub_class_of: [fde:Artifact]
+  - curie: mfg:SafetyAssessment
+    label: Safety Assessment
+    label_zh: 功能安全评估（ISO 13849 / IEC 61508）
+    sub_class_of: [fde:Artifact]
+  - curie: mfg:ConformityDeclaration
+    label: Conformity Declaration
+    label_zh: 合规声明（CE / EU AI Act）
+    sub_class_of: [fde:Artifact]
+  # 工业 KPI（对齐 eval/manufacturing_metrics.py）
+  - curie: mfg:OEE
+    label: OEE
+    label_zh: 设备综合效率
+    sub_class_of: [fde:Metric]
+  - curie: mfg:MTBF
+    label: MTBF
+    label_zh: 平均故障间隔时间
+    sub_class_of: [fde:Metric]
+  - curie: mfg:FPY
+    label: FPY
+    label_zh: 一次合格率
+    sub_class_of: [fde:Metric]
+  - curie: mfg:DPMO
+    label: DPMO
+    label_zh: 每百万缺陷数
+    sub_class_of: [fde:Metric]
+object_properties:
+  - curie: mfg:monitored_by
+    label: monitored by
+    label_zh: 被监测
+    domain: mfg:Equipment
+    range: mfg:Sensor
+  - curie: mfg:hosts_equipment
+    label: hosts equipment
+    label_zh: 承载设备
+    domain: mfg:WorkUnit
+    range: mfg:Equipment
+data_properties:
+  - curie: mfg:pl_determined
+    label: performance level determined
+    label_zh: 已确定 PL 等级
+    domain: mfg:SafetyAssessment
+    range: boolean
