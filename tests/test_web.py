@@ -40,6 +40,26 @@ def test_console_html(client) -> None:
     assert "Engagement Console" in r.text
 
 
+def test_glossary_tooltips_on_both_pages(client) -> None:
+    """Both pages ship the ?-tooltip glossary: CSS + script + term data."""
+    for path in ("/", "/console"):
+        html = client.get(path).text
+        assert "__GLOSSARY__" not in html  # placeholder must be replaced
+        assert ".term .tip" in html  # tooltip CSS shipped
+        assert "window.glossify" in html  # glossify() script shipped
+        assert "Gemba walk" in html  # glossary data includes the term…
+        assert "現場" in html  # …and its explanation
+
+
+def test_glossary_glossifies_console_dynamic_views(client) -> None:
+    """Console re-runs glossify() after JS-rendered views, not just on load."""
+    html = client.get("/console").text
+    assert "glossify(document.getElementById('view-workbench'))" in html
+    assert "glossify(document.getElementById('view-skills'))" in html
+    assert "glossify(document.getElementById('view-detail'))" in html
+    assert "glossify(el)" in html  # sidebar engagement list
+
+
 def test_profiles_api(client) -> None:
     r = client.get("/api/profiles")
     data = r.json()

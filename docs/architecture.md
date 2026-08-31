@@ -74,6 +74,24 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
 每个阶段有可选的 `gate`；`Engagement.advance()` 在 gate 未通过时**拒绝推进并返回 blockers**。
 这是把 SOP 从口号变成工程物的关键。
 
+#### 为什么是 gate 而不是 checklist
+
+两者是**记录与谓词**的区别，"更严格"不是语气而是机制：
+
+1. **清单是记录，门禁是谓词。** 勾选框陈述"曾经查过"；`Gate.check(ctx)` 在
+   推进的瞬间从 engagement 上下文重新推导事实。
+2. **腐化方向相反。** 清单填完那天状态最好，之后随现实漂移（代码、人员、需求）
+   单向腐化；`advance()` 对当前阶段全部门禁**无条件重评估**，旧的 passed
+   记录不提供豁免（`engagement/engagement.py` advance docstring：a stale pass
+   record never counts）。
+3. **执行点从纪律移到不变量。** blocker 在场时 `AdvanceBlocked` 让推进在物理上
+   不可能，不依赖任何人记得复查。
+4. **越权 ≠ 绕过。** `force=True` 仍评估并记录全部结果，例外本身进入审计日志，
+   事后无法与正常通过混淆。
+
+因此任何围绕 `evaluate_phase_gates` 的缓存/短路都会把机制退化回一张清单
+（AGENTS.md 不变量 1 禁止这样做）。
+
 ### 2. 工业 Overlay（manufacturing profile 启用）
 6 个 SaaS 不需要的并行 gate，每个都是 `Gate.check(ctx) -> GateResult`：
 
@@ -127,13 +145,30 @@ FDE Scope 不是又一个 Agent 应用，而是 **FDE 在客户现场的完整�
   `AgentSpec.toolkit.skills_dirs`）与 QwenPaw `customized_skills` 双兼容。
 详见 [`skills.md`](skills.md)。
 
-### 9. 多 Agent 拓扑（AgentScope 2.0 真实机制）
-`deploy` 支持多 Agent：`tenant_config.yaml` 的 `agents` 段（或 CLI `--agent
-name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 官方
-`SubAgentTemplate` 蓝图 + leader agent 的 `AgentCreate`/`TeamSay` 协调。
-已交付：蓝图导出进真实 `create_app(custom_subagent_templates=...)`
-（`deploy --serve` / `build_app` 已可用，CI 有真库测试）；leader 的运行时
-协调仍需独立后端（storage/message_bus），不虚构 API。
+### 9. 多 Agent 生产（真实 AgentScope 2.0 装配 + FDE 自定义）
+**装配即真实对象。** `TenantDeployer.deploy()` 为 `tenant_config.yaml` `agents:`
+段的每个 `AgentSpec` 组装一个真实 `agentscope.agent.Agent`：`spec.model` wiring
+成真实 ChatModel（缺省留运行时注入）、`plan_bindings()` 按角色把连接器/语料
+工具绑成真 `Toolkit`、`AgentState(permission_context=...)` 注入规则上下文、
+`ReActConfig(max_iters=20)`。
+
+**FDE 自开 Agent 有三个通道**（名字任意、中文可用）：
+1. CLI `--agent 名字:角色[:模型]`（可重复）+ `--connector-source slug=path` 绑源；
+2. YAML：`TenantConfig.agents` 声明 + `TenantConfig.sources` 给连接器数据源；
+3. 单 Agent 覆盖：`spec.toolkit["sources"]` / `["skills_dirs"]` 覆盖该 Agent
+   的数据源与挂载技能（`Toolkit(skills_or_loaders=...)` 注册）。
+
+角色是自由文本，经 `canonical_role()` 归入数据/日志/文件三个工具桶（含中文
+关键词）；未归桶的角色退化为 corpus-only。没有数据源的连接器工具保持
+**unbound** 并在 manifest 里写明原因——不假装可用（`describe_bindings`）。
+
+**协调走 2.0 官方机制**：每个 Agent 同时导出 `SubAgentTemplate` 蓝图进真实
+`create_app(custom_subagent_templates=...)`；leader 通过 `AgentCreate` 按
+`subagent_type` 派活、成员经 `TeamSay` 回报（CI 真库测试覆盖）。**装配 ≠ 服务**：
+不带 `--serve`，deploy 是真对象装配 + 诚实 manifest（dry-run/审计友好）；
+`deploy --serve`（`build_app()` + uvicorn）起真实 app 服务，需要 agentscope
+extra + Redis + 可达模型。生命周期：2.0 无 `Agent.stop`，`TenantDeployer.stop()`
+关闭 workspace/engine 句柄并标记 manifest。
 
 ### 10. QwenPaw 桌面形态（PawApp）
 `pawapp/` 把整个引擎做成 QwenPaw 的 PawApp（App Center 插件应用）：
@@ -182,11 +217,11 @@ name:role[:model]`）声明 tenant 的多个 Agent；交互走 AgentScope 2.0 �
 | Connector (CSV) | ✅ 真实实现 | + 工业协议真实 IO + Zammad/Salesforce HTTP |
 | Corpus 清洗/合成 | ✅ 规则版 + MiMo LLM 可选增强（同签名换内核） | + 批量样本 LLM 评分 |
 | LLM 横切层 | ✅ MiMoClient + 6 接入点（`llm.py`） | + 流式输出 + 多 provider 路由 |
-| Deploy 组装 | ✅ 真实类型组装 + manifest llm 段 | + 真实启动 + 模型调用 |
+| Deploy 组装 | ✅ 真实 Agent 装配（模型 wiring + Toolkit + PermissionContext）+ `--serve` 真实启动 | + serve 端到端实测（Redis + 模型） |
 | Eval | ✅ ticket + 制造业 KPI + mock/mimo reply | + 真实 AgentScope Agent.reply + 分类器 |
 | Runbook | ✅ Jinja 模板 + MiMo 起草（`handoff --llm`） | + 客户定制模板 |
 | Skills 沉淀库 | ✅ 四类分类 + 生命周期 + 双格式导出（AgentScope/QwenPaw） | + 技能检索嵌入化 + 跨项目同步 |
-| 多 Agent 拓扑 | ✅ SubAgentTemplate 蓝图导出 + manifest agents 段 | + 真实 app 服务 + 运行时协调 |
+| 多 Agent 生产 | ✅ 每规格真实 Agent 装配 + SubAgentTemplate 蓝图 + FDE 三通道自定义 | + serve 端到端实测（Redis + 模型） |
 | Flywheel | ✅ 事件映射 + 规则回流 | + 真实订阅 reply_stream + 微调 |
 | Web 工作台 | ✅ 三视图控制台（workbench 聚合 + journal + skills） | + 实时事件流 |
 | QwenPaw 集成 | ✅ qwenpaw export/validate + PawApp（真机验证通过） | + ACP 适配 + Studio 集成 |

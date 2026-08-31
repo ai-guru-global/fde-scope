@@ -318,6 +318,42 @@ fde-scope deploy --tenant acme \
 2.0 无 `Agent.stop`，`TenantDeployer.stop()` 关闭 workspace/engine 句柄并
 标记 manifest。
 
+#### 子 Agent 配置方法速查
+
+| 配置项 | 位置 | 说明 |
+|---|---|---|
+| Agent 列表 | `TenantConfig.agents` / CLI `--agent` | 每条 `AgentSpec(name, role, system_prompt?, model?, toolkit?)` |
+| 数据源 | `TenantConfig.sources` / CLI `--connector-source slug=value` | connector slug → 物理源（文件路径 / DSN / URL） |
+| 单 Agent 覆盖 | `spec.toolkit["sources"]` / `["skills_dirs"]` | 该 Agent 专属数据源与挂载技能 |
+| 审批策略 | `TenantConfig.approval_policy.mode` | `conservative` / `balanced` / `autonomous` |
+| 预检 | Web `POST /api/deploy/plan` · PawApp `/deploy/plan` · `deploy --dry-run` | 同一 `build_deploy_plan`，纯数据不 import AgentScope |
+
+#### 注意事项
+
+1. **角色是自由文本，但决定工具桶。** `canonical_role()` 按中文关键词把角色
+   归入 数据/日志/文件 桶并派生连接器集；匹配不上任何桶时**退化为
+   corpus-only**（只有语料工具）。想要某个连接器，角色词要沾边或显式覆盖
+   `spec.toolkit`。
+2. **数据源解析有优先级**：per-agent `spec.toolkit["sources"]` → tenant
+   `sources` → 隐式字段（ticket profile 下 `ticket_api` 隐式喂给
+   zammad/salesforce）。三处都没配的连接器工具**诚实标注 unbound 及原因**，
+   不进 Toolkit、不假装可用——先看 plan 再上现场。
+3. **审批模式决定未匹配工具的命运**：绑定的工具自动获得显式 ALLOW 规则；
+   未匹配工具在 `conservative`/`balanced` 下走 DEFAULT→**ASK**（HITL 确认），
+   `autonomous` 下走 DONT_ASK→**DENY**。默认 deny 恒含
+   `access_other_tenant` / `delete_any` / `exec_shell`。绑定工具不标
+   read-only（上游 ≥2.0.5 会先于 allow 规则自动放行只读调用）。
+4. **`skills_dirs` 必须指向真实存在、含 SKILL.md 的目录**；技能经
+   `Toolkit(skills_or_loaders=[...])` 注册，路径错了装配期即可发现。
+5. **凭据只走环境变量**（`FDE_SCOPE_MIMO_API_KEY` 等）——永远不进
+   tenant_config.yaml / manifest / 报告。
+6. **连接器 sample 工具每调用最多返回 `MAX_TOOL_ROWS = 50` 行**，大表预览
+   先小后大，不要拿它当导出通道。
+7. **`--serve` 不是默认**：需要 `.[agentscope]` extra（窗口
+   `>=2.0.4.post1,<3`，扩窗前先实测）+ Redis 后端 + 可达模型；纯装配 /
+   dry-run / plan 零 AgentScope 依赖。2.0 无 `Agent.stop`，停服用
+   `TenantDeployer.stop()`。
+
 ---
 
 ## 🐾 QwenPaw 集成
@@ -449,6 +485,15 @@ Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.
 ad-hoc 包首次打开被 Gatekeeper 拦时右键 → 打开；配置 `DEVELOPER_ID_P12_*` 与
 `NOTARY_API_KEY_*` 后脚本自动改为 Developer ID 签名 + 公证。推送 `v*` tag 时
 CI 自动出包（[`.github/workflows/release.yml`](.github/workflows/release.yml)）。
+
+**与 Web UI / QwenPaw PawApp 的关系：** Mac App 没有自己的界面——
+[`launcher.py`](appbuild/launcher.py) 直接加载 `fde_scope.web.app` 的 FastAPI
+对象跑在 `127.0.0.1:8737`，模板就是 `fde_scope/templates` 同一份，页面与
+`fde-scope web` 完全一致；它只是加了一层双击入口（打包运行时 + 单实例守护 +
+DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同一数据根
+目录之上的**另一个原生前端**：自带 APIRouter（宿主挂载 `/api/fde-scope`，
+18 条路由）与 `ui/index.js` 面板，不复用 Web 页面。一句话：Mac App = web
+控制台换个双击入口；PawApp = 同一引擎的另一个前端。
 
 ---
 

@@ -497,6 +497,185 @@ app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")
 
 
 # ---------------------------------------------------------------------------
+# glossary tooltips（术语小问号标注：术语后跟 ?，悬停/聚焦弹出解释气泡）
+# ---------------------------------------------------------------------------
+_GLOSSARY: list[tuple[str, str]] = [
+    (
+        "Gemba walk",
+        "源自日语「現場」：到价值创造的第一线（车间/工位）实地走查，"
+        "观察真实作业、与一线员工交谈，而不是隔着报表判断。精益/丰田生产方式的核心实践。",
+    ),
+    ("Gemba", "现场走查：工程师驻车间实地观察真实流程、设备与痛点（对应 site_survey 阶段）。"),
+    ("FDE", "Forward Deployed Engineer，前置部署工程师：带产品驻客户现场、快速交付解决方案的工程师角色。"),
+    ("Engagements", "Engagement 列表：本项目所有驻场项目的入口。"),
+    ("Engagement", "一次完整的驻场客户项目：从问题框定、构建、运营化到交接退场的全过程推进单位。"),
+    ("SOP", "Standard Operating Procedure，标准作业程序；这里指覆盖项目全生命周期的 18 阶段流程。"),
+    ("zones", "阶段分组（Zone）：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
+    ("Zone", "SOP 阶段分组：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
+    ("Gates", "Gate 列表：当前项目适用的所有门禁及其状态。"),
+    (
+        "Gate",
+        "谓词式门禁：每次推进阶段都重新评估的条件（如双 sponsor、FAT/SAT 签字），"
+        "不通过即拦截，过期结果不作数。",
+    ),
+    ("overlay", "叠加层：仅工业 profile 才额外生效的 gate 集合（🏭 标记）。"),
+    (
+        "FAT/SAT",
+        "FAT = Factory Acceptance Test 出厂验收测试；SAT = Site Acceptance Test 现场验收测试，均需客户签字。",
+    ),
+    ("sponsor", "项目拍板人/出资方干系人；本 SOP 要求业务与工业双 sponsor 共同确认成功标准。"),
+    ("works_council", "德国《企业组织法》BetrVG §87 工会共决：涉及员工监控/绩效的部署须工会同意。"),
+    ("air-gapped", "气隙部署：与外部网络物理隔离的封闭环境，安装与更新需走离线清单。"),
+    ("气隙", "air-gapped：与外部网络物理隔离的封闭网络环境。"),
+    ("OT/IT 隔离", "运营技术（OT）车间网与企业 IT 网隔离，是工业现场安全的常见要求。"),
+    ("班次", "轮班制度（如 3 班倒）；24/7 产线的部署需集成班次交接（shift_handover gate）。"),
+    ("工会", "员工代表机构；涉及员工监控/绩效的部署在德国需其共决（见 works_council gate）。"),
+    ("SLO", "Service Level Objective，服务等级目标：内部可度量的质量承诺，如「99% 工单 5 分钟内首次响应」。"),
+    ("SLA", "Service Level Agreement，服务等级协议：对外的合同性承诺，通常由多个 SLO 支撑。"),
+    ("on-call", "轮班值班响应机制：告警路由到当班人，保证 7×24 有人处置。"),
+    ("告警路由", "SLO 违约时告警送达的渠道/值班组（alert_route）。"),
+    ("runbook", "运维/应急手册：故障处置步骤、回滚方案与升级路径的文档。"),
+    ("移交包", "项目结束时交付客户的完整产物集合：runbook、模型、监控配置、已知局限等。"),
+    ("OEE", "Overall Equipment Effectiveness，设备综合效率 = 可用率 × 性能率 × 良品率；世界级水平 ≥ 0.85。"),
+    ("MTBF", "Mean Time Between Failures，平均无故障时间（小时），越高越可靠。"),
+    ("pick success", "机械臂抓取成功率；参照 DexNet 基准约 0.80。"),
+    ("DexNet", "UC Berkeley 的抓取规划神经网络及基准数据集，抓取成功率的常用参照。"),
+    ("KPI", "Key Performance Indicator，关键绩效指标；ticket 与 manufacturing 场景使用不同目录。"),
+    ("Profile", "场景档案：定义可用连接器、KPI 目录与适用 gate（ticket 客服 / manufacturing 制造业）。"),
+    ("ticket", "客服工单场景：CSV/Zammad/Salesforce/MySQL 数据接入，无工业 gate。"),
+    ("manufacturing", "制造业/具身机器人场景：OPC UA、MQTT、ROS2 等工业接入 + 6 个工业合规 gate。"),
+    ("Context", "项目上下文：现场、干系人、成功标准、SLO、功能安全与产物的结构化集合。"),
+    ("success_criteria", "成功标准：契约化、可度量的验收条件，由双 sponsor 签字确认。"),
+    ("干系人", "Stakeholder：与项目相关的角色（拍板人、使用者、运维、工会…）及其成功指标。"),
+    ("成功标准", "契约化、可度量的验收条件（success_criteria），双 sponsor 确认。"),
+    ("功能安全", "Functional Safety：机械/控制系统在故障时仍保持安全的标准体系（PL/SIL 等级）。"),
+    ("ISO 13849", "机械安全功能安全标准，定义性能等级 PL / PLr。"),
+    ("IEC 61508", "电气/电子/可编程电子安全系统的功能安全标准，定义 SIL 等级。"),
+    ("ISO 10218", "工业机器人安全标准：协作与常规机器人的风险评估要求。"),
+    ("CE", "欧盟合规标志：产品符合相关欧盟指令方可进入欧洲市场。"),
+    ("EU AI Act", "欧盟人工智能法案：按风险分级监管 AI，高风险用途需合规评估与文档。"),
+    ("PLr", "Required Performance Level，要求性能等级（ISO 13849）；PL 为实际达到的等级。"),
+    ("SIL", "Safety Integrity Level，安全完整性等级（IEC 61508）。"),
+    ("Corpus", "语料：训练/评估模型的样本集合；锻造（forge）即清洗、脱敏、补盲、合成的流水线。"),
+    ("语料锻造", "CSV 等原始数据 → 脱敏 → 去重 → 质量门 → 覆盖度分析 → 针对性合成 → 报告的流水线。"),
+    ("Flywheel", "飞轮：现场事件回流为语料、周度增量重训，让系统越用越准的闭环。"),
+    ("飞轮", "数据回流 → 语料增量 → 再训练的闭环：项目用得越久，模型越贴合该客户。"),
+    ("ISA-95", "企业系统与车间系统集成的国际标准，MES 数据模型的依据。"),
+    ("MES", "Manufacturing Execution System，制造执行系统：工单、质量、停机等车间数据源。"),
+    ("OPC UA", "工业自动化统一通信协议，可直接读取 PLC tag 数据。"),
+    ("PLC", "Programmable Logic Controller，可编程逻辑控制器：产线设备的控制单元。"),
+    ("MQTT-Sparkplug", "MQTT：轻量发布/订阅协议；Sparkplug B：规范其工业载荷语义。"),
+    ("ROS2 Bag", "Robot Operating System 2 的录制回放格式，常用于机器人轨迹/传感数据。"),
+    ("Historian", "时序历史数据库：存储生产过程历史数据（温度、节拍、报警等）。"),
+    ("Zammad", "开源客服工单系统。"),
+    ("Salesforce", "CRM 平台；此处为客户/工单相关数据源。"),
+    ("stub", "占位实现：接口与数据模型就绪，但尚未接通真实系统。"),
+    ("PII", "Personally Identifiable Information，个人身份信息（姓名/邮箱/电话）；锻造时自动脱敏。"),
+    ("min_samples", "每个类别最少真实样本数，低于即判定为缺口并触发合成。"),
+    ("synth_per_gap", "每个缺口类别补充合成的样本数量。"),
+    ("JSONL", "每行一个 JSON 对象的文本格式，样本与评估数据常用。"),
+    ("drift", "漂移：数据分布或质量随时间偏移，可能让模型失效；需持续检测并触发再训练。"),
+    ("漂移", "数据分布/质量随时间偏移，模型效果随之衰减；监控项之一。"),
+    ("bad case", "失败/低质样本挖掘：从评估结果中找出表现差的样本，归类归因。"),
+    ("force", "强制推进：豁免拦截，但 gate 照常评估并留痕，例外进入审计日志。"),
+    ("qualification", "问题框定：确认问题真实、客户有预算与意愿的阶段。"),
+    ("stakeholder_map", "干系人地图：识别拍板人、使用者、反对者等角色及其诉求。"),
+    ("prototype", "真实数据原型：用客户真实数据（非演示数据）搭建可验证原型。"),
+    ("AgentState", "AgentScope 的智能体状态对象；权限上下文经其注入运行时。"),
+    ("Toolkit", "AgentScope 的工具集合对象：把连接器/函数绑定为智能体可调用的工具。"),
+    ("SubAgentTemplate", "AgentScope 的子智能体蓝图：预置角色、工具与提示词的模板。"),
+    (
+        "技能库",
+        "沉淀的可复用方法论/经验文档，分 research / implementation / optimization / methodology 四类。",
+    ),
+    ("工作台", "跨项目总览：全局统计、项目矩阵与最近沉淀。"),
+    ("现场记录", "Journal：research / implementation / optimization 三类现场笔记，可一键沉淀为技能草稿。"),
+    ("沉淀", "把现场经验固化成可复用技能/文档，供后续项目检索复用。"),
+    ("门禁", "当前阶段适用的 gate 校验结果（通过/拦截）。"),
+]
+
+_GLOSSARY_CSS = """
+.term{position:relative;cursor:help;border-bottom:1px dashed #5a6b85;outline:none}
+.term:hover,.term:focus{border-bottom-color:var(--accent)}
+.term .q{display:inline-block;width:13px;height:13px;margin-left:3px;border:1px solid var(--muted);
+border-radius:50%;color:var(--muted);font-size:9px;line-height:12px;text-align:center;font-weight:700;
+vertical-align:1px;transition:color .12s,border-color .12s}
+.term:hover .q,.term:focus .q{color:var(--accent);border-color:var(--accent)}
+.term .tip{position:absolute;left:0;bottom:calc(100% + 9px);z-index:999;width:max-content;
+max-width:min(300px,78vw);padding:9px 12px;border-radius:9px;background:var(--panel2);
+border:1px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5);color:var(--fg);
+font-size:.76rem;line-height:1.6;font-weight:400;letter-spacing:normal;text-transform:none;
+white-space:normal;text-align:left;opacity:0;visibility:hidden;pointer-events:none;
+transform:translateY(5px);transition:opacity .13s ease,transform .13s ease,visibility .13s}
+.term:hover .tip,.term:focus .tip{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+.term.tip-flip .tip{left:auto;right:0}
+.term.tip-below .tip{bottom:auto;top:calc(100% + 9px)}
+"""
+
+_GLOSSARY_JS = r"""(() => {
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const ASCII_TERM = /^[A-Za-z0-9][A-Za-z0-9 /+.-]*$/;
+// id/slug 内的子串不标注（如 eng-caocao-ticket-seed05 里的 ticket、prototype_real_data 里的 prototype）
+const ADJACENT = /[-_A-Za-z0-9]/;
+const GLOSSARY = __GLOSSARY_DATA__.slice().sort((a, b) => b[0].length - a[0].length)
+  .map(([term, tip]) => ({ term, tip, ascii: ASCII_TERM.test(term),
+    pat: ASCII_TERM.test(term) ? '\\b' + escapeRe(term) : escapeRe(term) }));
+
+function glossify(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n) {
+      const p = n.parentElement;
+      return (p && n.nodeValue.trim() && !p.closest('.term,.tip,script,style,textarea,option,.cli,pre,code')) ? 1 : 2;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    let text = node.nodeValue;
+    const marks = [];
+    for (const g of GLOSSARY) {
+      if (!new RegExp(g.pat, 'i').test(text)) continue;
+      text = text.replace(new RegExp(g.pat, 'gi'), (m, off, full) => {
+        if (g.ascii && (ADJACENT.test(full[off - 1] || '') || ADJACENT.test(full[off + m.length] || ''))) return m;
+        marks.push([m, g.tip]);
+        return '\u0001' + marks.length + '\u0001';
+      });
+    }
+    if (!marks.length) continue;
+    const html = esc(text).replace(/\u0001(\d+)\u0001/g, (_, i) => {
+      const [m, tip] = marks[i - 1];
+      return '<span class="term" tabindex="0">' + esc(m) +
+        '<span class="tip">' + esc(tip) + '</span><span class="q">?</span></span>';
+    });
+    const wrap = document.createElement('span');
+    wrap.innerHTML = html;
+    node.parentNode.replaceChild(wrap, node);
+    wrap.querySelectorAll('.term').forEach(t => {
+      const r = t.getBoundingClientRect();
+      if (r.top < 130) t.classList.add('tip-below');
+      else if (r.left > window.innerWidth * 0.62) t.classList.add('tip-flip');
+    });
+  }
+}
+window.glossify = glossify;
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => glossify(document.body));
+} else {
+  glossify(document.body);
+}
+})();
+"""
+
+
+def _glossary_snippet() -> str:
+    data = json.dumps(_GLOSSARY, ensure_ascii=False)
+    js = _GLOSSARY_JS.replace("__GLOSSARY_DATA__", data)
+    return f"<style>{_GLOSSARY_CSS}</style><script>{js}</script>"
+
+
+# ---------------------------------------------------------------------------
 # HTML pages
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
@@ -539,6 +718,7 @@ header .nav a.active{color:var(--accent);border-color:var(--accent)}
 .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
 .btn:hover{opacity:.9}
 .sec-title{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:36px 0 14px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.sec-note{font-size:.78rem;color:var(--muted);margin:-6px 0 14px;line-height:1.6}
 .grid{display:grid;gap:14px}
 .cols-4{grid-template-columns:repeat(4,1fr)}
 .cols-3{grid-template-columns:repeat(3,1fr)}
@@ -579,6 +759,8 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <nav class="nav">
     <a href="/" class="active">功能总览</a>
     <a href="/console">Engagement 控制台 →</a>
+    <a href="#arch">架构清单</a>
+    <a href="#practices">最佳实践</a>
     <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
   </nav>
 </header>
@@ -588,7 +770,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 <div class="hero">
   <h2>FDE 的完整现场工作台</h2>
   <p>从第一次 Gemba walk 到签字移交——覆盖软件/SaaS 与具身机器人/制造业两类场景。
-     18 阶段 SOP、10 个可执行合规 gate、9 个数据连接器、真实生产 KPI。</p>
+     18 阶段 SOP、10 个可执行合规 gate、10 个数据连接器、真实生产 KPI。</p>
   <div class="cta">
     <a class="btn" href="/console">进入 Engagement 控制台</a>
     <a class="btn ghost" href="#quickstart">快速上手</a>
@@ -598,8 +780,8 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 <div class="grid cols-4" style="margin-bottom:8px">
   <div class="stat"><div class="num">18</div><div class="lab">SOP 阶段（4 zones）</div></div>
   <div class="stat"><div class="num">10</div><div class="lab">可执行 gate</div></div>
-  <div class="stat"><div class="num">9</div><div class="lab">数据连接器</div></div>
-  <div class="stat"><div class="num">228</div><div class="lab">测试全绿</div></div>
+  <div class="stat"><div class="num">10</div><div class="lab">数据连接器</div></div>
+  <div class="stat"><div class="num">CI</div><div class="lab">测试全绿</div></div>
 </div>
 
 <div class="sec-title">🗺 完整 SOP · 18 阶段 · 4 Zones</div>
@@ -623,6 +805,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 </div>
 
 <div class="sec-title">🚦 10 个可执行合规 Gate（工业 overlay）</div>
+<p class="sec-note">Gate 是谓词，不是清单：清单记录"曾经查过"，随现实漂移单向腐化；gate 在每次推进时重新评估，过期 passed 不作数。--force 只豁免拦截、照常评估留痕，例外进入审计日志。</p>
 <div class="grid cols-4">
   <div class="tile"><div class="name">site_survey 🏭</div><div class="desc">现场勘察记录校验</div></div>
   <div class="tile"><div class="name">success_criteria</div><div class="desc">双 sponsor + 可度量 done</div></div>
@@ -636,7 +819,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <div class="tile"><div class="name">handoff_signoff</div><div class="desc">移交包签字确认</div></div>
 </div>
 
-<div class="sec-title">🔌 9 个数据连接器</div>
+<div class="sec-title">🔌 10 个数据连接器</div>
 <div class="grid cols-4">
   <div class="tile"><div class="icon">📄</div><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><div class="icon">🗄</div><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
@@ -647,6 +830,7 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <div class="tile"><div class="icon">📈</div><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
   <div class="tile"><div class="icon">🎫</div><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
   <div class="tile"><div class="icon">☁️</div><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><div class="icon">📑</div><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
 </div>
 
 <div class="sec-title">⚙️ 6 大功能模块</div>
@@ -658,6 +842,27 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
   <div class="tile"><div class="icon">🗂</div><div class="name">SOP 状态机</div><div class="desc">18 阶段推进/回滚，gate 不通过即拦截。</div></div>
   <div class="tile"><div class="icon">🌐</div><div class="name">Web 控制台</div><div class="desc">交互式 engagement 仪表盘 + gate + forge + KPI。</div></div>
 </div>
+
+<div class="sec-title" id="arch">🏗 架构清单 · 四层 + 横切（证据化建模见 docs/architecture-model/）</div>
+<div class="grid cols-3">
+  <div class="tile"><div class="name">🖥 UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（27 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><div class="name">🧭 SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
+  <div class="tile"><div class="name">⚙️ 能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
+  <div class="tile"><div class="name">🧰 横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>
+  <div class="tile"><div class="name">💾 文件事实源</div><div class="desc">零数据库：.fde_scope/（engagements · skills · uploads）+ reports/；一律经 fsutil.atomic_write_text 原子写。</div></div>
+  <div class="tile"><div class="name">🔌 外部依赖（全可选）</div><div class="desc">AgentScope 2.0.x（extra，实测窗口 >=2.0.4.post1,&lt;3；deploy 三支柱 + documents 延迟导入）· MiMo LLM（凭据仅环境变量）· QwenPaw 宿主。</div></div>
+</div>
+
+<div class="sec-title" id="practices">✅ 工程最佳实践 · 六条不变式（AGENTS.md，架构守护测试钉住）</div>
+<div class="grid cols-3">
+  <div class="tile"><div class="name">1 · Gate 实时重评估</div><div class="desc">advance() 每次重评当前阶段全部 gate，过期通过不作数；强推也评估留痕。禁止缓存/短路。</div></div>
+  <div class="tile"><div class="name">2 · ID 服务端生成</div><div class="desc">SkillRecord.id / EngagementContext.id 由所属服务分配，外部输入永远不能指定。</div></div>
+  <div class="tile"><div class="name">3 · 凭据只走环境变量</div><div class="desc">API key 不落 manifest / 报告 / engagement JSON / 日志。</div></div>
+  <div class="tile"><div class="name">4 · 原子写盘</div><div class="desc">一切用户状态经 fsutil.atomic_write_text（临时文件 + os.replace），禁止裸 write_text。</div></div>
+  <div class="tile"><div class="name">5 · 规则授权是唯一通道</div><div class="desc">build_toolkit 不打 is_read_only（上游 ≥2.0.5 read-only 先放行）；未匹配工具按模式回退 DEFAULT→ASK / DONT_ASK→DENY。</div></div>
+  <div class="tile"><div class="name">6 · 实测版本窗口</div><div class="desc">pyproject 与 docs 逐字引用同一 agentscope specifier，放宽前逐版本真库跑测。</div></div>
+</div>
+<p class="sec-note">验证锚点：make test · pytest tests/test_architecture_guard.py（6 项契约）· pytest -m agentscope（真库运行时）· ruff check + format --check · 架构证据模型 docs/architecture-model/architecture-map.md</p>
 
 <div class="sec-title">📈 制造业 KPI（实测 BMW 数据）</div>
 <div class="grid cols-4">
@@ -719,10 +924,11 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 
 <footer>
   FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
-  401 tests collected · 398 passed + 3 env-skipped · 74 source files · 零配置可跑
+  测试套件 CI 全绿（含架构守护测试 6 项契约）· 零配置可跑
 </footer>
 
 </div>
+__GLOSSARY__
 </body>
 </html>
 """
@@ -752,6 +958,7 @@ h2{font-size:1rem;margin:0 0 10px;color:var(--muted);text-transform:uppercase;le
 .eng{cursor:pointer;transition:border-color .15s}
 .eng:hover{border-color:var(--accent)}
 .eng .id{font-weight:600}
+.meta{color:var(--muted);font-size:.8rem}
 .eng .meta{color:var(--muted);font-size:.78rem;margin-top:3px}
 .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:.7rem;background:#1e2738}
 .pill.ind{background:#3b2a1a;color:var(--warn)}
@@ -760,6 +967,7 @@ button,.btn{background:var(--accent);color:#04201d;border:0;padding:7px 12px;bor
 button.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
 button:disabled{opacity:.4;cursor:not-allowed}
 input,select{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:6px 9px;border-radius:6px;font-size:.85rem;width:100%}
+textarea{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:6px 9px;border-radius:6px;font-size:.85rem;width:100%;font-family:inherit;resize:vertical}
 .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
 .row label{min-width:90px;color:var(--muted);font-size:.8rem}
 .phases{display:flex;flex-direction:column;gap:6px}
@@ -795,10 +1003,11 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
 </header>
 <div class="layout">
   <aside class="sidebar">
-    <div class="row" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:8px">
       <button style="flex:1" onclick="go('workbench')">📊 工作台</button>
       <button class="ghost" style="flex:1" onclick="go('skills')">📚 技能库</button>
     </div>
+    <button class="ghost" style="width:100%;margin-bottom:14px" onclick="go('deploy')">🤖 Agent 部署</button>
     <h2>Engagements</h2>
     <div id="eng-list"></div>
     <div class="card" style="margin-top:16px">
@@ -818,6 +1027,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
   <main class="main" id="main">
     <div id="view-workbench"></div>
     <div id="view-skills" class="hidden"></div>
+    <div id="view-deploy" class="hidden"></div>
     <div id="view-detail" class="hidden"><div class="empty">← 选择或创建一个 engagement 开始</div></div>
   </main>
 </div>
@@ -827,7 +1037,7 @@ const API = '';
 let current = null;
 
 function showView(name) {
-  ['workbench','skills','detail'].forEach(v=>{
+  ['workbench','skills','deploy','detail'].forEach(v=>{
     const e=document.getElementById('view-'+v); if(e) e.classList.toggle('hidden', v!==name);
   });
 }
@@ -838,6 +1048,7 @@ function go(name) {
   else if (location.hash) history.replaceState(null,'',location.pathname);
   if (name==='workbench') loadWorkbench();
   if (name==='skills') loadSkills();
+  if (name==='deploy') renderDeploy();
 }
 
 // -- 工作台 ---------------------------------------------------------------
@@ -855,6 +1066,7 @@ async function loadWorkbench() {
     </div>
     <div class="card"><h2>跨项目矩阵</h2>${matrixHtml(w.matrix)}</div>
     <div class="card"><h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go('skills')">去沉淀 →</button></h2>${recentHtml(w.recent_skills)}</div>`;
+  if (window.glossify) glossify(document.getElementById('view-workbench'));
 }
 
 function matrixHtml(matrix) {
@@ -915,6 +1127,7 @@ async function loadSkills() {
       <div class="row"><label>正文</label><textarea id="sk-body" rows="4" style="width:100%;background:var(--code);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:.85rem;padding:6px 9px"></textarea></div>
       <button onclick="submitSkill()">+ 沉淀技能</button>
     </div>`;
+  if (window.glossify) glossify(document.getElementById('view-skills'));
 }
 
 function skillCard(r) {
@@ -1006,6 +1219,112 @@ async function journalToSkill(jid) {
   selectEng(current);
 }
 
+// -- Agent 部署（dry-run 计划，与 CLI / PawApp 同一 build_deploy_plan） -----
+let deployInit = false;
+function renderDeploy() {
+  if (deployInit) return;
+  document.getElementById('view-deploy').innerHTML = `
+    <div class="card"><h2>Agent 部署计划 · dry-run</h2>
+      <div class="meta" style="margin-bottom:10px">与 <code>fde-scope deploy</code> / PawApp 走同一 <code>build_deploy_plan</code>：纯数据预览「哪个角色 Agent 拿到哪个连接器工具、对着哪个数据源」，不 import AgentScope、不调模型、不起服务。</div>
+      <div class="row"><label>Tenant</label><input id="dp-tenant" value="acme"></div>
+      <div class="row"><label>Profile</label><select id="dp-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select></div>
+      <div class="row"><label>审批模式</label><select id="dp-mode">
+        <option value="conservative">conservative · 例行外呼/高成本也 ASK</option>
+        <option value="balanced" selected>balanced · 仅高风险 ASK</option>
+        <option value="autonomous">autonomous · 无人值守（未匹配 DENY）</option></select></div>
+      <div class="row"><label>模型</label><input id="dp-model" value="qwen-max"></div>
+      <div class="row"><label>Agents</label><textarea id="dp-agents" rows="3" placeholder="每行一个：名字:角色[:模型]&#10;数据员:数据分析&#10;日志员:日志分析:qwen3-14b"></textarea></div>
+      <div class="row"><label>数据源</label><textarea id="dp-sources" rows="2" placeholder="每行一个：slug=路径或URL&#10;csv=examples/quickstart_csv/sample_tickets.csv"></textarea></div>
+      <div class="row" style="margin-bottom:0"><button onclick="runDeployPlan()">生成部署计划</button>
+      <span class="meta">角色是自由文本 → 自动归 数据/日志/文件 工具桶；匹配不上 → corpus-only</span></div>
+    </div>
+    <div id="dp-result"><div class="empty">填写上方配置后点「生成部署计划」</div></div>
+    <div class="card"><h2>注意事项</h2><ul style="margin:0;padding-left:18px;font-size:.85rem;line-height:1.8;color:var(--muted)">
+      <li><b style="color:var(--fg)">数据源优先级</b>：Agent 级 <code>toolkit.sources</code> → tenant <code>sources</code> → 隐式字段（ticket 下 <code>ticket_api</code> 隐式喂 zammad/salesforce）。三处都没配的工具诚实标注 <span class="pill" style="color:var(--bad)">unbound</span>，不进 Toolkit、不假装可用。</li>
+      <li><b style="color:var(--fg)">审批模式决定未匹配工具的命运</b>：绑定工具自动获得 ALLOW 规则；conservative / balanced 未匹配 → ASK（HITL 人工确认），autonomous → DENY。默认 deny 恒含 access_other_tenant / delete_any / exec_shell。</li>
+      <li><b style="color:var(--fg)">skills_dirs 必须真实存在</b>（含 SKILL.md 的目录），技能经 <code>Toolkit(skills_or_loaders=…)</code> 注册，路径错误装配期即报。</li>
+      <li><b style="color:var(--fg)">凭据只走环境变量</b>（<code>FDE_SCOPE_MIMO_API_KEY</code> 等）——不进 manifest / tenant_config / 报告。</li>
+      <li><b style="color:var(--fg)">连接器 sample 每调用最多 50 行</b>（MAX_TOOL_ROWS），是预览不是导出通道。</li>
+      <li><b style="color:var(--fg)">装配 ≠ 服务</b>：<code>deploy --serve</code> 需 <code>.[agentscope]</code> extra + Redis + 可达模型；2.0 无 <code>Agent.stop</code>，停服用 <code>TenantDeployer.stop()</code>。</li>
+    </ul></div>`;
+  deployInit = true;
+}
+
+function _parseAgentLines(text) {
+  return text.split('\\n').map(s=>s.trim()).filter(Boolean).map(line=>{
+    const parts = line.split(':').map(s=>s.trim());
+    const a = {name: parts[0], role: parts[1] || ''};
+    if (parts[2]) a.model = parts[2];
+    return a;
+  }).filter(a=>a.name && a.role);
+}
+
+function _parseSourceLines(text) {
+  const out = {};
+  text.split('\\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
+    const i = line.indexOf('=');
+    if (i > 0) out[line.slice(0,i).trim()] = line.slice(i+1).trim();
+  });
+  return out;
+}
+
+async function runDeployPlan() {
+  const val = id => (document.getElementById(id)||{}).value || '';
+  const body = {
+    tenant: val('dp-tenant').trim() || 'acme',
+    profile: val('dp-profile'),
+    approval_mode: val('dp-mode'),
+    model: val('dp-model').trim() || 'qwen-max',
+    agents: _parseAgentLines(val('dp-agents')),
+    sources: _parseSourceLines(val('dp-sources')),
+  };
+  const out = document.getElementById('dp-result');
+  out.innerHTML = '<div class="empty">计算中…</div>';
+  try {
+    const plan = await api('/api/deploy/plan', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    out.innerHTML = planHtml(plan);
+  } catch(e) {
+    out.innerHTML = `<div class="gate fail"><b>校验失败（422）</b><pre>${escapeHtml(String(e.message||e))}</pre></div>`;
+  }
+}
+
+function planHtml(plan) {
+  const esc = escapeHtml;
+  const m = plan.manifest, sum = plan.summary || {};
+  const perm = m.permissions || {};
+  const fmtRules = rules => (rules||[]).map(([t,c])=>`<span class="pill">${esc(t)}${c?` <span class="meta">${esc(c)}</span>`:''}</span>`).join(' ') || '<span class="meta">—</span>';
+  const agents = (m.agents||[]).map(a => {
+    const tools = (a.tools||[]).map(t => t.bound
+      ? `<span class="pill tkt" title="${esc(t.note||'')}">${esc(t.tool)} → ${esc(t.source||'')}</span>`
+      : `<span class="pill" style="color:var(--bad)" title="${esc(t.note||'')}">${esc(t.tool)} ✕ unbound</span>`).join(' ');
+    const un = (a.unbound||[]);
+    return `<div class="card" style="margin-bottom:8px">
+      <div class="row"><b>${esc(a.name)}</b><span class="pill ${esc(a.role_bucket)==='corpus'?'ind':'tkt'}">${esc(a.role)} · ${esc(a.role_bucket||'corpus-only')}</span>
+        <span class="pill">${esc(a.model||'runtime 注入')}</span>
+        <span class="meta" style="margin-left:auto">bound ${((a.bound||[]).length)} · unbound ${un.length}</span></div>
+      <div class="meta" style="margin:4px 0">连接器集：${(a.connectors||[]).map(esc).join(' · ') || '—'} ｜ system_prompt: ${esc((a.system_prompt||'').slice(0,72))}…</div>
+      <div style="margin:6px 0">${tools || '<span class="meta">仅语料工具</span>'}</div>
+      ${un.length?`<div class="meta" style="color:var(--warn)">⚠ 未绑定 ${un.length} 个工具 — 在「数据源」里给对应连接器配 slug=源 即可绑定</div>`:''}
+    </div>`;
+  }).join('');
+  return `
+    <div class="kpi-grid" style="margin-bottom:12px">
+      <div class="kpi"><div class="k">Agents</div><div class="v">${sum.agents ?? (m.agents||[]).length}</div></div>
+      <div class="kpi"><div class="k">Bound 工具</div><div class="v" style="color:var(--good)">${(sum.bound_tools||[]).length}</div></div>
+      <div class="kpi"><div class="k">Unbound 工具</div><div class="v" style="color:${(sum.unbound_tools||[]).length?'var(--warn)':'var(--fg)'}">${(sum.unbound_tools||[]).length}</div></div>
+      <div class="kpi"><div class="k">Sandbox / Collection</div><div class="v" style="font-size:.85rem;line-height:1.5">${esc(m.sandbox&&m.sandbox.backend)} · ${esc(m.corpus_collection)}</div></div>
+    </div>
+    ${agents}
+    <div class="card"><h2>权限规则</h2>
+      <div class="meta" style="margin-bottom:6px">审批模式：${esc(m.approval_policy&&m.approval_policy.mode)}（未匹配工具 → ${m.approval_policy&&m.approval_policy.mode==='autonomous'?'DENY':'ASK'}）</div>
+      <div class="meta">ALLOW：${fmtRules(perm.allow)}</div>
+      <div class="meta">DENY：${fmtRules(perm.deny)}</div>
+      <div class="meta">ASK：${fmtRules(perm.ask)}</div>
+    </div>
+    <div class="card"><details><summary>查看完整 manifest JSON</summary><pre>${esc(JSON.stringify(m, null, 2))}</pre></details></div>`;
+}
+
 async function api(path, opts={}) {
   const r = await fetch(API+path, opts);
   if (!r.ok) throw new Error(await r.text());
@@ -1026,6 +1345,7 @@ async function refreshList() {
       </div>
       <div class="meta">id: ${escapeHtml(s.engagement_id)}</div>
     </div>`).join('');
+  if (window.glossify) glossify(el);
 }
 
 async function createEng() {
@@ -1118,6 +1438,7 @@ function renderDetail(s, phases, gates) {
   `;
   document.getElementById('view-detail').innerHTML = html;
   showView('detail');
+  if (window.glossify) glossify(document.getElementById('view-detail'));
 }
 
 function tab(name, el) {
@@ -1242,6 +1563,10 @@ window.addEventListener('hashchange', () => {
   else if (location.hash) go('workbench');
 });
 </script>
+__GLOSSARY__
 </body>
 </html>
 """
+
+_OVERVIEW_HTML = _OVERVIEW_HTML.replace("__GLOSSARY__", _glossary_snippet())
+_DASHBOARD_HTML = _DASHBOARD_HTML.replace("__GLOSSARY__", _glossary_snippet())
