@@ -4,6 +4,7 @@
 """
 
 from .jsonld import schema_to_jsonld, store_to_jsonld
+from .store import OntologyStore
 from .validation import (
     ValidationIssue,
     ValidationReport,
@@ -13,6 +14,7 @@ from .validation import (
 )
 
 __all__ = [
+    "OntologyStore",
     "ValidationIssue",
     "ValidationReport",
     "resolve_imports",
