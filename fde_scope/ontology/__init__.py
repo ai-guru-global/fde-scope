@@ -3,6 +3,7 @@
 零新依赖：pydantic + pyyaml + 标准库；不导入 agentscope（零配置可跑）。
 """
 
+from .jsonld import schema_to_jsonld, store_to_jsonld
 from .validation import (
     ValidationIssue,
     ValidationReport,
@@ -15,6 +16,8 @@ __all__ = [
     "ValidationIssue",
     "ValidationReport",
     "resolve_imports",
+    "schema_to_jsonld",
+    "store_to_jsonld",
     "validate_schema",
     "validate_store",
 ]
