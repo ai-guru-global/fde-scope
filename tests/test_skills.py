@@ -308,3 +308,73 @@ def test_export_slug_falls_back_for_pure_symbols():
 
     files = export_skill(_rec(title="！！！"), "agentscope")
     assert files[0].name == "skill/SKILL.md"
+
+
+# ---------------------------------------------------------------------------
+# P3.2 — concept-expanded search + optional frontmatter concepts line
+# ---------------------------------------------------------------------------
+def _taxonomy():
+    from fde_scope.ontology.store import OntologyStore
+
+    schema = OntologyStore().load_schema("fde-corpus-taxonomy")
+    assert schema is not None
+    return schema
+
+
+def test_search_concept_expands_narrower(service):
+    from fde_scope.skills.models import SkillDraft
+
+    billing = service.create(
+        SkillDraft(title="Billing", category=SkillCategory.RESEARCH, tags=["fde:cc-billing"])
+    )
+    refund = service.create(
+        SkillDraft(title="Refund", category=SkillCategory.IMPLEMENTATION, tags=["fde:cc-billing-refund"])
+    )
+    service.create(SkillDraft(title="Quality", category=SkillCategory.METHODOLOGY, tags=["fde:cc-quality"]))
+
+    hits = service.search(concept="fde:cc-billing", ontology_schema=_taxonomy())
+    assert {r.id for r in hits} == {billing.id, refund.id}  # 查父概念命中子概念技能
+
+    only_quality = service.search(concept="fde:cc-quality", ontology_schema=_taxonomy())
+    assert [r.title for r in only_quality] == ["Quality"]
+
+
+def test_search_concept_without_schema_raises(service):
+    with pytest.raises(ValueError, match="ontology_schema"):
+        service.search(concept="fde:cc-billing")
+
+
+def test_search_without_concept_ignores_ontology(service):
+    """concept=None 时零 ontology 参与，行为与旧签名一致。"""
+    from fde_scope.skills.models import SkillDraft
+
+    rec = service.create(SkillDraft(title="Plain", category=SkillCategory.RESEARCH, tags=["x"]))
+    assert [r.id for r in service.search(query="plain")] == [rec.id]
+
+
+def test_export_with_ontology_adds_concepts_line():
+    from fde_scope.skills.exporters import export_skill
+
+    rec = _rec(title="T", tags=["fde:cc-billing"])
+    files = export_skill(rec, "agentscope", ontology=_taxonomy())
+    content = files[0].content
+    assert "concepts: fde:cc-billing" in content
+    assert content.index("description:") < content.index("concepts:") < content.rindex("---")
+
+
+def test_export_without_ontology_is_byte_identical():
+    from fde_scope.skills.exporters import export_skill
+
+    rec = _rec(title="T", tags=["fde:cc-billing"])
+    files = export_skill(rec, "agentscope")
+    assert files[0].content == "---\nname: t\ndescription: T\n---\n\n# body"
+
+
+def test_export_many_with_ontology_propagates():
+    from fde_scope.skills.exporters import export_many
+
+    recs = [_rec(title="A", tags=["fde:cc-billing"]), _rec(title="B", tags=[])]
+    files = export_many(recs, "agentscope", ontology=_taxonomy())
+    by_name = {f.name: f.content for f in files}
+    assert "concepts: fde:cc-billing" in by_name["a/SKILL.md"]
+    assert "concepts:" not in by_name["b/SKILL.md"]  # 无概念就不写行

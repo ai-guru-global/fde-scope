@@ -11,8 +11,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
+from ..ontology.skills_bridge import skill_concepts
 from .models import SkillRecord
+
+if TYPE_CHECKING:
+    from ..ontology.models import OntologySchema
 
 
 @dataclass
@@ -32,23 +37,34 @@ def _slugify(title: str) -> str:
     return s[:60] or "skill"
 
 
-def _frontmatter(record: SkillRecord) -> str:
-    """按官方格式生成 frontmatter（name/description 必填，QwenPaw 兼容）。"""
-    return f"---\nname: {_slugify(record.title)}\ndescription: {record.title}\n---\n"
+def _frontmatter(record: SkillRecord, ontology: OntologySchema | None = None) -> str:
+    """按官方格式生成 frontmatter（name/description 必填，QwenPaw 兼容）。
+
+    ontology 提供且技能解析出概念时，追加可选 ``concepts:`` 行（官方规范的
+    附加元数据；无概念则不写行）。
+    """
+    fm = f"---\nname: {_slugify(record.title)}\ndescription: {record.title}"
+    if ontology is not None:
+        concepts = skill_concepts(record, ontology)
+        if concepts:
+            fm += f"\nconcepts: {', '.join(concepts)}"
+    return fm + "\n---\n"
 
 
-def export_skill(record: SkillRecord, fmt: str) -> list[ExportFile]:
+def export_skill(record: SkillRecord, fmt: str, ontology: OntologySchema | None = None) -> list[ExportFile]:
     """导出单条技能为指定格式；fmt 仅支持 agentscope / qwenpaw。"""
     if fmt not in ("agentscope", "qwenpaw"):
         raise ValueError(f"unsupported export format: {fmt!r}")
     name = _slugify(record.title)
-    content = _frontmatter(record) + "\n" + record.body_md
+    content = _frontmatter(record, ontology) + "\n" + record.body_md
     return [ExportFile(name=f"{name}/SKILL.md", content=content)]
 
 
-def export_many(records: list[SkillRecord], fmt: str) -> list[ExportFile]:
+def export_many(
+    records: list[SkillRecord], fmt: str, ontology: OntologySchema | None = None
+) -> list[ExportFile]:
     """批量导出（与单条同构，逐个目录条目）。"""
     files: list[ExportFile] = []
     for rec in records:
-        files.extend(export_skill(rec, fmt))
+        files.extend(export_skill(rec, fmt, ontology))
     return files

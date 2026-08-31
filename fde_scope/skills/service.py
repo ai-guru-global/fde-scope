@@ -7,8 +7,14 @@ tags 为"任一命中"；按 updated_at 倒序。过滤在内存中进行（文�
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from ..ontology.skills_bridge import expand_concept, skill_concepts
 from .models import SkillCategory, SkillDraft, SkillPatch, SkillRecord, SkillSource, SkillStatus
 from .store import SkillStore
+
+if TYPE_CHECKING:
+    from ..ontology.models import OntologySchema
 
 
 class SkillService:
@@ -68,8 +74,20 @@ class SkillService:
         gate_slug: str | None = None,
         profile: str | None = None,
         limit: int = 50,
+        concept: str | None = None,
+        ontology_schema: OntologySchema | None = None,
     ) -> list[SkillRecord]:
+        """concept 检索：skill_concepts(rec) ∩ expand_concept(concept) ≠ ∅ 即命中。
+
+        concept=None 时零 ontology 参与（行为与旧签名一致）；concept 非 None
+        而缺 ontology_schema 属调用错误，直接 ValueError。
+        """
         q = (query or "").strip().lower()
+        allowed: set[str] | None = None
+        if concept is not None:
+            if ontology_schema is None:
+                raise ValueError("concept search requires ontology_schema")
+            allowed = expand_concept(concept, ontology_schema)
         tag_set = set(tags or [])
         results = []
         for rec in self.store.load_all():
@@ -87,6 +105,10 @@ class SkillService:
                 continue
             if q and q not in (rec.title + " " + " ".join(rec.tags) + " " + rec.body_md).lower():
                 continue
+            if allowed is not None:
+                assert ontology_schema is not None  # 上方守卫已保证
+                if not allowed.intersection(skill_concepts(rec, ontology_schema)):
+                    continue
             results.append(rec)
         results.sort(key=lambda r: r.updated_at, reverse=True)
         return results[:limit]
