@@ -1086,5 +1086,133 @@ def skill_export(
     console.print(f"✅ 导出 {len(files)} 个文件 → [green]{out_dir}[/green] ({fmt})")
 
 
+# ---------------------------------------------------------------------------
+# ontology（本体语义层：TBox/ABox 校验 + JSON-LD 导出）
+# ---------------------------------------------------------------------------
+ontology_app = typer.Typer(
+    name="ontology", help="[Ontology] 本体 schema/实例库：校验与 JSON-LD 导出.", no_args_is_help=True
+)
+app.add_typer(ontology_app)
+
+
+def _ontology_store():
+    from .ontology.store import OntologyStore
+
+    return OntologyStore()
+
+
+def _print_report(prefix: str, report) -> None:
+    from rich.table import Table
+
+    if report.ok:
+        console.print(f"✅ [green]VALID[/green] — {prefix}")
+        return
+    table = Table(title="Validation errors")
+    table.add_column("code", style="red")
+    table.add_column("subject")
+    table.add_column("message")
+    for e in report.errors:
+        table.add_row(e.code, e.subject, e.message)
+    console.print(table)
+    console.print(f"❌ [red]INVALID[/red] — {len(report.errors)} error(s)")
+
+
+@ontology_app.command("list")
+def ontology_list() -> None:
+    """[Ontology] 列出内置 + 工作区 schema 与实例库."""
+    _banner("ontology list")
+    store = _ontology_store()
+    schemas = store.list_schemas()
+    stores = store.list_stores()
+    console.print(f"[bold]schemas[/bold] ({len(schemas)})")
+    for s in schemas:
+        console.print(
+            f"  {s['id']}@{s['version']}  [{s['origin']}]  classes={s['classes']} "
+            f"obj={s['object_properties']} data={s['data_properties']} schemes={s['concept_schemes']}"
+        )
+    console.print(f"[bold]stores[/bold] ({len(stores)})")
+    for s in stores:
+        console.print(f"  {s['id']}  ref={s['ontology_ref']}  individuals={s['individuals']}")
+    if not schemas and not stores:
+        console.print("  (empty)")
+
+
+@ontology_app.command("validate")
+def ontology_validate(
+    schema_id: str = typer.Argument(..., help="Schema id，如 fde-core"),
+) -> None:
+    """[Ontology] 校验 TBox（含 overlay 的 import 合并视图）. exit 1 = 校验失败."""
+    _banner(f"ontology validate · {schema_id}")
+    store = _ontology_store()
+    schema = store.load_schema(schema_id)
+    if schema is None:
+        console.print(f"[red]Unknown schema:[/red] {schema_id}")
+        raise typer.Exit(2)
+    from .ontology.validation import validate_schema
+
+    report = validate_schema(schema, loader=store.load_schema)
+    _print_report(f"{schema_id}@{schema.version}", report)
+    if not report.ok:
+        raise typer.Exit(1)
+
+
+@ontology_app.command("check")
+def ontology_check(
+    store_id: str = typer.Argument(..., help="Instance store id"),
+) -> None:
+    """[Ontology] 校验 ABox 实例库（对 ontology_ref 指向的 TBox）. exit 1 = 校验失败."""
+    _banner(f"ontology check · {store_id}")
+    inst = _ontology_store().load_store(store_id)
+    if inst is None:
+        console.print(f"[red]Unknown store:[/red] {store_id}")
+        raise typer.Exit(2)
+    from .ontology.validation import validate_store
+
+    report = validate_store(inst, loader=_ontology_store().load_schema)
+    _print_report(f"{store_id} ({inst.ontology_ref})", report)
+    if not report.ok:
+        raise typer.Exit(1)
+
+
+@ontology_app.command("export")
+def ontology_export(
+    target: str = typer.Argument(..., help="Schema 或 store id"),
+    fmt: str = typer.Option("jsonld", "--format", help="输出格式（当前仅 jsonld）"),
+    out: Path | None = typer.Option(None, "--out", "-o", help="写入文件（缺省打印到 stdout）"),
+) -> None:
+    """[Ontology] 导出 JSON-LD（schema 直接导出；store 联同其 TBox 上下文）."""
+    _banner(f"ontology export · {target}")
+    if fmt != "jsonld":
+        console.print(f"[red]Unsupported format:[/red] {fmt} (only jsonld)")
+        raise typer.Exit(2)
+    store = _ontology_store()
+    schema = store.load_schema(target)
+    if schema is not None:
+        from .ontology.jsonld import schema_to_jsonld
+
+        doc = schema_to_jsonld(schema)
+    else:
+        inst = store.load_store(target)
+        if inst is None:
+            console.print(f"[red]Unknown target:[/red] {target}")
+            raise typer.Exit(2)
+        ref_id = inst.ontology_ref.split("@", 1)[0]
+        ref_schema = store.load_schema(ref_id)
+        if ref_schema is None:
+            console.print(f"[red]Store references unknown schema:[/red] {inst.ontology_ref}")
+            raise typer.Exit(2)
+        from .ontology.jsonld import store_to_jsonld
+
+        doc = store_to_jsonld(inst, ref_schema)
+    text = json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True)
+    if out is None:
+        console.print(text)
+    else:
+        from .fsutil import atomic_write_text
+
+        atomic_write_text(out, text + "\n")
+        console.print(f"✅ Exported JSON-LD → [green]{out}[/green]")
+
+
 if __name__ == "__main__":
     main()
