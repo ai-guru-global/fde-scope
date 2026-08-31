@@ -192,7 +192,10 @@ ISA-95 `mfg-overlay` 为包内只读 YAML（狗粮校验：内置本体必须通
 SHACL-lite 校验器）；用户本体/实例库在 `.fde_scope/ontology/` 工作区
 （工作区覆盖内置），全部写入走 `fsutil.atomic_write_text`。JSON-LD 1.1
 导出保证互操作（`ontology export`）。校验返回错误码报告（ONTO-xxx）而非
-异常——记录与谓词分离，与 gate 哲学一致。详见
+异常——记录与谓词分离，与 gate 哲学一致。语义层向两个模块单向桥接：
+corpus（`--ontology` 概念注解 → 概念级覆盖 → 定向合成）与 skills
+（`skills_bridge.py` 检索时推导概念，`--concept` 经 narrower 闭包扩展
+检索、导出可选 `concepts:` frontmatter）；桥接不回写、不持久化。详见
 [`ontology.md`](ontology.md)。
 
 ## 数据流

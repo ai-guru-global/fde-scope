@@ -12,7 +12,9 @@
 | `fde_scope/ontology/validation.py` | SHACL-lite 校验器（错误码 ONTO-xxx）+ overlay import 合并 |
 | `fde_scope/ontology/jsonld.py` | 确定性 JSON-LD 1.1 导出（双语 label 走 language map） |
 | `fde_scope/ontology/store.py` | 内置只读 schema + 工作区 schemas/stores（原子写） |
-| `fde_scope/ontology/data/*.yaml` | 内置本体：`fde-core`（FDE 基础）+ `mfg-overlay`（ISA-95） |
+| `fde_scope/ontology/extract.py` | ConceptExtractor：match_keywords 规则抽取 + 祖先链并入 + LLM 可选（失败回退 rule） |
+| `fde_scope/ontology/skills_bridge.py` | SkillRecord ↔ SKOS 桥接（category 概念 + tag CURIE + narrower 闭包，纯函数） |
+| `fde_scope/ontology/data/*.yaml` | 内置本体：`fde-core`（FDE 基础+技能四类）+ `fde-corpus-taxonomy`（语料概念体系）+ `mfg-overlay`（ISA-95） |
 
 ## 存储布局
 
@@ -50,9 +52,48 @@
 
 ## 分期路线
 
-- **P1（本期）**：核心 + 内置本体 + CLI/Web + 文档。
-- **P2**：`corpus --ontology`——概念注解、概念级覆盖度（祖先合并）、定向合成。
-- **P3**：skills SKOS 桥接——`skills search --concept` 经 broader/narrower 扩展。
+- **P1（已完成）**：核心 + 内置本体 + CLI/Web + 文档。
+- **P2（已完成）**：corpus --ontology——概念注解、概念级覆盖度（祖先合并）、定向合成（见下）。
+- **P3（已完成）**：skills SKOS 桥接——`skill list --concept` 经 broader/narrower 扩展（见下）。
+
+## P2 — 语料引擎语义增强（corpus --ontology）
+
+开启后 forge 管线多出一道注解与一个覆盖维度，全程可关（零行为变化）：
+
+    fde-scope corpus -i tickets.csv --ontology
+
+数据流（`CorpusForge.forge_rows`）：
+
+1. **清洗后的 real items** 逐条经 `ConceptExtractor.annotate` 打上
+   `metadata["ontology_concepts"]`（命中概念 + 祖先链，来源 `rule`/`llm`
+   记入 trace `annotate:{source}`；LLM 缺失/失败诚实回退规则）。
+2. **CoverageAnalyzer** 在类目计数之外计算 `concept_counts`，低于
+   `min_samples_per_category` 的概念进入 `concept_gaps`（写入 JSON 报告）。
+3. **定向合成**：每个概念缺口由「注解了该概念的真实样本」做种子突变
+   （纯规则、seed 固定，确定性）；无真实锚点的概念缺口诚实跳过——
+   不凭空捏造。产物带独立 id 命名空间（`syn-fde:cc-*`）与
+   `synthesize:concept` trace。
+
+CLI 输出在类目缺口下追加概念覆盖行；HTML/JSON 报告同源。
+
+## P3 — 技能库 SKOS 桥接（skill --concept / export --ontology）
+
+桥接是检索时的纯函数推导（`skills_bridge.py`），**不持久化**、不改
+SkillRecord 模型：
+
+- `skill_concepts(record, schema)`：category 映射到 `fde:cat-*` 概念
+  （需 schema 声明 SkillCategoryScheme）+ tags 中已声明的 CURIE；
+  未声明 tag 忽略，不给检索引入幽灵节点。
+- `expand_concept(curie, schema)`：自身 + narrower 递归闭包
+  （独立实现，技能检索不依赖 corpus）。
+
+用法：
+
+    fde-scope skill list --concept fde:cat-implementation   # 类目概念检索（含 narrower 扩展）
+    fde-scope skill export <id> --format agentscope --ontology
+    # → SKILL.md frontmatter 追加可选行: concepts: fde:cat-implementation
+
+`--concept` 查询未声明概念 → exit 2；不带 flag 时行为与旧版逐字节一致。
 
 ## 作者指南（YAML）
 
