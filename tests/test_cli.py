@@ -412,3 +412,37 @@ def test_corpus_ontology_missing_schema_exits_2(
     assert result.exit_code == 2
     assert "fde-corpus-taxonomy" in result.stdout
     assert not out.exists()
+
+
+def test_skill_list_concept_hits_category(tmp_path: Path, monkeypatch) -> None:
+    """--concept 走 fde-core 的 cat-* 概念：查 implementation 只命中该类技能。"""
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["skill", "add", "--title", "Res1", "--category", "research"])
+    runner.invoke(app, ["skill", "add", "--title", "Impl1", "--category", "implementation"])
+    runner.invoke(app, ["skill", "add", "--title", "Meth1", "--category", "methodology"])
+    r = runner.invoke(app, ["skill", "list", "--concept", "fde:cat-implementation"])
+    assert r.exit_code == 0, r.stdout
+    assert "Impl1" in r.stdout
+    assert "Res1" not in r.stdout and "Meth1" not in r.stdout
+
+
+def test_skill_list_unknown_concept_exits_2(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["skill", "add", "--title", "T1", "--category", "research"])
+    r = runner.invoke(app, ["skill", "list", "--concept", "fde:no-such"])
+    assert r.exit_code == 2
+    assert "fde:no-such" in r.stdout
+
+
+def test_skill_export_with_ontology_writes_concepts_line(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["skill", "add", "--title", "Billing", "--category", "implementation"])
+    store = SkillStore(tmp_path / ".fde_scope" / "skills")
+    sid = store.load_all()[0].id
+    out = tmp_path / "out"
+    r = runner.invoke(
+        app, ["skill", "export", sid, "--format", "agentscope", "--out", str(out), "--ontology"]
+    )
+    assert r.exit_code == 0, r.stdout
+    content = (out / "billing" / "SKILL.md").read_text(encoding="utf-8")
+    assert "concepts: fde:cat-implementation" in content

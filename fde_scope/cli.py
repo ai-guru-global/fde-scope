@@ -946,6 +946,9 @@ def skill_list(
     gate: str | None = typer.Option(None, "--gate"),
     phase: str | None = typer.Option(None, "--phase"),
     search: str | None = typer.Option(None, "--search"),
+    concept: str | None = typer.Option(
+        None, "--concept", help="按本体概念检索（含 narrower 扩展，schema=fde-core）"
+    ),
 ) -> None:
     """列出/检索技能。"""
     _banner("skill list")
@@ -958,6 +961,18 @@ def skill_list(
     except ValueError:
         console.print("[red]非法 category/status[/red]")
         raise typer.Exit(2) from None
+    schema = None
+    if concept is not None:
+        from .ontology.store import OntologyStore
+
+        schema = OntologyStore().load_schema("fde-core")
+        if schema is None:
+            console.print("[red]Ontology schema not found:[/red] fde-core")
+            raise typer.Exit(2) from None
+        known = {c.curie for s in schema.concept_schemes for c in s.concepts}
+        if concept not in known:
+            console.print(f"[red]未知概念:[/red] {concept}（fde-core 未声明）")
+            raise typer.Exit(2) from None
     rows = service.search(
         search,
         category=cat,
@@ -966,6 +981,8 @@ def skill_list(
         profile=profile,
         gate_slug=gate,
         phase_slug=phase,
+        concept=concept,
+        ontology_schema=schema,
     )
     if not rows:
         console.print("[yellow]无匹配技能[/yellow]")
@@ -1079,13 +1096,23 @@ def skill_export(
     out: str | None = typer.Option(
         None, "--out", help="输出目录（默认 <data root>/.fde_scope/skills/export）"
     ),
+    ontology: bool = typer.Option(False, "--ontology", help="frontmatter 附带本体概念行（schema=fde-core）"),
 ) -> None:
     """导出技能为 AgentScope / QwenPaw 格式。"""
     from .skills.exporters import export_skill
 
+    schema = None
+    if ontology:
+        from .ontology.store import OntologyStore
+
+        schema = OntologyStore().load_schema("fde-core")
+        if schema is None:
+            console.print("[red]Ontology schema not found:[/red] fde-core")
+            raise typer.Exit(2) from None
+
     try:
         rec = _skill_service().get(skill_id)
-        files = export_skill(rec, fmt)
+        files = export_skill(rec, fmt, ontology=schema)
     except KeyError:
         console.print(f"[red]技能不存在:[/red] {skill_id}")
         raise typer.Exit(2) from None
