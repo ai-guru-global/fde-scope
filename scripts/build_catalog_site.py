@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import posixpath
 import re
@@ -25,98 +26,162 @@ OUT = SITE / "index.html"
 ZONES = [
     ("zone-a-pre-engagement", "Zone A · Pre-engagement", "调研 · 摸底 · 干系人 · 成功标准", "#6366f1"),
     ("zone-b-build", "Zone B · Build", "数据接入 · 语料 · 原型 · 验证 · 部署 · 评估", "#0ea5e9"),
-    ("zone-c-operationalization", "Zone C · Operationalization", "SLO · 监控 · 排障 · 事件 · 训练迭代", "#f59e0b"),
+    (
+        "zone-c-operationalization",
+        "Zone C · Operationalization",
+        "SLO · 监控 · 排障 · 事件 · 训练迭代",
+        "#f59e0b",
+    ),
     ("zone-d-handoff", "Zone D · Handoff", "文档 · 培训 · 移交演示", "#10b981"),
     ("cross-cutting", "横切 · 元能力", "skill 工程 · 评审 · 计划 · 调度 · 平台套件", "#8b5cf6"),
+    ("mcp", "MCP · 服务器", "浏览器 · 抓取 · 云端 · 桌面 · 知识库 · 文档", "#e11d48"),
+    ("tools", "工具 · 内置", "执行层全景 · 使用纪律", "#64748b"),
 ]
 
 # (标题, 说明, [(展示名, 相对 catalog 的页面路径)])；构建时校验目标存在
 SCENARIOS = [
-    ("接手陌生系统", "wiki 化摸底 → 证据建模 → 根因排查", [
-        ("zread", "zone-a-pre-engagement/zread.md"),
-        ("architecture-visualization 套件", "cross-cutting/architecture-visualization-suite.md"),
-        ("investigate", "zone-c-operationalization/investigate.md"),
-        ("qmind-knowledge", "zone-a-pre-engagement/qmind-knowledge.md"),
-    ]),
-    ("客户调研摸底", "联网检索 → 抽取 → 入知识库 → 需求探索", [
-        ("firecrawl-search", "zone-a-pre-engagement/firecrawl-search.md"),
-        ("firecrawl-scrape", "zone-a-pre-engagement/firecrawl-scrape.md"),
-        ("firecrawl-parse", "zone-a-pre-engagement/firecrawl-parse.md"),
-        ("qmind-knowledge", "zone-a-pre-engagement/qmind-knowledge.md"),
-        ("brainstorming", "zone-a-pre-engagement/brainstorming.md"),
-    ]),
-    ("方案书与选型", "模型决策 → 讲清楚 → 画出来 → 交付格式", [
-        ("huggingface-best", "zone-b-build/huggingface-best.md"),
-        ("bailian-cli 家族", "cross-cutting/bailian-cli.md"),
-        ("architecture-communicator", "zone-a-pre-engagement/architecture-communicator.md"),
-        ("drawio", "zone-a-pre-engagement/drawio.md"),
-        ("pptx", "zone-d-handoff/pptx.md"),
-    ]),
-    ("数据接入与语料", "画像 → 转换 → 挂库 → 查询 → 协议接入", [
-        ("read-file", "zone-b-build/read-file.md"),
-        ("convert-file", "zone-b-build/convert-file.md"),
-        ("attach-db", "zone-b-build/attach-db.md"),
-        ("query", "zone-b-build/query.md"),
-        ("mqtt-development", "zone-b-build/mqtt-development.md"),
-        ("firecrawl-crawl", "zone-a-pre-engagement/firecrawl-crawl.md"),
-    ]),
-    ("训练与评估", "数据集 → 嵌入训练 → 本地评测 → 闭环", [
-        ("huggingface-datasets", "zone-b-build/huggingface-datasets.md"),
-        ("train-sentence-transformers", "zone-b-build/train-sentence-transformers.md"),
-        ("huggingface-community-evals", "zone-b-build/huggingface-community-evals.md"),
-        ("phoenix-evals", "zone-b-build/phoenix-evals.md"),
-        ("bailian-train-deploy", "zone-b-build/bailian-train-deploy.md"),
-    ]),
-    ("部署上线", "本地推理 → 容器 → 编排 → IaC → 快速 demo", [
-        ("huggingface-local-models", "zone-b-build/huggingface-local-models.md"),
-        ("vllm-deploy-docker", "zone-b-build/vllm-deploy-docker.md"),
-        ("docker-build-deploy", "zone-b-build/docker-build-deploy.md"),
-        ("kubernetes-specialist", "zone-b-build/kubernetes-specialist.md"),
-        ("alibabacloud-spec-ops-suite", "zone-b-build/alibabacloud-spec-ops-suite.md"),
-        ("vercel-deploy", "zone-b-build/vercel-deploy.md"),
-    ]),
-    ("运维与排障", "根因 → 浏览器取证 → 可观测性 → AIOps", [
-        ("investigate", "zone-c-operationalization/investigate.md"),
-        ("systematic-debugging", "zone-c-operationalization/systematic-debugging.md"),
-        ("chrome-devtools", "zone-c-operationalization/chrome-devtools.md"),
-        ("datadog", "zone-c-operationalization/datadog.md"),
-        ("sentry-mcp", "zone-c-operationalization/sentry-mcp.md"),
-        ("starops", "zone-c-operationalization/starops.md"),
-    ]),
-    ("文档与移交", "补文档 → 出版级 PDF → 规范 → 课程 → 播客", [
-        ("document-generate", "zone-d-handoff/document-generate.md"),
-        ("make-pdf", "zone-d-handoff/make-pdf.md"),
-        ("anthropic-documentation", "zone-d-handoff/anthropic-documentation.md"),
-        ("slidev", "zone-d-handoff/slidev.md"),
-        ("shifu", "zone-d-handoff/shifu.md"),
-        ("podcast", "zone-d-handoff/podcast.md"),
-    ]),
-    ("工程纪律（横切）", "计划 → 执行 → 评审 → 安全 → 生态与调度", [
-        ("writing-plans", "cross-cutting/writing-plans.md"),
-        ("executing-plans", "cross-cutting/executing-plans.md"),
-        ("code-review", "cross-cutting/code-review.md"),
-        ("security-scan", "cross-cutting/security-scan.md"),
-        ("skill-discovery", "cross-cutting/skill-discovery.md"),
-        ("using-git-worktrees", "cross-cutting/using-git-worktrees.md"),
-        ("schedule", "cross-cutting/schedule.md"),
-        ("cloud-agents", "cross-cutting/cloud-agents.md"),
-    ]),
+    (
+        "新人第一周",
+        "三层能力模型 → 工具纪律 → 会话方法论 → 按 Zone 补场景",
+        [
+            ("内置工具总览", "tools/overview.md"),
+            ("使用纪律", "tools/discipline.md"),
+            ("MCP 服务器总览", "mcp/overview.md"),
+            ("skill-discovery", "cross-cutting/skill-discovery.md"),
+            ("using-superpowers-family", "cross-cutting/using-superpowers-family.md"),
+        ],
+    ),
+    (
+        "接手陌生系统",
+        "wiki 化摸底 → 证据建模 → 根因排查",
+        [
+            ("zread", "zone-a-pre-engagement/zread.md"),
+            ("architecture-visualization 套件", "cross-cutting/architecture-visualization-suite.md"),
+            ("investigate", "zone-c-operationalization/investigate.md"),
+            ("qmind-knowledge", "zone-a-pre-engagement/qmind-knowledge.md"),
+        ],
+    ),
+    (
+        "客户调研摸底",
+        "联网检索 → 抽取 → 入知识库 → 需求探索",
+        [
+            ("firecrawl-search", "zone-a-pre-engagement/firecrawl-search.md"),
+            ("firecrawl-scrape", "zone-a-pre-engagement/firecrawl-scrape.md"),
+            ("firecrawl-parse", "zone-a-pre-engagement/firecrawl-parse.md"),
+            ("qmind-knowledge", "zone-a-pre-engagement/qmind-knowledge.md"),
+            ("brainstorming", "zone-a-pre-engagement/brainstorming.md"),
+        ],
+    ),
+    (
+        "方案书与选型",
+        "模型决策 → 讲清楚 → 画出来 → 交付格式",
+        [
+            ("huggingface-best", "zone-b-build/huggingface-best.md"),
+            ("bailian-cli 家族", "cross-cutting/bailian-cli.md"),
+            ("architecture-communicator", "zone-a-pre-engagement/architecture-communicator.md"),
+            ("drawio", "zone-a-pre-engagement/drawio.md"),
+            ("pptx", "zone-d-handoff/pptx.md"),
+        ],
+    ),
+    (
+        "数据接入与语料",
+        "画像 → 转换 → 挂库 → 查询 → 协议接入",
+        [
+            ("read-file", "zone-b-build/read-file.md"),
+            ("convert-file", "zone-b-build/convert-file.md"),
+            ("attach-db", "zone-b-build/attach-db.md"),
+            ("query", "zone-b-build/query.md"),
+            ("mqtt-development", "zone-b-build/mqtt-development.md"),
+            ("firecrawl-crawl", "zone-a-pre-engagement/firecrawl-crawl.md"),
+        ],
+    ),
+    (
+        "训练与评估",
+        "数据集 → 嵌入训练 → 本地评测 → 闭环",
+        [
+            ("huggingface-datasets", "zone-b-build/huggingface-datasets.md"),
+            ("train-sentence-transformers", "zone-b-build/train-sentence-transformers.md"),
+            ("huggingface-community-evals", "zone-b-build/huggingface-community-evals.md"),
+            ("phoenix-evals", "zone-b-build/phoenix-evals.md"),
+            ("bailian-train-deploy", "zone-b-build/bailian-train-deploy.md"),
+        ],
+    ),
+    (
+        "部署上线",
+        "本地推理 → 容器 → 编排 → IaC → 快速 demo",
+        [
+            ("huggingface-local-models", "zone-b-build/huggingface-local-models.md"),
+            ("vllm-deploy-docker", "zone-b-build/vllm-deploy-docker.md"),
+            ("docker-build-deploy", "zone-b-build/docker-build-deploy.md"),
+            ("kubernetes-specialist", "zone-b-build/kubernetes-specialist.md"),
+            ("alibabacloud-spec-ops-suite", "zone-b-build/alibabacloud-spec-ops-suite.md"),
+            ("vercel-deploy", "zone-b-build/vercel-deploy.md"),
+        ],
+    ),
+    (
+        "运维与排障",
+        "根因 → 浏览器取证 → 可观测性 → AIOps",
+        [
+            ("investigate", "zone-c-operationalization/investigate.md"),
+            ("systematic-debugging", "zone-c-operationalization/systematic-debugging.md"),
+            ("chrome-devtools", "zone-c-operationalization/chrome-devtools.md"),
+            ("datadog", "zone-c-operationalization/datadog.md"),
+            ("sentry-mcp", "zone-c-operationalization/sentry-mcp.md"),
+            ("starops", "zone-c-operationalization/starops.md"),
+        ],
+    ),
+    (
+        "文档与移交",
+        "补文档 → 出版级 PDF → 规范 → 课程 → 播客",
+        [
+            ("document-generate", "zone-d-handoff/document-generate.md"),
+            ("make-pdf", "zone-d-handoff/make-pdf.md"),
+            ("anthropic-documentation", "zone-d-handoff/anthropic-documentation.md"),
+            ("slidev", "zone-d-handoff/slidev.md"),
+            ("shifu", "zone-d-handoff/shifu.md"),
+            ("podcast", "zone-d-handoff/podcast.md"),
+        ],
+    ),
+    (
+        "工程纪律（横切）",
+        "计划 → 执行 → 评审 → 安全 → 生态与调度",
+        [
+            ("writing-plans", "cross-cutting/writing-plans.md"),
+            ("executing-plans", "cross-cutting/executing-plans.md"),
+            ("code-review", "cross-cutting/code-review.md"),
+            ("security-scan", "cross-cutting/security-scan.md"),
+            ("skill-discovery", "cross-cutting/skill-discovery.md"),
+            ("using-git-worktrees", "cross-cutting/using-git-worktrees.md"),
+            ("schedule", "cross-cutting/schedule.md"),
+            ("cloud-agents", "cross-cutting/cloud-agents.md"),
+        ],
+    ),
 ]
 
 
 # --------------------------------------------------------------------------- README 解析
 
+
 def parse_readme() -> dict[str, list[tuple[str, str, str, str]]]:
-    """分区标题 -> [(名称, 相对路径, 状态, 一句话)]，按 README 表格顺序。"""
+    """分区标题 -> [(名称, 相对路径, 状态, 一句话)]，按 README 表格顺序；key 是目录 id。"""
     text = (CATALOG / "README.md").read_text(encoding="utf-8")
     sections: dict[str, list[tuple[str, str, str, str]]] = {}
     current: str | None = None
     row_re = re.compile(r"^\|\s*\[([^\]]+)\]\(([^)]+)\)\s*\|\s*(✅|📦|⚰️)\s*\|\s*(.+?)\s*\|\s*$")
-    head_re = re.compile(r"^##\s+(Zone [A-D]|横切)")
+    head_re = re.compile(r"^##\s+(Zone [A-D]|横切|MCP · 服务器工具面|工具 · 内置)")
+    head_key = {
+        "Zone A": "zone-a-pre-engagement",
+        "Zone B": "zone-b-build",
+        "Zone C": "zone-c-operationalization",
+        "Zone D": "zone-d-handoff",
+        "横切": "cross-cutting",
+        "MCP · 服务器工具面": "mcp",
+        "工具 · 内置": "tools",
+    }
     for line in text.splitlines():
         m = head_re.match(line)
         if m:
-            current = m.group(1)
+            current = head_key[m.group(1)]
             sections.setdefault(current, [])
             continue
         if current:
@@ -126,19 +191,17 @@ def parse_readme() -> dict[str, list[tuple[str, str, str, str]]]:
     return sections
 
 
-README_KEY = {"Zone A": "Zone A", "Zone B": "Zone B", "Zone C": "Zone C", "Zone D": "Zone D", "横切": "横切"}
-
-
 # --------------------------------------------------------------------------- 极简 Markdown 渲染
 
 CODE_FENCE = re.compile(r"^```")
 
 
 def render_inline(text: str, page_rel: str, page_set: set[str]) -> str:
-    """转义后的行内文本 -> HTML（代码/加粗/链接）。"""
+    """行内文本 -> HTML：先整体转义，再做代码/加粗/链接变换（escape-then-transform）。"""
     parts = re.split(r"(`[^`]+`)", text)
     out: list[str] = []
     for part in parts:
+        part = html.escape(part, quote=True)
         if part.startswith("`") and part.endswith("`") and len(part) > 1:
             out.append(f"<code>{part[1:-1]}</code>")
             continue
@@ -172,14 +235,14 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
     def flush_para():
         nonlocal para
         if para:
-            body = "<br>".join(render_inline(l, page_rel, page_set) for l in para)
+            body = "<br>".join(render_inline(ln, page_rel, page_set) for ln in para)
             html.append(f"<p>{body}</p>")
             para = []
 
     def flush_quote():
         nonlocal quote
         if quote:
-            body = "<br>".join(render_inline(l, page_rel, page_set) for l in quote)
+            body = "<br>".join(render_inline(ln, page_rel, page_set) for ln in quote)
             html.append(f'<div class="page-meta">{body}</div>')
             quote = []
 
@@ -205,6 +268,16 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
             html.append("<ul>" + "".join(f"<li>{i}</li>" for i in ul) + "</ul>")
             ul = []
 
+    def flush_all():
+        flush_para()
+        flush_quote()
+        flush_table()
+        flush_ul()
+
+    def flush_text():
+        flush_para()
+        flush_ul()
+
     for raw in md.splitlines():
         line = raw.rstrip()
         if fence:
@@ -214,33 +287,33 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
                 fence = False
             continue
         if CODE_FENCE.match(line):
-            flush_para(); flush_quote(); flush_table(); flush_ul()
-            html.append('<pre><code>')
+            flush_all()
+            html.append("<pre><code>")
             fence = True
             continue
         if line.startswith("|"):
-            flush_para(); flush_quote(); flush_ul()
+            flush_text()
             table.append(line)
             continue
         flush_table()
         if line.startswith("> "):
-            flush_para(); flush_ul()
+            flush_text()
             quote.append(line[2:])
             continue
         flush_quote()
         if not line:
-            flush_para(); flush_ul()
+            flush_text()
             continue
         if line.startswith("### "):
-            flush_para(); flush_ul()
+            flush_text()
             html.append(f"<h3>{render_inline(line[4:], page_rel, page_set)}</h3>")
             continue
         if line.startswith("## "):
-            flush_para(); flush_ul()
+            flush_text()
             html.append(f"<h2>{render_inline(line[3:], page_rel, page_set)}</h2>")
             continue
         if line.startswith("# "):
-            flush_para(); flush_ul()
+            flush_text()
             html.append(f"<h1>{render_inline(line[2:], page_rel, page_set)}</h1>")
             continue
         m = re.match(r"^(\s*)[-*]\s+(.*)$", line)
@@ -254,21 +327,16 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
             ul.append(render_inline(m.group(1), page_rel, page_set))
             continue
         para.append(line)
-    flush_para(); flush_quote(); flush_table(); flush_ul()
+    flush_all()
     return "\n".join(html)
 
 
 # --------------------------------------------------------------------------- 组装数据
 
+
 def build_data() -> dict:
     readme = parse_readme()
-    zone_rows = {
-        "zone-a-pre-engagement": readme.get("Zone A", []),
-        "zone-b-build": readme.get("Zone B", []),
-        "zone-c-operationalization": readme.get("Zone C", []),
-        "zone-d-handoff": readme.get("Zone D", []),
-        "cross-cutting": readme.get("横切", []),
-    }
+    zone_rows = {zone_id: readme.get(zone_id, []) for zone_id, *_ in ZONES}
     page_set = {path[:-3] for rows in zone_rows.values() for _, path, _, _ in rows}
 
     zones = []
@@ -277,16 +345,31 @@ def build_data() -> dict:
         skills = []
         for name, rel, status, blurb in zone_rows[zone_id]:
             page_file = CATALOG / rel
-            md = page_file.read_text(encoding="utf-8") if page_file.exists() else f"# {name}\n\n页面缺失：{rel}"
+            md = (
+                page_file.read_text(encoding="utf-8")
+                if page_file.exists()
+                else f"# {name}\n\n页面缺失：{rel}"
+            )
             page_rel = posixpath.splitext(rel)[0]
-            skills.append({"name": name, "route": page_rel, "status": status, "blurb": blurb})
-            all_pages.append({
-                "route": page_rel,
-                "zone": label,
-                "zoneId": zone_id,
-                "status": status,
-                "html": render_markdown(md, page_rel, page_set),
-            })
+            # name/blurb 转录自 README（含第三方 skill 简介），route 进 href 与
+            # JS 模板串：统一在此处转义，portal JS 直接注入，不再有第二层转义。
+            skills.append(
+                {
+                    "name": html.escape(name),
+                    "route": html.escape(page_rel),
+                    "status": status,
+                    "blurb": html.escape(blurb),
+                }
+            )
+            all_pages.append(
+                {
+                    "route": html.escape(page_rel),
+                    "zone": label,
+                    "zoneId": zone_id,
+                    "status": status,
+                    "html": render_markdown(md, page_rel, page_set),
+                }
+            )
         zones.append({"id": zone_id, "label": label, "tag": tag, "accent": accent, "skills": skills})
 
     scenarios = []
@@ -294,10 +377,13 @@ def build_data() -> dict:
         missing = [rel for _, rel in items if rel[:-3] not in page_set]
         if missing:
             raise SystemExit(f"场景「{title}」引用了不存在的页面：{missing}")
-        scenarios.append({
-            "title": title, "desc": desc,
-            "items": [{"name": n, "route": rel[:-3]} for n, rel in items],
-        })
+        scenarios.append(
+            {
+                "title": title,
+                "desc": desc,
+                "items": [{"name": n, "route": rel[:-3]} for n, rel in items],
+            }
+        )
 
     installed = sum(1 for p in all_pages if p["status"] == "✅")
     installable = sum(1 for p in all_pages if p["status"] == "📦")
@@ -415,7 +501,6 @@ const DATA = JSON.parse(document.getElementById('catalog-data').textContent);
 const PAGES = {}; DATA.pages.forEach((p,i)=>{PAGES[p.route]=i;});
 const app = document.getElementById('app');
 
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
 function badge(st){
   const cls = st==='✅' ? 'ok' : (st==='📦' ? 'pkg' : 'dead');
   const txt = st==='✅' ? '已安装' : (st==='📦' ? '可安装' : '已移除');
@@ -425,7 +510,7 @@ function nav(){
   return `<nav class="nav">
     <div class="brand" onclick="location.hash='#/'">FDE Skills <span>手册库</span></div>
     <div class="zlinks">${DATA.zones.map(z=>`<a href="#/" onclick="goZone('${z.id}')">${z.label.split('·')[0].trim()}</a>`).join('')}</div>
-    <input id="q" type="search" placeholder="搜索 89+ skills…" oninput="onSearch(this.value)">
+    <input id="q" type="search" placeholder="搜索 ${DATA.stats.total} 页 skills / tools / MCP…" oninput="onSearch(this.value)">
   </nav>`;
 }
 function goZone(id){ location.hash='#/'; setTimeout(()=>{const el=document.getElementById('zone-'+id); if(el) el.scrollIntoView({behavior:'smooth'});},30); }
@@ -435,9 +520,9 @@ function home(){
   return `${nav()}
   <header class="hero">
     <h1>FDE Skills 手册库</h1>
-    <p>每个 skill 一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。按 FDE 四阶段 + 横切元能力组织，先选场景，再进页面。</p>
+    <p>每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。</p>
     <div class="stats">
-      <span class="stat"><b>${s.total}</b>个 skill 档案</span>
+      <span class="stat"><b>${s.total}</b>页能力档案</span>
       <span class="stat"><b>${s.installed}</b>已安装</span>
       <span class="stat"><b>${s.installable}</b>可安装</span>
       <span class="stat"><b>${s.zoneCount}</b>大区</span>
@@ -453,7 +538,7 @@ function home(){
       </div>
     </div>
     <div id="zones-sec" style="margin-top:40px">
-      <div class="section-h"><h2>按阶段浏览</h2><p>FDE 四 Zone + 横切元能力</p></div>
+      <div class="section-h"><h2>按阶段浏览</h2><p>FDE 四 Zone + 横切元能力 + MCP 服务器 + 内置工具</p></div>
       <div class="zone-grid">
         ${DATA.zones.map(z=>`<div class="zone" id="zone-${z.id}">
           <div class="zh" style="--accent:${z.accent}"><h3>${z.label}</h3><p>${z.tag} · ${z.skills.length} 项</p></div>
@@ -462,7 +547,7 @@ function home(){
       </div>
     </div>
     <div id="all-sec" style="margin-top:40px">
-      <div class="section-h"><h2>全部 skills</h2><p>支持搜索与状态筛选</p></div>
+      <div class="section-h"><h2>全部能力档案</h2><p>支持搜索与状态筛选</p></div>
       <div class="toolbar">
         <button class="chip on" data-f="all" onclick="setFilter(this)">全部</button>
         <button class="chip" data-f="✅" onclick="setFilter(this)">✅ 已安装</button>
@@ -491,7 +576,7 @@ function renderAll(){
     items.push({k,z});
   }));
   grid.innerHTML=items.map(({k,z})=>`<a class="sk" href="#/${k.route}">
-    <div class="t">${k.name} ${badge(k.status)}</div><div class="b">${esc(k.blurb)}</div>
+    <div class="t">${k.name} ${badge(k.status)}</div><div class="b">${k.blurb}</div>
     <div class="z">${z.label}</div></a>`).join('');
   document.getElementById('nohit').style.display=items.length?'none':'block';
   const hit=document.getElementById('hit'); if(hit) hit.textContent=`${items.length} 项`;
@@ -540,7 +625,9 @@ render();
 
 
 def build_html(data: dict) -> str:
-    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+    # <script id="catalog-data"> 的 JSON 块里不能出现任何裸 `<`：否则 `</script>`
+    # 提前闭合、`<!--` + `<script` 吞掉整页。`\u003c` 是合法 JSON 转义，parse 后还原。
+    payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -563,7 +650,9 @@ def main() -> None:
     SITE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(build_html(data), encoding="utf-8")
     s = data["stats"]
-    print(f"OK {OUT.relative_to(ROOT)} ｜ {s['total']} 页（✅ {s['installed']} / 📦 {s['installable']}）｜ {OUT.stat().st_size // 1024} KB")
+    print(
+        f"OK {OUT.relative_to(ROOT)} ｜ {s['total']} 页（✅ {s['installed']} / 📦 {s['installable']}）｜ {OUT.stat().st_size // 1024} KB"
+    )
 
 
 if __name__ == "__main__":

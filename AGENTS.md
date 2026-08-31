@@ -15,8 +15,8 @@ changing engagement, deploy or persistence code. Full context:
    are assigned by the owning service/store. External input must never be
    able to set them (no `SkillDraft.id`, no id-bearing mass assignment).
 3. **Credentials live in env vars only.** API keys flow through the
-   environment (`fde_scope/config.py`); they must never be persisted into
-   manifests, reports, engagement JSON or logs.
+   environment (`fde_scope/llm.py` `_ENV_KEY` / `_env()`); they must never be
+   persisted into manifests, reports, engagement JSON or logs.
 4. **Persisted records are written atomically.** Every on-disk user record
    goes through `fde_scope/fsutil.atomic_write_text` (temp file +
    `os.replace`). Never write user state with bare `Path.write_text`.

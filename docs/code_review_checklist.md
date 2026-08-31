@@ -68,6 +68,16 @@
 
 对应回归测试：`tests/test_llm.py` 中 `# Review fixes` 一节。
 
+## 案例库（2026-08-31 全量质量检查，catalog 构建器）
+
+| # | 严重度 | Bug | 根因类别 |
+|---|---|---|---|
+| 1 | High | `build_catalog_site.py` 把 README 行与页面 .md（转录第三方 skill 简介的**不可信内容**）未经转义直接插值进 Markdown→HTML 管线，任何含 `<img onerror>`/`<script>` 的简介都会成为存储型 XSS | 信任边界/输出转义 |
+| 2 | Low | 同一构建器 JSON payload 只中和 `</`，`<!--` + `<script` 仍可吞掉整页脚本块 | 输出转义 |
+
+修复原则（2026-08-31 落地）：先整体 `html.escape(quote=True)` 再做行内 markdown 变换（escape-then-transform，单一转义点）；JSON 块把所有 `<` 替换为 `\u003c`。对应回归测试：`tests/test_build_catalog_site.py`。
+检查入口：凡是「构建器/生成器把外部转录内容渲染成 HTML 或嵌进 `<script>`」的改动，按存储型 XSS（High）评审。
+
 ## 门禁命令
 
 ```bash
