@@ -10,6 +10,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Code style: formatter](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![GitHub issues](https://img.shields.io/github/issues/ai-guru-global/fde-scope)](https://github.com/ai-guru-global/fde-scope/issues)
+[![GitHub PRs](https://img.shields.io/github/issues-pr/ai-guru-global/fde-scope)](https://github.com/ai-guru-global/fde-scope/pulls)
+[![GitHub Stars](https://img.shields.io/github/stars/ai-guru-global/fde-scope?style=social)](https://github.com/ai-guru-global/fde-scope)
 
 FDE is 2026's hottest AI role (OpenAI, Anthropic, Google, Palantir all build FDE
 teams; listings up ~7× YoY). But every FDE shows up to a customer site and
@@ -33,6 +36,31 @@ Zone A · Pre-engagement  →  Zone B · Build  →  Zone C · Operationalizatio
 
 It is **not** an agent application — it's an FDE's workbench: a CLI, a Web UI,
 and a Python library that turns the SOP from a checklist into enforced engineering.
+
+## 📸 At a glance
+
+![FDE Scope engagement console — engagement dashboard, gate inspector, context cards, corpus forge, KPI explorer and report browser in one page](docs/images/overview.png)
+
+## 📑 Table of contents
+
+- [What makes it different](#-what-makes-it-different)
+- [Quick start](#-quick-start) · [Web UI](#web-ui) · [Mock demo data](#-mock-demo-data)
+- [Feature checklist](#-feature-checklist)
+- [Architecture](#-architecture) · [The 10 phase gates](#the-10-phase-gates) · [Repository layout](#repository-layout)
+- [Engineering best practices](#-engineering-best-practices-enforced-not-aspirational)
+- [CLI reference](#-cli-reference)
+- [多 Agent 生产（AgentScope 2.0）](#multi-agent)
+- [QwenPaw 集成](#qwenpaw)
+- [Skill 沉淀（Skills / Methodology capture）](#skills-capture)
+- [FDE 工作台（Workbench + 现场记录）](#workbench)
+- [LLM 接入（可选）](#llm)
+- [Tests](#-tests)
+- [Installation](#-installation) · [macOS App](#macos-app)
+- [Documentation](#-documentation)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgements](#-acknowledgements)
 
 ---
 
@@ -112,6 +140,10 @@ A single-page engagement console — no build step, backed by JSON APIs:
 - **Corpus forge** — upload a CSV (≤ 10 MiB) and forge an auditable corpus report.
 - **KPI explorer** — compute profile-specific KPIs over a sample set.
 - **Report browser** — `/reports/` serves generated runbooks and corpus HTML.
+- **Agent deploy preflight** — 🤖 Agent 部署 view (`/console#deploy`): render
+  the per-tenant crew plan (role buckets, bound / unbound tools with reasons,
+  permission rules) via the same `build_deploy_plan` — no AgentScope import,
+  no model call. Linked from the overview page hero and Deploy tile.
 
 **实机截图**（macOS App · universal2 DMG，与 `fde-scope web` 同一控制台）：
 
@@ -182,6 +214,49 @@ carries the full evidence index.
 
 ## 🏗 Architecture
 
+```mermaid
+graph TD
+    subgraph surfaces["Surfaces"]
+        CLI["fde-scope CLI"]
+        WEB["web/ · FastAPI console · 27 routes"]
+        PAW["pawapp/ · QwenPaw plugin · 18 routes"]
+        MAC["macOS App · universal2 DMG"]
+    end
+
+    subgraph engine["SOP engine · engagement/ + profiles/ · zero AgentScope"]
+        PH["18-phase state machine · 4 zones"]
+        GT["10 executable gates · live re-eval on every advance"]
+    end
+
+    subgraph layers["Data & intelligence layers"]
+        L1["1 · connectors/"]
+        L2["2 · corpus/"]
+        L3["3 · deploy/ · AgentScope 2.0 (lazy)"]
+        L4["4 · eval/"]
+        L5["5 · flywheel/"]
+    end
+
+    subgraph cross["Cross-cutting"]
+        SK["6 · skills/"]
+        INT["7 · integrations/"]
+        LLM["llm.py · optional LLM egress"]
+    end
+
+    CLI --> PH
+    WEB --> PH
+    PAW --> PH
+    MAC --> PH
+    PH --> GT
+    PH --> L1
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+    L4 --> L5
+    SK -.-> L3
+    INT -.-> PAW
+    LLM -.-> L3
+```
+
 | Layer | Module | Role | agentscope? |
 |---|---|---|---|
 | **SOP** | `engagement/` | 18-phase state machine + 10 enforceable gates + handoff | ❌ |
@@ -196,6 +271,33 @@ carries the full evidence index.
 | **Web** | `web/` | FastAPI engagement console (27 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
+
+### Repository layout
+
+```
+fde-scope/
+├── fde_scope/            # the Python package — layers map to the table above
+│   ├── engagement/       # 18-phase SOP state machine + 10 gates + handoff (no AgentScope)
+│   ├── profiles/         # ticket / manufacturing scenario profiles
+│   ├── connectors/       # 10 data-source connectors (CSV … Historian + document parsers)
+│   ├── corpus/           # PII scrub → dedup → quality gate → synthesis → report
+│   ├── deploy/           # three-pillar runtime assembly on AgentScope 2.0 (lazy import)
+│   ├── eval/             # ticket metrics + industrial KPIs + bad-case miner
+│   ├── flywheel/         # concept→real event mapping + retrain scheduler
+│   ├── skills/           # methodology capture (draft → published → archived)
+│   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
+│   └── web/              # FastAPI engagement console (27 routes)
+├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
+├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
+├── GTM/                  # product / GTM landing page (single-file HTML)
+├── docs/                 # architecture, SOP, API mapping + 101-page skills catalog
+├── examples/             # quickstart data + seed_mock_engagements.py
+├── samples/              # sample datasets
+├── reports/              # generated runbooks / corpus reports (produced by corpus & seed scripts)
+├── scripts/              # guard scripts (skills-catalog check, …)
+├── tests/                # pytest suite incl. tests/test_architecture_guard.py contracts
+└── .github/workflows/    # CI + release pipelines
+```
 
 ### The 10 phase gates
 
@@ -284,6 +386,8 @@ qwenpaw   [QwenPaw] Export / validate QwenPaw-compatible bundles (agents + skill
 
 ---
 
+<a id="multi-agent"></a>
+
 ## 🤖 多 Agent 生产（AgentScope 2.0）
 
 **装配即真实 Agent。** `tenant_config.yaml` 的 `agents` 段（或 CLI
@@ -354,7 +458,18 @@ fde-scope deploy --tenant acme \
    dry-run / plan 零 AgentScope 依赖。2.0 无 `Agent.stop`，停服用
    `TenantDeployer.stop()`。
 
+**入口（三个渠道，同一 `build_deploy_plan`，输出零分歧）**：
+
+- **Web 控制台** — `fde-scope web` → `/console#deploy`「🤖 Agent 部署」：
+  表单点名 Agent / 选 profile / 填数据源，直接出预检清单；总览页 hero 按钮
+  与 Deploy 模块卡都链向此处；
+- **macOS App（QwenPaw PawApp）** — 同款「🤖 Agent 部署」标签页，走
+  `/api/fde-scope/deploy/plan`，与 Web 控制台同一引擎；
+- **CLI** — `fde-scope deploy --tenant acme … --dry-run`，同一预检的命令行形态。
+
 ---
+
+<a id="qwenpaw"></a>
 
 ## 🐾 QwenPaw 集成
 
@@ -362,11 +477,14 @@ fde-scope deploy --tenant acme \
 把 tenant 的 agent 拓扑导出为 QwenPaw 兼容产物（`config.json` 的 `agents.profiles`
 多 Agent 声明 + `workspaces/{agent_id}/agent.json` + `AGENTS.md` persona +
 published 技能包 + corpus 说明），`qwenpaw validate --out ...` 按官方规则校验
-（必填字段 / agent id 规则 / SKILL.md frontmatter）。ACP 适配：`AcpEndpoint`
+（必填字段 / agent id 规则 / SKILL.md frontmatter）。macOS App（PawApp）
+内的「🤖 Agent 部署」标签页提供同款多 Agent 预检。ACP 适配：`AcpEndpoint`
 基类把 FDE 能力暴露为 QwenPaw ACP runner（`delegate_external_agent`）。
 详见 [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md)。
 
 ---
+
+<a id="skills-capture"></a>
 
 ## 💡 Skill 沉淀（Skills / Methodology capture）
 
@@ -396,6 +514,8 @@ Web UI 暴露完整的 skills API：`GET/POST /api/skills`、`GET/PATCH /api/ski
 
 ---
 
+<a id="workbench"></a>
+
 ## 🖥️ FDE 工作台（Workbench + 现场记录）
 
 `fde-scope web` 打开的单页控制台现在是一个跨项目工作台：
@@ -410,6 +530,8 @@ Web UI 暴露完整的 skills API：`GET/POST /api/skills`、`GET/PATCH /api/ski
 CLI 等价入口：`fde-scope engage journal <id> --kind research --note "..." [--link-skill <sid>]`。
 
 ---
+
+<a id="llm"></a>
 
 ## 🤖 LLM 接入（可选）
 
@@ -474,6 +596,8 @@ pip install -e ".[full]"           # everything (dev + agentscope + mysql + opcu
 
 Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.cli`).
 
+<a id="macos-app"></a>
+
 ### macOS App（双击即用）
 
 ```bash
@@ -505,6 +629,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [`docs/architecture-model/architecture-map.md`](docs/architecture-model/architecture-map.md) — evidence-backed architecture views (L1/L2/L3) + health report + canonical DSL/DOT sources
 - [`docs/skills.md`](docs/skills.md) — 技能沉淀系统：数据模型 / 生命周期 / 三种入口 / 双格式导出
 - [`docs/skills-catalog/README.md`](docs/skills-catalog/README.md) — 101 页 skill 手册库（Zone A–D + 横切 + MCP + 工具），门户 `site/index.html`，`make check-catalog` 门禁 / `make build-site` 重建
+- [`GTM/index.html`](GTM/index.html) — 产品 / GTM 落地页（仓库内单文件：定位、功能/架构/实践清单、实机截图）
 - [`docs/llm_integration.md`](docs/llm_integration.md) — MiMo Token Plan integration: 6 touchpoints, fallback semantics, cost model, testing
 - [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md) — QwenPaw 集成：配置两层结构 / 导出与校验 / PawApp 桌面形态
 - [`pawapp/README.md`](pawapp/README.md) — QwenPaw PawApp 安装/开发/API 契约
@@ -512,6 +637,26 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.x API (measured version matrix)
 - [`docs/fde_playbook.md`](docs/fde_playbook.md) — on-site 72h playbook
 - [`examples/README.md`](examples/README.md) — CSV cold-start walkthrough (quickstart data included)
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Fastest path to a green PR:
+
+```bash
+pip install -e ".[dev]"
+pytest -q                                    # full suite
+ruff check fde_scope tests && ruff format --check fde_scope tests
+pytest tests/test_architecture_guard.py      # contract guards
+```
+
+Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
+
+- Don't weaken the six invariants above; the guard tests fail on purpose when they drift.
+- `engagement/phases.py` (18 phases) and the default gate registry (10 gates) are contract-pinned: changing them requires a deliberate contract update **and** a description in `docs/`.
+- Credentials flow through environment variables only — never persisted into manifests, reports, engagement JSON or logs.
+- Large or risky changes: open an issue / draft PR first so the invariants can be discussed before code lands.
 
 ---
 
@@ -536,3 +681,12 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 ## 📄 License
 
 MIT.
+
+---
+
+## 🙏 Acknowledgements
+
+- [AgentScope 2.0](https://github.com/agentscope-ai/agentscope) — the multi-agent runtime under the deploy layer (three-pillar assembly).
+- QwenPaw — the desktop PawApp host targeted by our plugin (see [QwenPaw 集成](#qwenpaw)).
+- MiMo Token Plan — optional LLM egress, env-var configured with deterministic fallback (see [LLM 接入](#llm)).
+- Ruff — lint & format enforcement across the codebase.
