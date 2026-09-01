@@ -13,7 +13,7 @@ digraph fde_scope_modules {
     subgraph cluster_ui {
         label="UI 层（零 agentscope）"; style=rounded; color="#2563EB"; bgcolor="#EFF6FF";
         cli        [label="cli.py\n(Typer 入口)", fillcolor="#DBEAFE"];
-        web        [label="web/app.py\n(FastAPI, 27 routes)", fillcolor="#DBEAFE"];
+        web        [label="web/app.py\n(FastAPI, 32 routes)", fillcolor="#DBEAFE"];
         pawapp     [label="pawapp/backend/main.py\n(PawApp, 18 routes\n@api/fde-scope)", fillcolor="#DBEAFE"];
     }
 

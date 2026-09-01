@@ -23,7 +23,7 @@ workspace "FDE Scope" "FDE Scope 现状架构模型（current-state，证据见 
 
             cli = container "CLI 工作台" "Typer 命令行：connect/corpus/deploy/eval/flywheel/engage-*/gate-*/handoff/kpi/profiles/web/qwenpaw-*/skill-*" "Python 3.11+ / Typer"
 
-            webConsole = container "Web 控制台" "FastAPI 三视图工作台（workbench 聚合 + journal + skills），27 个路由" "Python / FastAPI (optional extra web)"
+            webConsole = container "Web 控制台" "FastAPI 三视图工作台（workbench 聚合 + journal + skills + ontology 本体库），32 个路由" "Python / FastAPI (optional extra web)"
 
             pawapp = container "PawApp 插件应用" "QwenPaw 桌面形态：后端薄封装 18 路由挂载 /api/fde-scope + 2 个 Agent 工具 + skill_provider" "Python / QwenPaw PawApp SDK"
 

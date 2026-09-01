@@ -144,6 +144,10 @@ A single-page engagement console — no build step, backed by JSON APIs:
   the per-tenant crew plan (role buckets, bound / unbound tools with reasons,
   permission rules) via the same `build_deploy_plan` — no AgentScope import,
   no model call. Linked from the overview page hero and Deploy tile.
+- **Ontology 本体库** — read-only view (`/console#ontology`): browse the built-in
+  TBox schemas (classes / properties / SKOS concept trees, cycle-safe rendering),
+  workspace ABox stores, and preview JSON-LD 1.1 exports via the same
+  implementation as `fde-scope ontology export`.
 
 **实机截图**（macOS App · universal2 DMG，与 `fde-scope web` 同一控制台）：
 
@@ -194,8 +198,8 @@ carries the full evidence index.
 
 **Surfaces**
 
-- [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / qwenpaw / handoff / kpi / web)
-- [x] Web console — FastAPI, 27 routes: workbench + engagement dashboard + journal + skills + corpus forge + KPI explorer
+- [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web)
+- [x] Web console — FastAPI, 32 routes: workbench + engagement dashboard + journal + skills + corpus forge + KPI explorer + ontology 本体库
 - [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 2 agent tools, skill provider
 - [x] macOS app — double-click DMG (universal2, signed/notarized release path, same console as `fde-scope web`)
 
@@ -206,6 +210,7 @@ carries the full evidence index.
 - [x] Eval — ticket metrics + industrial KPIs (OEE / MTBF / FPY / DPMO / grasp success / collision rate) + bad-case miner
 - [x] Flywheel — concept→real event mapping, corpus backflow, retrain scheduler
 - [x] Skills library — draft → published → archived, AgentScope + QwenPaw dual-format export
+- [x] Ontology 语义层 — TBox schemas (fde-core + mfg-overlay ISA-95) + SKOS concept scheme + SHACL-lite validation (ONTO-* codes) + JSON-LD 1.1 export; wired into corpus coverage and skill search
 - [x] Deploy — three-pillar runtime assembly on real AgentScope 2.0 (multi-agent, subagent templates, permission context, honest manifest)
 - [x] Handoff — runbook + eval report + SLO + training material, customer sign-off package
 - [x] Optional LLM — MiMo Token Plan via env var only; every entry point falls back to deterministic rules
@@ -218,7 +223,7 @@ carries the full evidence index.
 graph TD
     subgraph surfaces["Surfaces"]
         CLI["fde-scope CLI"]
-        WEB["web/ · FastAPI console · 27 routes"]
+        WEB["web/ · FastAPI console · 32 routes"]
         PAW["pawapp/ · QwenPaw plugin · 18 routes"]
         MAC["macOS App · universal2 DMG"]
     end
@@ -239,6 +244,7 @@ graph TD
     subgraph cross["Cross-cutting"]
         SK["6 · skills/"]
         INT["7 · integrations/"]
+        ONT["8 · ontology/ · TBox + ABox + JSON-LD"]
         LLM["llm.py · optional LLM egress"]
     end
 
@@ -254,6 +260,8 @@ graph TD
     L4 --> L5
     SK -.-> L3
     INT -.-> PAW
+    ONT -.-> L2
+    ONT -.-> SK
     LLM -.-> L3
 ```
 
@@ -268,7 +276,8 @@ graph TD
 | 5 | `flywheel/` | Concept→real event mapping + collectors + retrain scheduler | ❌ |
 | 6 | `skills/` | Methodology capture (draft → published → archived, dual-format export) | ❌ |
 | 7 | `integrations/` | QwenPaw bundle export + ACP adapter + manifest validator | ❌ |
-| **Web** | `web/` | FastAPI engagement console (27 routes, single-page, JSON APIs) | ❌ |
+| 8 | `ontology/` | Semantic layer: TBox schemas + SKOS concepts + ABox stores, SHACL-lite validation, JSON-LD 1.1 export | ❌ |
+| **Web** | `web/` | FastAPI engagement console (32 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
 
@@ -286,7 +295,8 @@ fde-scope/
 │   ├── flywheel/         # concept→real event mapping + retrain scheduler
 │   ├── skills/           # methodology capture (draft → published → archived)
 │   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
-│   └── web/              # FastAPI engagement console (27 routes)
+│   ├── ontology/         # TBox schemas + SKOS concepts + ABox stores + JSON-LD export (data/*.yaml built-ins)
+│   └── web/              # FastAPI engagement console (32 routes)
 ├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
 ├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
 ├── GTM/                  # product / GTM landing page (single-file HTML)
@@ -381,6 +391,7 @@ web       Launch the Web UI (workbench + skills + engagement console)
 engage    [SOP] init / status / advance / rollback / journal / list
 gate      [SOP] list (per profile) / check (per engagement)
 skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
+ontology  [Ontology] 本体语义层（list / validate / check / export — JSON-LD 1.1）
 qwenpaw   [QwenPaw] Export / validate QwenPaw-compatible bundles (agents + skills + corpus)
 ```
 
@@ -666,7 +677,7 @@ Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
 - [x] Category-stratified train/eval/test split（`CorpusReport.splits`）
 - [ ] MQTT-Sparkplug 真实 broker IO（paho-mqtt）
 - [ ] rosbag2 真实回放（rosbags）
-- [ ] Ontology 模块（横切语义层：TBox + ABox、JSON-LD 标准导出、零新依赖）— [设计已批准](docs/superpowers/specs/2026-08-31-ontology-module-design.md) · [P1 计划（TDD，9 任务）](docs/superpowers/plans/2026-08-31-ontology-module-p1.md)
+- [x] Ontology 模块（横切语义层：TBox + ABox、SKOS 概念体系、SHACL-lite 校验 ONTO-* 错误码、JSON-LD 1.1 标准导出、零新依赖）— [设计文档](docs/superpowers/specs/2026-08-31-ontology-module-design.md) · [使用指南](docs/ontology.md)
 - [x] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
 - [x] 小米 MiMo Token Plan 接入（`fde_scope/llm.py`，env 配置，失败回退规则）
 - [x] Skill 沉淀库（四类分类 + 生命周期 + AgentScope/QwenPaw 双格式导出）
