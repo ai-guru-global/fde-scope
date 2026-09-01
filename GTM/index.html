@@ -703,6 +703,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <div class="crib">
       <div class="crib-row"><span class="crib-label">Name the crew · 点名<span class="zh" lang="zh">名字:角色[:模型]，可重复</span></span><code class="crib-cmd">fde-scope deploy --tenant acme --agent 数据员:数据分析 --agent 日志员:日志分析:qwen3-14b --connector-source csv=sample.csv</code><button class="copybtn" data-copy="fde-scope deploy --tenant acme --agent 数据员:数据分析 --agent 日志员:日志分析:qwen3-14b --connector-source csv=sample.csv">COPY</button></div>
+      <div class="crib-row"><span class="crib-label">Pre-flight · 预检<span class="zh" lang="zh">发车前先看 plan：Web 控制台 /console#deploy「🤖 Agent 部署」（macOS App 同款标签页），同走 build_deploy_plan</span></span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">COPY</button></div>
       <div class="conveyor" aria-label="Agent crew coordination">
         <span class="station"><b>ROSTER</b>real Agent per spec<span class="zh" lang="zh">每个名字一个真实 Agent</span></span><span class="belt"></span>
         <span class="station"><b>SUBAGENT TEMPLATE</b>blueprint → create_app<span class="zh" lang="zh">蓝图注册进真实 app</span></span><span class="belt"></span>
@@ -774,7 +775,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="crib-row"><span class="crib-label">Install · 安装<span class="zh" lang="zh">核心 + 开发 + Web</span></span><code class="crib-cmd">pip install -e ".[dev]"</code><button class="copybtn" data-copy='pip install -e ".[dev]"'>COPY</button></div>
       <div class="crib-row"><span class="crib-label">Seed demo · 种入演示<span class="zh" lang="zh">六个真实感 engagement</span></span><code class="crib-cmd">python examples/seed_mock_engagements.py</code><button class="copybtn" data-copy="python examples/seed_mock_engagements.py">COPY</button></div>
       <div class="crib-row"><span class="crib-label">Open console · 控制台<span class="zh" lang="zh">http://127.0.0.1:8080</span></span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">COPY</button></div>
-      <div class="crib-row"><span class="crib-label">Ontology · 本体库<span class="zh" lang="zh">TBox/ABox/SKOS 浏览与 JSON-LD 导出；Web 控制台 /console#ontology 同款</span></span><code class="crib-cmd">fde-scope ontology list</code><button class="copybtn" data-copy="fde-scope ontology list">COPY</button></div>
+      <div class="crib-row"><span class="crib-label">Ontology · 本体库<span class="zh" lang="zh">TBox/ABox/SKOS 浏览与校验（list/validate/check）；导出 JSON-LD 1.1；Web 控制台 /console#ontology 同款</span></span><code class="crib-cmd">fde-scope ontology export fde-core</code><button class="copybtn" data-copy="fde-scope ontology export fde-core">COPY</button></div>
       <div class="conveyor" aria-label="Skill capture lifecycle">
         <span class="station"><b>SKILL CAPTURE</b>draft<span class="zh" lang="zh">现场沉淀草稿</span></span><span class="belt"></span>
         <span class="station"><b>REVIEW</b>review<span class="zh" lang="zh">审阅队列</span></span><span class="belt"></span>
@@ -859,6 +860,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <a href="https://github.com/ai-guru-global/fde-scope">GitHub</a>
       <a href="../docs/fde_sop_full.md">SOP</a>
       <a href="../docs/architecture.md">Architecture</a>
+      <a href="../docs/ontology.md">Ontology</a>
       <a href="../docs/agentscope_api_mapping.md">AgentScope mapping</a>
       <a href="../LICENSE">MIT License</a>
     </nav>
