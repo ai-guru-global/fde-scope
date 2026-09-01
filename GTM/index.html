@@ -774,6 +774,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="crib-row"><span class="crib-label">Install · 安装<span class="zh" lang="zh">核心 + 开发 + Web</span></span><code class="crib-cmd">pip install -e ".[dev]"</code><button class="copybtn" data-copy='pip install -e ".[dev]"'>COPY</button></div>
       <div class="crib-row"><span class="crib-label">Seed demo · 种入演示<span class="zh" lang="zh">六个真实感 engagement</span></span><code class="crib-cmd">python examples/seed_mock_engagements.py</code><button class="copybtn" data-copy="python examples/seed_mock_engagements.py">COPY</button></div>
       <div class="crib-row"><span class="crib-label">Open console · 控制台<span class="zh" lang="zh">http://127.0.0.1:8080</span></span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">COPY</button></div>
+      <div class="crib-row"><span class="crib-label">Ontology · 本体库<span class="zh" lang="zh">TBox/ABox/SKOS 浏览与 JSON-LD 导出；Web 控制台 /console#ontology 同款</span></span><code class="crib-cmd">fde-scope ontology list</code><button class="copybtn" data-copy="fde-scope ontology list">COPY</button></div>
       <div class="conveyor" aria-label="Skill capture lifecycle">
         <span class="station"><b>SKILL CAPTURE</b>draft<span class="zh" lang="zh">现场沉淀草稿</span></span><span class="belt"></span>
         <span class="station"><b>REVIEW</b>review<span class="zh" lang="zh">审阅队列</span></span><span class="belt"></span>
@@ -805,6 +806,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <li><span><b>Corpus forge</b> — synthesize to fill gaps, not to pad<span class="zh" lang="zh">脱敏→质量门→覆盖度→缺口检测→补盲区合成</span></span></li>
           <li><span><b>Eval + industrial KPI</b><span class="zh" lang="zh">OEE / MTBF / 抓取成功率 / 碰撞率</span></span></li>
           <li><span><b>Skills library</b> — draft→review→publish→export<span class="zh" lang="zh">AgentScope 与 QwenPaw 双格式导出</span></span></li>
+          <li><span><b>Ontology semantic layer</b> — TBox + ABox + JSON-LD 1.1<span class="zh" lang="zh">fde-core + ISA-95 overlay · SKOS 概念体系驱动语料覆盖与技能检索 · ONTO-* 错误码校验</span></span></li>
           <li><span><b>Deploy three-pillar</b> on real AgentScope 2.0<span class="zh" lang="zh">Agent 装配 · 权限上下文 · 沙箱 workspace</span></span></li>
           <li><span><b>Handoff + flywheel</b>, optional MiMo LLM<span class="zh" lang="zh">无 key 全走规则路径，失败自动回退</span></span></li>
         </ul>
@@ -816,8 +818,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <li><span><b>Core layers</b> — data / SOP / profiles / web<span class="zh" lang="zh">零顶层 agentscope 依赖：无 key、无 Docker 五分钟全绿</span></span></li>
           <li><span><b>deploy/</b> — 5 modules lazy-import agentscope<span class="zh" lang="zh">三支柱运行时组装，optional extra</span></span></li>
           <li><span><b>connectors/documents.py</b><span class="zh" lang="zh">PDF/Word/Excel/PPT 解析延迟用 agentscope.rag</span></span></li>
-          <li><span><b>Cross-cutting</b> — llm · config · templates · paths<span class="zh" lang="zh">唯一 LLM 出口 llm.py；data_root() 四级解析</span></span></li>
-          <li><span><b>4 surfaces</b><span class="zh" lang="zh">CLI · Web 控制台 27 路由 · PawApp 18 路由 · macOS DMG 双击即用</span></span></li>
+          <li><span><b>Cross-cutting</b> — llm · config · ontology · templates · paths<span class="zh" lang="zh">唯一 LLM 出口 llm.py；本体 TBox/ABox/SKOS 原子落盘；data_root() 四级解析</span></span></li>
+          <li><span><b>4 surfaces</b><span class="zh" lang="zh">CLI · Web 控制台 32 路由 · PawApp 18 路由 · macOS DMG 双击即用</span></span></li>
           <li><span><b>Evidence model</b> — docs/architecture-model/<span class="zh" lang="zh">Structurizr DSL + DOT 为事实源，Mermaid 沉淀可读图</span></span></li>
         </ul>
       </div>
