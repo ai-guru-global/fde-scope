@@ -493,8 +493,8 @@ def test_console_has_workbench_and_skills_views(client) -> None:
     assert r.status_code == 200
     assert 'id="view-workbench"' in r.text
     assert 'id="view-skills"' in r.text
-    assert "📊 工作台" in r.text
-    assert "📚 技能库" in r.text
+    assert ">工作台</button>" in r.text
+    assert ">技能库</button>" in r.text
     assert "现场记录" in r.text
     assert "沉淀为技能" in r.text
     assert "草稿审阅队列" in r.text
@@ -539,3 +539,64 @@ def test_deploy_plan_defaults_to_single_agent(client) -> None:
 def test_deploy_plan_rejects_bad_agent_spec(client) -> None:
     r = client.post("/api/deploy/plan", json={"tenant": "acme", "agents": [{"role": "缺名字"}]})
     assert r.status_code == 422
+
+
+def test_ontology_export_api_schema_jsonld(client) -> None:
+    """内置 schema 可直接导出 JSON-LD（与 CLI ontology export 同一实现）。"""
+    r = client.get("/api/ontology/export/fde-core")
+    assert r.status_code == 200
+    doc = r.json()
+    assert "@context" in doc and "@graph" in doc
+
+
+def test_ontology_stores_api_lists_workspace_stores(client) -> None:
+    """store 列表端点供 console 本体库视图使用（id / ontology_ref / individuals）。"""
+    from fde_scope.ontology.models import InstanceStore
+    from fde_scope.ontology.store import OntologyStore
+
+    OntologyStore().save_store(
+        InstanceStore(
+            id="acme-tickets",
+            ontology_ref="fde-core@1.0.0",
+            individuals=[{"curie": "ex:evt-1"}],
+        )
+    )
+    r = client.get("/api/ontology/stores")
+    assert r.status_code == 200
+    entry = next(e for e in r.json() if e["id"] == "acme-tickets")
+    assert entry == {"id": "acme-tickets", "ontology_ref": "fde-core@1.0.0", "individuals": 1}
+
+
+def test_ontology_export_api_store_wraps_tbox(client) -> None:
+    """实例库导出带 TBox 上下文：individuals 来自 store，classes 来自其 ontology_ref。"""
+    from fde_scope.ontology.models import InstanceStore
+    from fde_scope.ontology.store import OntologyStore
+
+    store = OntologyStore()
+    store.save_store(InstanceStore(id="acme-tickets", ontology_ref="fde-core@1.0.0"))
+    r = client.get("/api/ontology/export/acme-tickets")
+    assert r.status_code == 200
+    doc = r.json()
+    assert "@context" in doc and "@graph" in doc
+
+
+def test_ontology_export_api_unknown_target_404(client) -> None:
+    r = client.get("/api/ontology/export/does-not-exist")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "unknown ontology export target: does-not-exist"
+
+
+def test_console_has_ontology_view(client) -> None:
+    """console 提供只读 ontology 视图（导航 + 容器 + 加载器 + hash 路由）。"""
+    html = client.get("/console").text
+    assert 'data-view="ontology"' in html
+    assert 'id="view-ontology"' in html
+    assert "loadOntology" in html
+    assert "location.hash === '#ontology'" in html
+
+
+def test_overview_has_ontology_section(client) -> None:
+    """落地页有 ontology section，并链向 console 的 ontology 视图。"""
+    html = client.get("/").text
+    assert "Ontology 语义层" in html
+    assert 'href="/console#ontology"' in html

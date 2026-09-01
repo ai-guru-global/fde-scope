@@ -501,6 +501,13 @@ def api_ontology_schemas() -> list[dict]:
     return OntologyStore().list_schemas()
 
 
+@app.get("/api/ontology/stores")
+def api_ontology_stores() -> list[dict]:
+    from ..ontology.store import OntologyStore
+
+    return OntologyStore().list_stores()
+
+
 @app.get("/api/ontology/schema/{schema_id}")
 def api_ontology_schema(schema_id: str) -> dict:
     from ..ontology.store import OntologyStore
@@ -519,6 +526,28 @@ def api_ontology_store(store_id: str) -> dict:
     if store is None:
         raise HTTPException(status_code=404, detail=f"unknown ontology store: {store_id}")
     return store.model_dump()
+
+
+@app.get("/api/ontology/export/{target_id}")
+def api_ontology_export(target_id: str) -> dict:
+    """JSON-LD 导出：schema 直出；store 联同其 TBox 上下文（与 CLI ontology export 同语义）。"""
+    from ..ontology.store import OntologyStore
+
+    store = OntologyStore()
+    schema = store.load_schema(target_id)
+    if schema is not None:
+        from ..ontology.jsonld import schema_to_jsonld
+
+        return schema_to_jsonld(schema)
+    inst = store.load_store(target_id)
+    if inst is None:
+        raise HTTPException(status_code=404, detail=f"unknown ontology export target: {target_id}")
+    ref_schema = store.load_schema(inst.ontology_ref.split("@", 1)[0])
+    if ref_schema is None:
+        raise HTTPException(status_code=404, detail=f"store references unknown schema: {inst.ontology_ref}")
+    from ..ontology.jsonld import store_to_jsonld
+
+    return store_to_jsonld(inst, ref_schema)
 
 
 from fastapi.staticfiles import StaticFiles  # noqa: E402
@@ -548,7 +577,7 @@ _GLOSSARY: list[tuple[str, str]] = [
         "谓词式门禁：每次推进阶段都重新评估的条件（如双 sponsor、FAT/SAT 签字），"
         "不通过即拦截，过期结果不作数。",
     ),
-    ("overlay", "叠加层：仅工业 profile 才额外生效的 gate 集合（🏭 标记）。"),
+    ("overlay", "叠加层：仅工业 profile 才额外生效的 gate 集合（工厂小图标标记）。"),
     (
         "FAT/SAT",
         "FAT = Factory Acceptance Test 出厂验收测试；SAT = Site Acceptance Test 现场验收测试，均需客户签字。",
@@ -625,7 +654,7 @@ _GLOSSARY: list[tuple[str, str]] = [
 ]
 
 _GLOSSARY_CSS = """
-.term{position:relative;cursor:help;border-bottom:1px dashed #5a6b85;outline:none}
+.term{position:relative;cursor:help;border-bottom:1px dashed var(--border-strong);outline:none}
 .term:hover,.term:focus{border-bottom-color:var(--accent)}
 .term .q{display:inline-block;width:13px;height:13px;margin-left:3px;border:1px solid var(--muted);
 border-radius:50%;color:var(--muted);font-size:9px;line-height:12px;text-align:center;font-weight:700;
@@ -633,7 +662,7 @@ vertical-align:1px;transition:color .12s,border-color .12s}
 .term:hover .q,.term:focus .q{color:var(--accent);border-color:var(--accent)}
 .term .tip{position:absolute;left:0;bottom:calc(100% + 9px);z-index:999;width:max-content;
 max-width:min(300px,78vw);padding:9px 12px;border-radius:9px;background:var(--panel2);
-border:1px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.5);color:var(--fg);
+border:1px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.3);color:var(--fg);
 font-size:.76rem;line-height:1.6;font-weight:400;letter-spacing:normal;text-transform:none;
 white-space:normal;text-align:left;opacity:0;visibility:hidden;pointer-events:none;
 transform:translateY(5px);transition:opacity .13s ease,transform .13s ease,visibility .13s}
@@ -726,64 +755,123 @@ _OVERVIEW_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · 功能总览</title>
+<script>(function(){var t=null;try{t=localStorage.getItem('fde-theme')}catch(e){}if(!t)t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';document.documentElement.dataset.theme=t})();</script>
 <style>
-:root{--bg:#0b0e14;--panel:#131822;--panel2:#1a2030;--fg:#e6edf3;--muted:#8b98a9;
---accent:#2dd4bf;--warn:#fbbf24;--bad:#f87171;--good:#4ade80;--border:#242c3d;--code:#0d1117}
+/* Hallmark · genre: modern-minimal · macrostructure: long-document · design-system: design.md (Graphite) · designed-as-app */
+:root{--bg:oklch(0.973 0.003 255);--bg2:oklch(1 0 0);--panel:oklch(1 0 0);--panel2:oklch(0.945 0.005 255);
+--fg:oklch(0.225 0.014 255);--muted:oklch(0.47 0.016 255);--faint:oklch(0.52 0.014 255);
+--border:oklch(0.9 0.006 255);--border-strong:oklch(0.8 0.01 255);
+--accent:oklch(0.5 0.095 235);--accent-2:oklch(0.44 0.095 235);--accent-ink:oklch(0.99 0.002 255);--accent-dim:oklch(0.5 0.095 235/0.09);
+--good:oklch(0.51 0.12 152);--warn:oklch(0.53 0.11 75);--bad:oklch(0.55 0.17 25);--code:oklch(0.955 0.004 255);
+--font:-apple-system,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+--mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;color-scheme:light}
+html[data-theme="dark"]{--bg:oklch(0.165 0.012 255);--bg2:oklch(0.2 0.013 255);--panel:oklch(0.2 0.013 255);--panel2:oklch(0.22 0.015 255);
+--fg:oklch(0.93 0.006 255);--muted:oklch(0.68 0.014 255);--faint:oklch(0.61 0.013 255);
+--border:oklch(0.3 0.014 255);--border-strong:oklch(0.4 0.016 255);
+--accent:oklch(0.74 0.085 232);--accent-2:oklch(0.79 0.07 232);--accent-ink:oklch(0.2 0.04 232);--accent-dim:oklch(0.74 0.085 232/0.13);
+--good:oklch(0.76 0.13 152);--warn:oklch(0.8 0.13 85);--bad:oklch(0.7 0.16 25);--code:oklch(0.14 0.012 255);color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,"PingFang SC","Segoe UI",sans-serif;background:var(--bg);color:var(--fg);line-height:1.6}
-header{padding:20px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px}
-header .logo{font-size:1.5rem;font-weight:800}
-header .logo span{color:var(--accent)}
-header .tag{color:var(--accent);font-size:.75rem;background:#0d2e2a;padding:3px 10px;border-radius:6px;font-weight:600}
-header .nav{margin-left:auto;display:flex;gap:6px}
-header .nav a{color:var(--muted);font-size:.85rem;padding:6px 12px;border-radius:6px;border:1px solid transparent}
-header .nav a:hover{color:var(--fg);border-color:var(--border)}
-header .nav a.active{color:var(--accent);border-color:var(--accent)}
-.wrap{max-width:1200px;margin:0 auto;padding:28px 24px}
-.hero{text-align:center;padding:36px 0 28px}
-.hero h2{font-size:1.9rem;margin:0 0 10px;font-weight:800}
-.hero p{color:var(--muted);font-size:1.05rem;margin:0 auto;max-width:680px}
-.hero .cta{margin-top:22px;display:flex;gap:10px;justify-content:center}
-.btn{background:var(--accent);color:#04201d;border:0;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.95rem;text-decoration:none;display:inline-block}
-.btn.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
-.btn:hover{opacity:.9}
-.sec-title{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:36px 0 14px;border-bottom:1px solid var(--border);padding-bottom:8px}
-.sec-note{font-size:.78rem;color:var(--muted);margin:-6px 0 14px;line-height:1.6}
-.grid{display:grid;gap:14px}
-.cols-4{grid-template-columns:repeat(4,1fr)}
-.cols-3{grid-template-columns:repeat(3,1fr)}
-.cols-2{grid-template-columns:repeat(2,1fr)}
-@media(max-width:900px){.cols-4,.cols-3,.cols-2{grid-template-columns:1fr}}
-.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color .15s,transform .15s}
-.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
-.tile .icon{font-size:1.8rem;margin-bottom:8px}
-.tile .name{font-weight:700;font-size:1rem;margin-bottom:4px}
-.tile .desc{color:var(--muted);font-size:.82rem;line-height:1.5}
-.tile .status{display:inline-block;margin-top:8px;padding:1px 8px;border-radius:999px;font-size:.68rem;font-weight:600}
-.s-ok{background:#0f3d2e;color:var(--good)}
-.s-partial{background:#3b2a1a;color:var(--warn)}
-.s-stub{background:#2a1a1a;color:var(--bad)}
-.step-flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0}
-.zone{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin:0 4px;position:relative}
-.zone .ztag{font-size:.7rem;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
-.zone .zname{font-size:.95rem;font-weight:700;margin:4px 0 8px}
-.zone ol{margin:0;padding-left:18px;font-size:.82rem;color:var(--muted)}
-.zone ol li{margin-bottom:3px}
-.zone ol li b{color:var(--fg)}
-.stat{text-align:center;padding:14px;background:var(--panel2);border:1px solid var(--border);border-radius:10px}
-.stat .num{font-size:2rem;font-weight:800;color:var(--accent)}
-.stat .lab{font-size:.78rem;color:var(--muted)}
-.kpi-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.85rem}
+html,body{overflow-x:clip}
+body{margin:0;font:400 15px/1.65 var(--font);background:var(--bg);color:var(--fg)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important;scroll-behavior:auto!important}}
+a{color:var(--accent);text-decoration:none}
+.ic,.ic-xs{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic{width:16px;height:16px}.ic-xs{width:13px;height:13px}
+.mk-g{color:var(--accent)}.mk-w{color:var(--warn)}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+padding:11px 24px;border-bottom:1px solid var(--border);background:var(--bg);
+background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.logo{font-size:1.08rem;font-weight:700;letter-spacing:-.01em}
+.logo span{color:var(--accent)}
+.tag{font:600 11px/1 var(--mono);color:var(--accent);background:var(--accent-dim);padding:5px 10px;border-radius:999px;white-space:nowrap}
+.nav{margin-left:auto;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.nav a{color:var(--muted);font-size:.85rem;padding:6px 10px;border-radius:7px;transition:color .15s,background-color .15s}
+.nav a:hover{color:var(--fg);background:var(--panel2)}
+.nav a.active{color:var(--accent);background:var(--accent-dim)}
+.tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;
+border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s}
+.tbtn:hover{color:var(--fg);border-color:var(--border-strong)}
+.when-dark{display:none}
+html[data-theme="dark"] .when-light{display:none}
+html[data-theme="dark"] .when-dark{display:inline}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px 44px}
+.hero{padding:58px 0 38px;max-width:760px}
+.hero .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 16px}
+.hero h2{font-size:clamp(30px,4.5vw,42px);font-weight:680;letter-spacing:-.022em;line-height:1.12;margin:0 0 14px;overflow-wrap:anywhere;min-width:0}
+.hero p{color:var(--muted);font-size:1.02rem;margin:0;max-width:660px}
+.hero .cta{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;background:var(--accent);color:var(--accent-ink);border:1px solid transparent;
+padding:9px 16px;border-radius:7px;font-weight:600;font-size:.9rem;font-family:inherit;text-decoration:none;cursor:pointer;
+transition:background-color .15s,border-color .15s,color .15s}
+.btn:hover{background:var(--accent-2)}
+.btn.ghost{background:transparent;border-color:var(--border);color:var(--fg)}
+.btn.ghost:hover{border-color:var(--border-strong);background:var(--panel2)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--border);
+border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.stat{background:var(--bg2);padding:16px 18px}
+.stat .num{font-size:1.9rem;font-weight:700;line-height:1.1;letter-spacing:-.02em;color:var(--accent)}
+.stat .lab{font-size:.78rem;color:var(--muted);margin-top:3px}
+section{padding-top:44px}
+.sec-head{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.sec-head .ic{color:var(--accent)}
+.sec-head h2{margin:0;font-size:19px;font-weight:650;letter-spacing:-.01em;min-width:0;overflow-wrap:anywhere}
+.sec-head .n{font:600 11px/1 var(--mono);color:var(--faint);margin-left:auto;letter-spacing:.1em}
+.sec-note{font-size:.8rem;color:var(--muted);margin:0 0 14px;line-height:1.7;max-width:780px}
+.grid{display:grid;gap:10px}
+.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px 16px;transition:border-color .15s;min-width:0}
+.tile:hover{border-color:var(--border-strong)}
+.tile>.ic{color:var(--muted);margin-bottom:9px}
+.tile .name{font-weight:600;font-size:.95rem;margin-bottom:4px;overflow-wrap:anywhere;min-width:0}
+.tile.mono .name{font:600 .82rem/1.55 var(--mono)}
+.tile .name .ic-xs{vertical-align:-2px;margin-left:3px}
+.tile .desc{color:var(--muted);font-size:.82rem;line-height:1.55}
+.tile .desc a{white-space:nowrap}
+.status{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:2px 9px;border:1px solid var(--border);
+border-radius:999px;font:500 11px/1.6 var(--mono);color:var(--muted)}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+.s-ok::before{background:var(--good)}
+.s-partial::before{background:var(--warn)}
+.s-stub::before{background:var(--bad)}
+.step-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.zone{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px 16px;min-width:0}
+.zone .ztag{font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.zone .zname{font-size:.95rem;font-weight:650;margin:6px 0 10px}
+.zone ol{margin:0;padding:0;list-style:none;font-size:.82rem;color:var(--muted)}
+.zone li{display:flex;align-items:center;gap:7px;padding:5px 0;border-top:1px solid var(--border)}
+.zone li:first-child{border-top:0}
+.zone li b{color:var(--fg);font:600 .76rem/1.5 var(--mono)}
+.zone .marks{margin-left:auto;display:inline-flex;gap:4px}
+.kpi-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--muted)}
 .kpi-row:last-child{border:0}
-.kpi-row .v{font-weight:700;color:var(--accent)}
-.cli{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:"SF Mono",Consolas,monospace;font-size:.8rem;overflow-x:auto}
-.cli .c{color:var(--muted)}
+.kpi-row .v{font:700 .85rem var(--mono);color:var(--fg)}
+.cli{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+font:400 .78rem/1.75 var(--mono);overflow-x:auto;margin:8px 0 0}
+.cli .c{color:var(--faint)}
 .cli .cmd{color:var(--accent)}
-footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;border-top:1px solid var(--border);margin-top:30px}
+.inv-n{display:inline-flex;width:20px;height:20px;border:1px solid var(--border);border-radius:6px;
+align-items:center;justify-content:center;font:600 11px/1 var(--mono);color:var(--accent);margin-right:8px;vertical-align:-4px}
+footer{margin-top:56px;padding:22px 0 6px;border-top:1px solid var(--border);color:var(--faint);
+font-size:.8rem;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+@media(max-width:960px){
+.cols-4,.cols-3,.step-flow{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+.cols-4,.cols-3,.cols-2,.step-flow{grid-template-columns:1fr}
+.stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.topbar{gap:10px;padding:10px 16px}
+.wrap{padding:0 16px 32px}
+.hero{padding:38px 0 26px}
+footer{flex-direction:column}
+}
 </style>
 </head>
 <body>
-<header>
+__ICON_SPRITE__
+<header class="topbar">
   <div class="logo">FDE <span>Scope</span></div>
   <span class="tag">72h · raw data → deployed agent</span>
   <nav class="nav">
@@ -793,116 +881,171 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
     <a href="#practices">最佳实践</a>
     <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
   </nav>
+  <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
+    <svg class="ic when-dark"><use href="#i-sun"/></svg>
+    <svg class="ic when-light"><use href="#i-moon"/></svg>
+  </button>
 </header>
 
 <div class="wrap">
 
 <div class="hero">
+  <div class="eyebrow">FDE · Field Delivery Engine</div>
   <h2>FDE 的完整现场工作台</h2>
   <p>从第一次 Gemba walk 到签字移交——覆盖软件/SaaS 与具身机器人/制造业两类场景。
      18 阶段 SOP、10 个可执行合规 gate、10 个数据连接器、真实生产 KPI。</p>
   <div class="cta">
     <a class="btn" href="/console">进入 Engagement 控制台</a>
+    <a class="btn ghost" href="/console#deploy"><svg class="ic"><use href="#i-bot"/></svg>Agent 部署预检</a>
     <a class="btn ghost" href="#quickstart">快速上手</a>
   </div>
 </div>
 
-<div class="grid cols-4" style="margin-bottom:8px">
+<div class="stats">
   <div class="stat"><div class="num">18</div><div class="lab">SOP 阶段（4 zones）</div></div>
   <div class="stat"><div class="num">10</div><div class="lab">可执行 gate</div></div>
   <div class="stat"><div class="num">10</div><div class="lab">数据连接器</div></div>
   <div class="stat"><div class="num">CI</div><div class="lab">测试全绿</div></div>
 </div>
 
-<div class="sec-title">🗺 完整 SOP · 18 阶段 · 4 Zones</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-map"/></svg><h2>完整 SOP · 18 阶段 · 4 Zones</h2><span class="n">01</span></div>
 <div class="step-flow">
   <div class="zone">
     <div class="ztag">Zone A</div><div class="zname">立项勘察</div>
-    <ol><li><b>qualification</b> 问题框定</li><li><b>site_survey</b> 🚦🏭 Gemba</li><li><b>stakeholder_map</b> 双 sponsor</li><li><b>success_criteria</b> 🚦 契约化</li></ol>
+    <ol>
+      <li><b>qualification</b> 问题框定</li>
+      <li><b>site_survey</b> Gemba<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg><svg class="ic-xs mk-w"><use href="#i-factory"/></svg></span></li>
+      <li><b>stakeholder_map</b> 双 sponsor</li>
+      <li><b>success_criteria</b> 契约化<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg></span></li>
+    </ol>
   </div>
   <div class="zone">
     <div class="ztag">Zone B</div><div class="zname">构建</div>
-    <ol><li><b>connect</b> 数据接入</li><li><b>corpus</b> 语料锻造</li><li><b>prototype</b> 真实数据原型</li><li><b>validate</b> 验证</li><li><b>deploy</b> 🚦🏭 FAT/SAT</li><li><b>eval</b> 评估</li></ol>
+    <ol>
+      <li><b>connect</b> 数据接入</li>
+      <li><b>corpus</b> 语料锻造</li>
+      <li><b>prototype</b> 真实数据原型</li>
+      <li><b>validate</b> 验证</li>
+      <li><b>deploy</b> FAT/SAT<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg><svg class="ic-xs mk-w"><use href="#i-factory"/></svg></span></li>
+      <li><b>eval</b> 评估</li>
+    </ol>
   </div>
   <div class="zone">
     <div class="ztag">Zone C</div><div class="zname">运营化</div>
-    <ol><li><b>slo_sla</b> 🚦 SLO+on-call</li><li><b>runbook</b> 应急手册</li><li><b>monitoring</b> 漂移检测</li><li><b>change_mgmt</b> 🚦🏭 工会</li><li><b>flywheel</b> 飞轮产品化</li></ol>
+    <ol>
+      <li><b>slo_sla</b> SLO+on-call<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg></span></li>
+      <li><b>runbook</b> 应急手册</li>
+      <li><b>monitoring</b> 漂移检测</li>
+      <li><b>change_mgmt</b> 工会<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg><svg class="ic-xs mk-w"><use href="#i-factory"/></svg></span></li>
+      <li><b>flywheel</b> 飞轮产品化</li>
+    </ol>
   </div>
   <div class="zone">
     <div class="ztag">Zone D</div><div class="zname">交接退场</div>
-    <ol><li><b>ops_handoff</b> 运维移交</li><li><b>knowledge_transfer</b> 知识转移</li><li><b>disengage</b> 🚦 签字退场</li></ol>
+    <ol>
+      <li><b>ops_handoff</b> 运维移交</li>
+      <li><b>knowledge_transfer</b> 知识转移</li>
+      <li><b>disengage</b> 签字退场<span class="marks"><svg class="ic-xs mk-g"><use href="#i-shield"/></svg></span></li>
+    </ol>
   </div>
 </div>
+</section>
 
-<div class="sec-title">🚦 10 个可执行合规 Gate（工业 overlay）</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-shield"/></svg><h2>10 个可执行合规 Gate（工业 overlay）</h2><span class="n">02</span></div>
 <p class="sec-note">Gate 是谓词，不是清单：清单记录"曾经查过"，随现实漂移单向腐化；gate 在每次推进时重新评估，过期 passed 不作数。--force 只豁免拦截、照常评估留痕，例外进入审计日志。</p>
 <div class="grid cols-4">
-  <div class="tile"><div class="name">site_survey 🏭</div><div class="desc">现场勘察记录校验</div></div>
-  <div class="tile"><div class="name">success_criteria</div><div class="desc">双 sponsor + 可度量 done</div></div>
-  <div class="tile"><div class="name">fat_sat 🏭</div><div class="desc">FAT/SAT 验收签字</div></div>
-  <div class="tile"><div class="name">functional_safety 🏭</div><div class="desc">ISO 13849 / IEC 61508 / ISO 10218</div></div>
-  <div class="tile"><div class="name">conformity 🏭</div><div class="desc">CE / EU AI Act conformity</div></div>
-  <div class="tile"><div class="name">works_council 🏭</div><div class="desc">德国 BetrVG §87 工会共决</div></div>
-  <div class="tile"><div class="name">air_gap 🏭</div><div class="desc">air-gapped 部署清单</div></div>
-  <div class="tile"><div class="name">shift_handover 🏭</div><div class="desc">24/7 班次交接集成</div></div>
-  <div class="tile"><div class="name">slo</div><div class="desc">SLO + on-call 定义</div></div>
-  <div class="tile"><div class="name">handoff_signoff</div><div class="desc">移交包签字确认</div></div>
+  <div class="tile mono"><div class="name">site_survey<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">现场勘察记录校验</div></div>
+  <div class="tile mono"><div class="name">success_criteria</div><div class="desc">双 sponsor + 可度量 done</div></div>
+  <div class="tile mono"><div class="name">fat_sat<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">FAT/SAT 验收签字</div></div>
+  <div class="tile mono"><div class="name">functional_safety<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">ISO 13849 / IEC 61508 / ISO 10218</div></div>
+  <div class="tile mono"><div class="name">conformity<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">CE / EU AI Act conformity</div></div>
+  <div class="tile mono"><div class="name">works_council<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">德国 BetrVG §87 工会共决</div></div>
+  <div class="tile mono"><div class="name">air_gap<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">air-gapped 部署清单</div></div>
+  <div class="tile mono"><div class="name">shift_handover<svg class="ic-xs mk-w"><use href="#i-factory"/></svg></div><div class="desc">24/7 班次交接集成</div></div>
+  <div class="tile mono"><div class="name">slo</div><div class="desc">SLO + on-call 定义</div></div>
+  <div class="tile mono"><div class="name">handoff_signoff</div><div class="desc">移交包签字确认</div></div>
 </div>
+</section>
 
-<div class="sec-title">🔌 10 个数据连接器</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-plug"/></svg><h2>10 个数据连接器</h2><span class="n">03</span></div>
 <div class="grid cols-4">
-  <div class="tile"><div class="icon">📄</div><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><div class="icon">🗄</div><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><div class="icon">📡</div><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
-  <div class="tile"><div class="icon">🏭</div><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">JSONL 可用</span></div>
-  <div class="tile"><div class="icon">⚙️</div><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><div class="icon">🤖</div><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><div class="icon">📈</div><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><div class="icon">🎫</div><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><div class="icon">☁️</div><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><div class="icon">📑</div><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-doc"/></svg><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-db"/></svg><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-broadcast"/></svg><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-factory"/></svg><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">JSONL 可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-cpu"/></svg><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-bot"/></svg><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-ticket"/></svg><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-cloud"/></svg><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-docs"/></svg><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
 </div>
+</section>
 
-<div class="sec-title">⚙️ 6 大功能模块</div>
-<div class="grid cols-3">
-  <div class="tile"><div class="icon">🔬</div><div class="name">Corpus Engine</div><div class="desc">脱敏→去重→质量门→覆盖度分析→缺口检测→针对性合成→报告。<b>核心差异化</b>：合成是补盲区不是凑数量。</div></div>
-  <div class="tile"><div class="icon">📊</div><div class="name">Eval 评估</div><div class="desc">ticket 指标 + 制造业 KPI（OEE/MTBF/抓取率/碰撞率）+ bad case 挖掘 + 自动建议。</div></div>
-  <div class="tile"><div class="icon">🚀</div><div class="name">Deploy 部署</div><div class="desc">角色 Agent 真实装配：沙箱 workspace + 权限上下文（经 AgentState 注入）+ Toolkit 工具绑定 + SubAgentTemplate 蓝图，全部真实 AgentScope 2.0 API。</div></div>
-  <div class="tile"><div class="icon">🔄</div><div class="name">Flywheel 飞轮</div><div class="desc">概念事件→真实事件映射 + 语料回流 + 周度增量重训。</div></div>
-  <div class="tile"><div class="icon">🗂</div><div class="name">SOP 状态机</div><div class="desc">18 阶段推进/回滚，gate 不通过即拦截。</div></div>
-  <div class="tile"><div class="icon">🌐</div><div class="name">Web 控制台</div><div class="desc">交互式 engagement 仪表盘 + gate + forge + KPI。</div></div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-globe"/></svg><h2>Ontology 语义层 · TBox + ABox</h2><span class="n">04</span></div>
+<div class="grid cols-4">
+  <div class="tile"><svg class="ic"><use href="#i-layers"/></svg><div class="name">TBox 双 Schema</div><div class="desc">fde-core（Skill/Connector/Engagement 等核心概念）+ mfg-overlay（ISA-95 制造业 overlay，imports 复用）</div><span class="status s-ok">内置</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-map"/></svg><div class="name">SKOS 概念体系</div><div class="desc">fde-corpus-taxonomy 双向集成：corpus 引擎按概念覆盖度选样本，skill 搜索概念扩展召回</div><span class="status s-ok">内置</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-shield"/></svg><div class="name">SHACL-lite 校验</div><div class="desc">ONTO-* 错误码契约（domain/range、环引用、未声明前缀），校验失败即拦截</div><span class="status s-ok">10 个错误码</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-doc"/></svg><div class="name">JSON-LD 1.1 导出</div><div class="desc">schema 直出；store 导出自动并入其 TBox 上下文，CLI 与 Web API 同一实现。<a href="/console#ontology">→ 本体库</a></div><span class="status s-ok">零新依赖</span></div>
 </div>
+</section>
 
-<div class="sec-title" id="arch">🏗 架构清单 · 四层 + 横切（证据化建模见 docs/architecture-model/）</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-gears"/></svg><h2>6 大功能模块</h2><span class="n">05</span></div>
 <div class="grid cols-3">
-  <div class="tile"><div class="name">🖥 UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（27 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
-  <div class="tile"><div class="name">🧭 SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
-  <div class="tile"><div class="name">⚙️ 能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
-  <div class="tile"><div class="name">🧰 横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>
-  <div class="tile"><div class="name">💾 文件事实源</div><div class="desc">零数据库：.fde_scope/（engagements · skills · uploads）+ reports/；一律经 fsutil.atomic_write_text 原子写。</div></div>
-  <div class="tile"><div class="name">🔌 外部依赖（全可选）</div><div class="desc">AgentScope 2.0.x（extra，实测窗口 >=2.0.4.post1,&lt;3；deploy 三支柱 + documents 延迟导入）· MiMo LLM（凭据仅环境变量）· QwenPaw 宿主。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-flask"/></svg><div class="name">Corpus Engine</div><div class="desc">脱敏→去重→质量门→覆盖度分析→缺口检测→针对性合成→报告。<b>核心差异化</b>：合成是补盲区不是凑数量。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Eval 评估</div><div class="desc">ticket 指标 + 制造业 KPI（OEE/MTBF/抓取率/碰撞率）+ bad case 挖掘 + 自动建议。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-rocket"/></svg><div class="name">Deploy 部署</div><div class="desc">角色 Agent 真实装配：沙箱 workspace + 权限上下文（经 AgentState 注入）+ Toolkit 工具绑定 + SubAgentTemplate 蓝图，全部真实 AgentScope 2.0 API。<a href="/console#deploy">→ 部署预检台</a></div></div>
+  <div class="tile"><svg class="ic"><use href="#i-refresh"/></svg><div class="name">Flywheel 飞轮</div><div class="desc">概念事件→真实事件映射 + 语料回流 + 周度增量重训。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-flow"/></svg><div class="name">SOP 状态机</div><div class="desc">18 阶段推进/回滚，gate 不通过即拦截。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-globe"/></svg><div class="name">Web 控制台</div><div class="desc">交互式 engagement 仪表盘 + gate + forge + KPI + Agent 部署预检（/console#deploy）+ 本体库（/console#ontology）。</div></div>
 </div>
+</section>
 
-<div class="sec-title" id="practices">✅ 工程最佳实践 · 六条不变式（AGENTS.md，架构守护测试钉住）</div>
+<section id="arch">
+<div class="sec-head"><svg class="ic"><use href="#i-layers"/></svg><h2>架构清单 · 四层 + 横切</h2><span class="n">06</span></div>
+<p class="sec-note">证据化建模见 docs/architecture-model/。</p>
 <div class="grid cols-3">
-  <div class="tile"><div class="name">1 · Gate 实时重评估</div><div class="desc">advance() 每次重评当前阶段全部 gate，过期通过不作数；强推也评估留痕。禁止缓存/短路。</div></div>
-  <div class="tile"><div class="name">2 · ID 服务端生成</div><div class="desc">SkillRecord.id / EngagementContext.id 由所属服务分配，外部输入永远不能指定。</div></div>
-  <div class="tile"><div class="name">3 · 凭据只走环境变量</div><div class="desc">API key 不落 manifest / 报告 / engagement JSON / 日志。</div></div>
-  <div class="tile"><div class="name">4 · 原子写盘</div><div class="desc">一切用户状态经 fsutil.atomic_write_text（临时文件 + os.replace），禁止裸 write_text。</div></div>
-  <div class="tile"><div class="name">5 · 规则授权是唯一通道</div><div class="desc">build_toolkit 不打 is_read_only（上游 ≥2.0.5 read-only 先放行）；未匹配工具按模式回退 DEFAULT→ASK / DONT_ASK→DENY。</div></div>
-  <div class="tile"><div class="name">6 · 实测版本窗口</div><div class="desc">pyproject 与 docs 逐字引用同一 agentscope specifier，放宽前逐版本真库跑测。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（32 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-compass"/></svg><div class="name">SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-gears"/></svg><div class="name">能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · ontology · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-wrench"/></svg><div class="name">横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-drive"/></svg><div class="name">文件事实源</div><div class="desc">零数据库：.fde_scope/（engagements · skills · uploads）+ reports/；一律经 fsutil.atomic_write_text 原子写。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-plug"/></svg><div class="name">外部依赖（全可选）</div><div class="desc">AgentScope 2.0.x（extra，实测窗口 >=2.0.4.post1,&lt;3；deploy 三支柱 + documents 延迟导入）· MiMo LLM（凭据仅环境变量）· QwenPaw 宿主。</div></div>
+</div>
+</section>
+
+<section id="practices">
+<div class="sec-head"><svg class="ic"><use href="#i-check-badge"/></svg><h2>工程最佳实践 · 六条不变式</h2><span class="n">07</span></div>
+<p class="sec-note">AGENTS.md 契约，由架构守护测试钉住。</p>
+<div class="grid cols-3">
+  <div class="tile"><div class="name"><span class="inv-n">1</span>Gate 实时重评估</div><div class="desc">advance() 每次重评当前阶段全部 gate，过期通过不作数；强推也评估留痕。禁止缓存/短路。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">2</span>ID 服务端生成</div><div class="desc">SkillRecord.id / EngagementContext.id 由所属服务分配，外部输入永远不能指定。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">3</span>凭据只走环境变量</div><div class="desc">API key 不落 manifest / 报告 / engagement JSON / 日志。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">4</span>原子写盘</div><div class="desc">一切用户状态经 fsutil.atomic_write_text（临时文件 + os.replace），禁止裸 write_text。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">5</span>规则授权是唯一通道</div><div class="desc">build_toolkit 不打 is_read_only（上游 ≥2.0.5 read-only 先放行）；未匹配工具按模式回退 DEFAULT→ASK / DONT_ASK→DENY。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">6</span>实测版本窗口</div><div class="desc">pyproject 与 docs 逐字引用同一 agentscope specifier，放宽前逐版本真库跑测。</div></div>
 </div>
 <p class="sec-note">验证锚点：make test · pytest tests/test_architecture_guard.py（6 项契约）· pytest -m agentscope（真库运行时）· ruff check + format --check · 架构证据模型 docs/architecture-model/architecture-map.md</p>
+</section>
 
-<div class="sec-title">📈 制造业 KPI（实测 BMW 数据）</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-trend"/></svg><h2>制造业 KPI（实测 BMW 数据）</h2><span class="n">08</span></div>
 <div class="grid cols-4">
   <div class="tile"><div class="name">OEE</div><div class="kpi-row"><span>设备综合效率</span><span class="v">0.724</span></div><div class="desc">世界级 ≥0.85</div></div>
   <div class="tile"><div class="name">抓取成功率</div><div class="kpi-row"><span>pick success</span><span class="v">0.793</span></div><div class="desc">DexNet 基准 ~0.80</div></div>
   <div class="tile"><div class="name">MTBF</div><div class="kpi-row"><span>平均无故障(h)</span><span class="v">39.8</span></div><div class="desc">越高越好</div></div>
   <div class="tile"><div class="name">碰撞/干预率</div><div class="kpi-row"><span>per cycle</span><span class="v">1.08%</span></div><div class="desc">越低越好</div></div>
 </div>
+</section>
 
-<div class="sec-title" id="quickstart">🚀 快速上手</div>
+<section id="quickstart">
+<div class="sec-head"><svg class="ic"><use href="#i-rocket"/></svg><h2>快速上手</h2><span class="n">09</span></div>
 <div class="grid cols-2">
   <div class="tile">
     <div class="name">CLI 命令行</div>
@@ -933,31 +1076,45 @@ footer{text-align:center;color:var(--muted);font-size:.8rem;padding:30px 0 20px;
 · 18 阶段可视化 + gate 拦截<br>
 · CSV → 语料锻造（HTML 报告）<br>
 · KPI 计算（ticket / 制造业）<br>
-· 推进/回滚 SOP 状态机
+· 推进/回滚 SOP 状态机<br>
+· Agent 部署预检（/console#deploy）
     </div>
   </div>
 </div>
+</section>
 
-<div class="sec-title">📦 两种场景</div>
+<section>
+<div class="sec-head"><svg class="ic"><use href="#i-box"/></svg><h2>两种场景</h2><span class="n">10</span></div>
 <div class="grid cols-2">
   <div class="tile">
-    <div class="name">🎫 ticket · 客服工单</div>
+    <svg class="ic"><use href="#i-ticket"/></svg>
+    <div class="name">ticket · 客服工单</div>
     <div class="desc">CSV/Zammad/Salesforce/MySQL 接入。意图准确率、回复采纳率、升级率评估。无工业 gate。</div>
     <span class="status s-ok">完整可用</span>
   </div>
   <div class="tile">
-    <div class="name">🏭 manufacturing · 具身机器人</div>
+    <svg class="ic"><use href="#i-factory"/></svg>
+    <div class="name">manufacturing · 具身机器人</div>
     <div class="desc">OPC UA/MQTT/ROS2/MES/Historian 接入。OEE/MTBF/抓取率/碰撞率 + 6 个工业合规 gate。</div>
     <span class="status s-partial">核心可用 · 工业IO部分 stub</span>
   </div>
 </div>
+</section>
 
 <footer>
-  FDE Scope · 基于真实 AgentScope 2.0 API · MIT License<br>
-  测试套件 CI 全绿（含架构守护测试 6 项契约）· 零配置可跑
+  <span>FDE Scope · 基于真实 AgentScope 2.0 API · MIT License</span>
+  <span>测试套件 CI 全绿（含架构守护测试 6 项契约）· 零配置可跑</span>
 </footer>
 
 </div>
+<script>
+function toggleTheme(){
+  var h = document.documentElement;
+  var n = h.dataset.theme === 'light' ? 'dark' : 'light';
+  h.dataset.theme = n;
+  try { localStorage.setItem('fde-theme', n); } catch(e) {}
+}
+</script>
 __GLOSSARY__
 </body>
 </html>
@@ -970,78 +1127,163 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · Engagement Console</title>
+<script>(function(){var t=null;try{t=localStorage.getItem('fde-theme')}catch(e){}if(!t)t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';document.documentElement.dataset.theme=t})();</script>
 <style>
-:root{--bg:#0b0e14;--panel:#131822;--panel2:#1a2030;--fg:#e6edf3;--muted:#8b98a9;
---accent:#2dd4bf;--warn:#fbbf24;--bad:#f87171;--good:#4ade80;--border:#242c3d;--code:#0d1117}
+/* Hallmark · genre: modern-minimal · macrostructure: workbench · design-system: design.md (Graphite) · designed-as-app */
+:root{
+--bg:oklch(0.973 0.003 255);--bg2:oklch(1 0 0);--panel:oklch(1 0 0);
+--panel2:oklch(0.945 0.005 255);--fg:oklch(0.225 0.014 255);--muted:oklch(0.47 0.016 255);
+--faint:oklch(0.52 0.014 255);--border:oklch(0.9 0.006 255);--border-strong:oklch(0.8 0.01 255);
+--accent:oklch(0.5 0.095 235);--accent-2:oklch(0.44 0.095 235);--accent-ink:oklch(0.99 0.002 255);
+--accent-dim:oklch(0.5 0.095 235/0.09);--good:oklch(0.51 0.12 152);--warn:oklch(0.53 0.11 75);
+--bad:oklch(0.55 0.17 25);--code:oklch(0.955 0.004 255);
+--font:-apple-system,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+--mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+color-scheme:light}
+html[data-theme="dark"]{
+--bg:oklch(0.165 0.012 255);--bg2:oklch(0.2 0.013 255);--panel:oklch(0.2 0.013 255);
+--panel2:oklch(0.22 0.015 255);--fg:oklch(0.93 0.006 255);--muted:oklch(0.68 0.014 255);
+--faint:oklch(0.61 0.013 255);--border:oklch(0.3 0.014 255);--border-strong:oklch(0.4 0.016 255);
+--accent:oklch(0.74 0.085 232);--accent-2:oklch(0.79 0.07 232);--accent-ink:oklch(0.2 0.04 232);
+--accent-dim:oklch(0.74 0.085 232/0.13);--good:oklch(0.76 0.13 152);--warn:oklch(0.8 0.13 85);
+--bad:oklch(0.7 0.16 25);--code:oklch(0.14 0.012 255);
+color-scheme:dark}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,"PingFang SC","Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
+html,body{overflow-x:clip}
+body{margin:0;font-family:var(--font);background:var(--bg);color:var(--fg);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
 a{color:var(--accent);text-decoration:none}
-header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-header h1{margin:0;font-size:1.3rem}
-header .v{color:var(--accent);font-size:.8rem;background:#0d2e2a;padding:2px 8px;border-radius:6px}
-header .sub{color:var(--muted);font-size:.85rem;margin-left:auto}
-.layout{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 61px)}
-.sidebar{border-right:1px solid var(--border);padding:16px;overflow-y:auto}
-.main{padding:20px;overflow-y:auto}
-h2{font-size:1rem;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
-.eng{cursor:pointer;transition:border-color .15s}
+::selection{background:var(--accent);color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important;scroll-behavior:auto!important}}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border:3px solid var(--bg);border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+.ic{width:14px;height:14px;flex:none;display:inline-block;vertical-align:-2px}
+.when-dark{display:none}
+html[data-theme="dark"] .when-light{display:none}
+html[data-theme="dark"] .when-dark{display:inline-block}
+header{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+@supports not (backdrop-filter:blur(1px)){header{background:var(--bg)}}
+.logo{font-weight:800;letter-spacing:-.01em;font-size:1.02rem}
+.v{font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-dim);border:1px solid color-mix(in oklab,var(--accent) 28%,transparent);padding:3px 9px;border-radius:999px;white-space:nowrap}
+.sub{color:var(--faint);font-size:.8rem;margin-left:6px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.back{color:var(--muted);font-size:.85rem;transition:color .13s}
+.back:hover{color:var(--fg)}
+.tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;transition:color .13s,border-color .13s}
+.tbtn:hover{color:var(--fg);border-color:var(--border-strong)}
+.layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 57px)}
+.sidebar{border-right:1px solid var(--border);padding:16px 14px;overflow-y:auto;background:var(--bg2)}
+.main{padding:20px 22px;overflow-x:clip}
+h2{font-size:.8rem;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+.nav{display:flex;flex-direction:column;gap:4px;margin-bottom:18px}
+.navbtn{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 11px;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .13s,color .13s;text-align:left}
+.navbtn:hover{background:var(--panel2);color:var(--fg)}
+.navbtn.active{background:var(--accent-dim);color:var(--accent);border-color:color-mix(in oklab,var(--accent) 30%,transparent)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.eng{cursor:pointer;transition:border-color .13s}
 .eng:hover{border-color:var(--accent)}
 .eng .id{font-weight:600}
-.meta{color:var(--muted);font-size:.8rem}
-.eng .meta{color:var(--muted);font-size:.78rem;margin-top:3px}
-.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:.7rem;background:#1e2738}
-.pill.ind{background:#3b2a1a;color:var(--warn)}
-.pill.tkt{background:#1a2e2a;color:var(--accent)}
-button,.btn{background:var(--accent);color:#04201d;border:0;padding:7px 12px;border-radius:6px;font-weight:600;cursor:pointer;font-size:.85rem}
-button.ghost{background:transparent;border:1px solid var(--border);color:var(--fg)}
+.meta{color:var(--muted);font-size:.78rem}
+.eng .meta{margin-top:3px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:.7rem;background:var(--panel2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.pill .ic{width:11px;height:11px}
+.pill.ind{color:var(--warn);background:color-mix(in oklab,var(--warn) 10%,transparent);border-color:color-mix(in oklab,var(--warn) 28%,transparent)}
+.pill.tkt{color:var(--accent);background:var(--accent-dim);border-color:color-mix(in oklab,var(--accent) 26%,transparent)}
+button,.btn{background:var(--accent);color:var(--accent-ink);border:1px solid transparent;padding:7px 13px;border-radius:7px;font-weight:600;cursor:pointer;font-size:.85rem;font-family:inherit;transition:background .13s,border-color .13s,color .13s;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+button:hover,.btn:hover{background:var(--accent-2)}
+button.ghost,.btn.ghost{background:transparent;border-color:var(--border);color:var(--fg)}
+button.ghost:hover,.btn.ghost:hover{border-color:var(--border-strong);background:var(--panel2)}
 button:disabled{opacity:.4;cursor:not-allowed}
-input,select{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:6px 9px;border-radius:6px;font-size:.85rem;width:100%}
-textarea{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:6px 9px;border-radius:6px;font-size:.85rem;width:100%;font-family:inherit;resize:vertical}
+input,select,textarea{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:7px 10px;border-radius:7px;font-size:.85rem;width:100%;font-family:inherit;transition:border-color .13s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;line-height:1.5}
 .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
-.row label{min-width:90px;color:var(--muted);font-size:.8rem}
+.row label{min-width:90px;color:var(--muted);font-size:.8rem;flex:none}
 .phases{display:flex;flex-direction:column;gap:6px}
-.phase{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;background:var(--panel2);font-size:.85rem}
+.phase{display:flex;align-items:center;gap:8px;padding:7px 11px;border-radius:7px;background:var(--panel2);font-size:.85rem;border:1px solid transparent}
 .phase.done{opacity:.55}
-.phase.current{background:#0d2e2a;border:1px solid var(--accent)}
-.phase .idx{width:22px;height:22px;border-radius:50%;background:#2a3346;display:flex;align-items:center;justify-content:center;font-size:.72rem}
-.phase.current .idx{background:var(--accent);color:#04201d}
-.zone-tag{font-size:.66rem;color:var(--muted);margin-left:auto}
-.gate{padding:10px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border)}
-.gate.pass{border-color:var(--good);background:#0f1f15}
-.gate.fail{border-color:var(--bad);background:#1f0f0f}
-.gate .h{display:flex;justify-content:space-between;margin-bottom:4px}
-.gate ul{margin:4px 0 0;padding-left:18px;font-size:.8rem}
-pre{background:var(--code);padding:10px;border-radius:6px;overflow:auto;font-size:.78rem;border:1px solid var(--border)}
+.phase.current{background:var(--accent-dim);border-color:color-mix(in oklab,var(--accent) 40%,transparent)}
+.phase .idx{width:22px;height:22px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-family:var(--mono);flex:none}
+.phase.current .idx{background:var(--accent);color:var(--accent-ink)}
+.zone-tag{font-size:.64rem;color:var(--faint);margin-left:auto;font-family:var(--mono);letter-spacing:.04em;flex:none}
+.gate{padding:10px 13px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);border-left:3px solid var(--border-strong);background:var(--panel2)}
+.gate.pass{border-left-color:var(--good)}
+.gate.fail{border-left-color:var(--bad)}
+.gate .h{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;font-size:.9rem}
+.gate ul{margin:6px 0 0;padding-left:4px;font-size:.8rem;color:var(--muted);list-style:none;display:flex;flex-direction:column;gap:3px}
+.gate li{display:flex;gap:6px;align-items:flex-start}
+.gate li .ic{margin-top:2px;width:12px;height:12px;color:var(--faint)}
+.gate li.bl .ic{color:var(--bad)}
+.gate li.wn .ic{color:var(--warn)}
+pre{background:var(--code);padding:10px;border-radius:7px;overflow:auto;font-size:.78rem;border:1px solid var(--border);font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.82em;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-.kpi{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px}
-.kpi .k{color:var(--muted);font-size:.72rem;text-transform:uppercase}
-.kpi .v{font-size:1.4rem;font-weight:700;margin-top:2px}
-.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border)}
-.tab{padding:8px 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent}
+.kpi{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:11px 12px}
+.kpi .k{color:var(--faint);font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono)}
+.kpi .v{font-size:1.35rem;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:8px 13px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-size:.88rem;white-space:nowrap;transition:color .13s}
+.tab:hover{color:var(--fg)}
 .tab.active{color:var(--accent);border-color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+th{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-weight:600}
+td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr{transition:background .13s}
+tbody tr:hover{background:var(--panel2)}
+.tablewrap{overflow-x:auto;margin:2px 0}
 .hidden{display:none}
-.empty{color:var(--muted);text-align:center;padding:30px;font-size:.9rem}
+.empty{color:var(--faint);text-align:center;padding:28px 12px;font-size:.88rem;display:flex;flex-direction:column;align-items:center;gap:8px}
+.empty .ic{width:18px;height:18px;opacity:.7}
 details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 0}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);vertical-align:1px}
+.d-ok{background:var(--good)}
+.d-bad{background:var(--bad)}
+#toast-host{position:fixed;right:18px;bottom:18px;z-index:1000;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border-strong);border-radius:9px;padding:9px 14px;font-size:.85rem;max-width:min(420px,86vw);box-shadow:0 12px 32px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .16s ease,transform .16s ease}
+.toast.on{opacity:1;transform:none}
+.toast .ic{color:var(--accent)}
+.toast.ok .ic{color:var(--good)}
+.toast.warn{border-color:color-mix(in oklab,var(--warn) 55%,var(--border))}
+.toast.warn .ic{color:var(--warn)}
+.toast.bad{border-color:color-mix(in oklab,var(--bad) 55%,var(--border))}
+.toast.bad .ic{color:var(--bad)}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--border-strong);border-radius:12px;padding:0;width:min(560px,92vw);box-shadow:0 24px 64px rgba(0,0,0,.4)}
+dialog::backdrop{background:color-mix(in oklab,var(--bg) 60%,transparent);backdrop-filter:blur(2px)}
+.dlg-h{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--border);font-size:.95rem}
+.dlg-b{padding:16px}
+@media(max-width:960px){.layout{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--border)}}
+@media(max-width:640px){.sub{display:none}.main{padding:14px}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hdr-right .back{display:none}}
 </style>
 </head>
 <body>
+__ICON_SPRITE__
 <header>
-  <h1>FDE Scope <span class="v">Engagement Console</span></h1>
+  <span class="logo">FDE Scope</span>
+  <span class="v">Engagement Console</span>
   <span class="sub">72h from raw data to a deployed agent · 全 SOP 工作台</span>
-  <a href="/" style="margin-left:auto;color:var(--muted);font-size:.85rem">← 功能总览</a>
+  <div class="hdr-right">
+    <a class="back" href="/">&#8592; 功能总览</a>
+    <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
+      <svg class="ic when-dark"><use href="#i-sun"/></svg>
+      <svg class="ic when-light"><use href="#i-moon"/></svg>
+    </button>
+  </div>
 </header>
 <div class="layout">
   <aside class="sidebar">
-    <div class="row" style="margin-bottom:8px">
-      <button style="flex:1" onclick="go('workbench')">📊 工作台</button>
-      <button class="ghost" style="flex:1" onclick="go('skills')">📚 技能库</button>
-    </div>
-    <button class="ghost" style="width:100%;margin-bottom:14px" onclick="go('deploy')">🤖 Agent 部署</button>
+    <nav class="nav">
+      <button class="navbtn active" data-view="workbench" onclick="go('workbench')"><svg class="ic"><use href="#i-gauge"/></svg>工作台</button>
+      <button class="navbtn" data-view="skills" onclick="go('skills')"><svg class="ic"><use href="#i-library"/></svg>技能库</button>
+      <button class="navbtn" data-view="deploy" onclick="go('deploy')"><svg class="ic"><use href="#i-bot"/></svg>Agent 部署</button>
+      <button class="navbtn" data-view="ontology" onclick="go('ontology')"><svg class="ic"><use href="#i-globe"/></svg>本体库</button>
+    </nav>
     <h2>Engagements</h2>
     <div id="eng-list"></div>
     <div class="card" style="margin-top:16px">
-      <h2 style="margin-bottom:10px">新建 Engagement</h2>
+      <h2>新建 Engagement</h2>
       <div class="row"><label>客户</label><input id="new-customer" placeholder="BMW Spartanburg"></div>
       <div class="row"><label>Profile</label>
         <select id="new-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select>
@@ -1049,16 +1291,17 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
       <button onclick="createEng()" style="width:100%">+ 创建</button>
     </div>
     <div class="card">
-      <h2 style="margin-bottom:10px">工具</h2>
-      <a class="btn ghost" style="display:block;text-align:center;margin-bottom:6px" href="/reports/" target="_blank">📁 报告归档</a>
-      <button class="ghost" style="width:100%" onclick="loadProfiles()">查看 Profiles & Phases</button>
+      <h2>工具</h2>
+      <a class="btn ghost" style="display:flex;width:100%;margin-bottom:6px" href="/reports/" target="_blank"><svg class="ic"><use href="#i-folder"/></svg>报告归档</a>
+      <button class="ghost" style="width:100%" onclick="loadProfiles()"><svg class="ic"><use href="#i-layers"/></svg>查看 Profiles &amp; Phases</button>
     </div>
   </aside>
   <main class="main" id="main">
     <div id="view-workbench"></div>
     <div id="view-skills" class="hidden"></div>
     <div id="view-deploy" class="hidden"></div>
-    <div id="view-detail" class="hidden"><div class="empty">← 选择或创建一个 engagement 开始</div></div>
+    <div id="view-ontology" class="hidden"></div>
+    <div id="view-detail" class="hidden"><div class="empty"><svg class="ic"><use href="#i-map"/></svg>选择或创建一个 engagement 开始</div></div>
   </main>
 </div>
 
@@ -1066,19 +1309,46 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
 const API = '';
 let current = null;
 
+function icon(n){return '<svg class="ic" aria-hidden="true"><use href="#'+n+'"/></svg>'}
+function dot(ok){return '<span class="dot '+(ok?'d-ok':'d-bad')+'"></span>'}
+function yn(ok){return dot(ok)+(ok?'是':'否')}
+
+function toast(msg, kind, ms) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  t.innerHTML = '<svg class="ic" aria-hidden="true"><use href="' + (kind === 'ok' ? '#i-check' : '#i-alert') + '"/></svg>';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  t.appendChild(span);
+  document.getElementById('toast-host').appendChild(t);
+  requestAnimationFrame(() => t.classList.add('on'));
+  setTimeout(() => { t.classList.remove('on'); setTimeout(() => t.remove(), 200); }, ms || 3800);
+}
+
+function toggleTheme(){
+  const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try{localStorage.setItem('fde-theme', next)}catch(e){}
+}
+
 function showView(name) {
-  ['workbench','skills','deploy','detail'].forEach(v=>{
+  ['workbench','skills','deploy','ontology','detail'].forEach(v=>{
     const e=document.getElementById('view-'+v); if(e) e.classList.toggle('hidden', v!==name);
   });
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
 }
 
 function go(name) {
   showView(name);
   if (name==='skills') location.hash = 'skills';
+  else if (name==='deploy') location.hash = 'deploy';
+  else if (name==='ontology') location.hash = 'ontology';
   else if (location.hash) history.replaceState(null,'',location.pathname);
   if (name==='workbench') loadWorkbench();
   if (name==='skills') loadSkills();
   if (name==='deploy') renderDeploy();
+  if (name==='ontology') loadOntology();
 }
 
 // -- 工作台 ---------------------------------------------------------------
@@ -1107,12 +1377,12 @@ function matrixHtml(matrix) {
       <td><b>${escapeHtml(s.customer)}</b><div class="meta">${escapeHtml(s.engagement_id)}</div></td>
       <td><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span></td>
       <td>${escapeHtml(s.current_phase)}<div class="meta">${escapeHtml(zoneLabel(s.current_zone))}</div></td>
-      <td>${s.gate?`${escapeHtml(s.gate)} ${s.gate_passed?'✅':'❌'}`:'—'}</td>
+      <td>${s.gate?escapeHtml(s.gate)+' '+dot(s.gate_passed):'—'}</td>
       <td class="meta">${ts?escapeHtml(String(ts).slice(0,16).replace('T',' ')):'—'}</td>
-      ${s.is_complete?'<td>✅ 完成</td>':''}
+      ${s.is_complete?'<td>'+dot(true)+' 完成</td>':''}
     </tr>`;
   }).join('');
-  return `<table><thead><tr><th>客户</th><th>Profile</th><th>阶段</th><th>门禁</th><th>最近更新</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<div class="tablewrap"><table><thead><tr><th>客户</th><th>Profile</th><th>阶段</th><th>门禁</th><th>最近更新</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function recentHtml(skills) {
@@ -1193,22 +1463,31 @@ function draftCards(drafts) {
 
 async function submitSkill() {
   const title = document.getElementById('sk-title').value.trim();
-  if (!title) return alert('请填写标题');
+  if (!title) return toast('请填写标题','warn');
   const tags = document.getElementById('sk-tags').value.split(',').map(s=>s.trim()).filter(Boolean);
   await api('/api/skills', {method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({title, category:document.getElementById('sk-new-cat').value,
       tags, body_md:document.getElementById('sk-body').value})});
+  toast('技能已沉淀','ok');
   loadSkills();
 }
 
-async function publishSkill(sid) { await api(`/api/skills/${sid}/publish`, {method:'POST'}); loadSkills(); }
-async function archiveSkill(sid) { await api(`/api/skills/${sid}/archive`, {method:'POST'}); loadSkills(); }
+async function publishSkill(sid) { await api(`/api/skills/${sid}/publish`, {method:'POST'}); toast('已发布','ok'); loadSkills(); }
+async function archiveSkill(sid) { await api(`/api/skills/${sid}/archive`, {method:'POST'}); toast('已归档','ok'); loadSkills(); }
 
-async function editSkill(sid) {
-  const body = prompt('编辑正文（Markdown）：');
-  if (body===null) return;
-  await api(`/api/skills/${sid}`, {method:'PATCH', headers:{'Content-Type':'application/json'},
+let editingId = null;
+function editSkill(sid) {
+  editingId = sid;
+  document.getElementById('dlg-body').value = '';
+  document.getElementById('dlg-edit').showModal();
+}
+
+async function dlgEditSave() {
+  const body = document.getElementById('dlg-body').value;
+  await api(`/api/skills/${editingId}`, {method:'PATCH', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({body_md: body})});
+  document.getElementById('dlg-edit').close();
+  toast('已保存','ok');
   loadSkills();
 }
 
@@ -1218,7 +1497,7 @@ function journalHtml(ctx) {
   const entries = (ctx && ctx.journal) || [];
   const rows = entries.map(e => `<div class="card">
     <div class="row"><span class="pill">${esc(e.kind)}</span><span class="meta">${esc(e.ts)}</span>
-      <span class="meta" style="margin-left:auto">${e.skill_id?'💡 '+esc(e.skill_id):''}</span></div>
+      <span class="meta" style="margin-left:auto">${e.skill_id?icon('i-bulb')+' '+esc(e.skill_id):''}</span></div>
     <div>${esc(e.note)}</div>
     ${e.skill_id?'':`<button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="journalToSkill('${esc(e.id)}')">沉淀为技能</button>`}
   </div>`).join('') || '<div class="empty">暂无现场记录</div>';
@@ -1236,7 +1515,7 @@ function journalHtml(ctx) {
 async function addJournal() {
   const kind = document.getElementById('jn-kind').value;
   const note = document.getElementById('jn-note').value.trim();
-  if (!note) return alert('请填写记录内容');
+  if (!note) return toast('请填写记录内容','warn');
   await api(`/api/engagements/${current}/journal`, {method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({kind, note})});
@@ -1245,7 +1524,7 @@ async function addJournal() {
 
 async function journalToSkill(jid) {
   const r = await api(`/api/engagements/${current}/journal/${jid}/skill`, {method:'POST'});
-  alert(`已沉淀为技能草稿: ${r.id} (${r.category})`);
+  toast(`已沉淀为技能草稿: ${r.id} (${r.category})`,'ok');
   selectEng(current);
 }
 
@@ -1327,7 +1606,7 @@ function planHtml(plan) {
   const agents = (m.agents||[]).map(a => {
     const tools = (a.tools||[]).map(t => t.bound
       ? `<span class="pill tkt" title="${esc(t.note||'')}">${esc(t.tool)} → ${esc(t.source||'')}</span>`
-      : `<span class="pill" style="color:var(--bad)" title="${esc(t.note||'')}">${esc(t.tool)} ✕ unbound</span>`).join(' ');
+      : `<span class="pill" style="color:var(--bad)" title="${esc(t.note||'')}">${esc(t.tool)} ${icon('i-x')} unbound</span>`).join(' ');
     const un = (a.unbound||[]);
     return `<div class="card" style="margin-bottom:8px">
       <div class="row"><b>${esc(a.name)}</b><span class="pill ${esc(a.role_bucket)==='corpus'?'ind':'tkt'}">${esc(a.role)} · ${esc(a.role_bucket||'corpus-only')}</span>
@@ -1335,7 +1614,7 @@ function planHtml(plan) {
         <span class="meta" style="margin-left:auto">bound ${((a.bound||[]).length)} · unbound ${un.length}</span></div>
       <div class="meta" style="margin:4px 0">连接器集：${(a.connectors||[]).map(esc).join(' · ') || '—'} ｜ system_prompt: ${esc((a.system_prompt||'').slice(0,72))}…</div>
       <div style="margin:6px 0">${tools || '<span class="meta">仅语料工具</span>'}</div>
-      ${un.length?`<div class="meta" style="color:var(--warn)">⚠ 未绑定 ${un.length} 个工具 — 在「数据源」里给对应连接器配 slug=源 即可绑定</div>`:''}
+      ${un.length?`<div class="meta" style="color:var(--warn)">${icon('i-alert')} 未绑定 ${un.length} 个工具 — 在「数据源」里给对应连接器配 slug=源 即可绑定</div>`:''}
     </div>`;
   }).join('');
   return `
@@ -1371,7 +1650,7 @@ async function refreshList() {
       <div class="meta">
         <span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span>
         ${escapeHtml(s.current_phase)} · ${escapeHtml(s.current_zone)}
-        ${s.is_complete?' ✅':''}
+        ${s.is_complete?' '+dot(true):''}
       </div>
       <div class="meta">id: ${escapeHtml(s.engagement_id)}</div>
     </div>`).join('');
@@ -1380,12 +1659,13 @@ async function refreshList() {
 
 async function createEng() {
   const customer = document.getElementById('new-customer').value.trim();
-  if (!customer) return alert('请填写客户名');
+  if (!customer) return toast('请填写客户名','warn');
   const profile = document.getElementById('new-profile').value;
   await api('/api/engagements', {method:'POST',
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({customer, profile})});
   document.getElementById('new-customer').value = '';
+  toast('已创建 engagement','ok');
   refreshList();
 }
 
@@ -1406,17 +1686,17 @@ function renderDetail(s, phases, gates) {
     const cls = i<curIdx?'done':(i===curIdx?'current':'');
     return `<div class="phase ${cls}">
       <span class="idx">${p.index}</span><span>${escapeHtml(p.name)}</span>
-      ${p.industrial?'<span class="pill ind">🏭</span>':''}
-      ${p.gates&&p.gates.length?`<span class="pill" title="gates: ${escapeHtml(p.gates.join(', '))}">🚦</span>`:''}
+      ${p.industrial?`<span class="pill ind" title="工业阶段">${icon('i-factory')}</span>`:''}
+      ${p.gates&&p.gates.length?`<span class="pill" title="gates: ${escapeHtml(p.gates.join(', '))}">${icon('i-shield')}</span>`:''}
       <span class="zone-tag">${escapeHtml(zoneLabel(p.zone))}</span></div>`;
   }).join('');
 
   const gateHtml = Object.entries(gates).map(([slug,g])=>{
     const cls = g.passed?'pass':'fail';
-    const blocks = g.blockers.map(b=>`<li>🚫 ${escapeHtml(b)}</li>`).join('');
-    const warns = g.warnings.map(w=>`<li>⚠️ ${escapeHtml(w)}</li>`).join('');
+    const blocks = g.blockers.map(b=>`<li class="bl">${icon('i-ban')} ${escapeHtml(b)}</li>`).join('');
+    const warns = g.warnings.map(w=>`<li class="wn">${icon('i-alert')} ${escapeHtml(w)}</li>`).join('');
     return `<div class="gate ${cls}"><div class="h"><b>${escapeHtml(g.name)}</b>
-      <span>${g.passed?'✅ PASS':'❌ BLOCKED'}</span></div>
+      <span>${g.passed?dot(true)+' PASS':dot(false)+' BLOCKED'}</span></div>
       ${blocks?`<ul>${blocks}</ul>`:''}${warns?`<ul>${warns}</ul>`:''}
       <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${escapeHtml(slug)}')">重新校验</button></div>`;
   }).join('') || '<div class="empty">无适用 gate（当前 profile）</div>';
@@ -1440,7 +1720,7 @@ function renderDetail(s, phases, gates) {
         <div class="row"><label>下一阶段</label>${escapeHtml(s.next_phase||'— (完成)')}</div>
         <div class="row"><label>进度</label>${curIdx+1}/${phases.phases.length}</div>
         <div class="row" style="margin-top:10px">
-          <button onclick="advance(false)">⏭ 推进到下一阶段</button>
+          <button onclick="advance(false)">${icon('i-next')} 推进到下一阶段</button>
           <button class="ghost" onclick="advance(true)">force 推进</button>
         </div>
       </div>
@@ -1490,9 +1770,9 @@ function contextHtml(ctx) {
   if (site.location) {
     const net = (site.networks||[]).map(n=>`<li>${esc(n)}</li>`).join('');
     siteHtml = `<div class="row"><label>地点</label><b>${esc(site.location)}</b></div>
-      <div class="row"><label>班次</label>${esc(site.shift_count)} · OT/IT 隔离 ${site.ot_it_separated?'✅':'❌'} · 气隙 ${site.air_gapped?'✅':'❌'}</div>
+      <div class="row"><label>班次</label>${esc(site.shift_count)} · OT/IT 隔离 ${yn(site.ot_it_separated)} · 气隙 ${yn(site.air_gapped)}</div>
       ${net?`<div class="row"><label>网络</label><ul style="margin:2px 0 0;padding-left:18px">${net}</ul></div>`:''}
-      <div class="row"><label>资产</label>${(site.assets||[]).length} 项 · 工会代表 ${site.works_council_represented?'✅':'—'}</div>
+      <div class="row"><label>资产</label>${(site.assets||[]).length} 项 · 工会代表 ${site.works_council_represented?yn(true):'—'}</div>
       ${site.notes?`<div class="row"><label>备注</label>${esc(site.notes)}</div>`:''}`;
   } else {
     siteHtml = '<div class="empty">无现场数据（SaaS 项目）</div>';
@@ -1511,30 +1791,30 @@ function contextHtml(ctx) {
   const safetyHtml = ctx.profile==='manufacturing'
     ? `<tr><td>ISO 13849</td><td>PLr ${esc(safety.required_plr||'—')} / PL ${esc(safety.achieved_pl||'—')}</td></tr>
     <tr><td>IEC 61508</td><td>SIL ${esc(safety.sil_required||'—')} / ${esc(safety.sil_achieved??'—')}</td></tr>
-    <tr><td>ISO 10218 评估</td><td>${safety.iso10218_assessed?'✅':'❌'}</td></tr>
-    <tr><td>EU AI Act 高风险</td><td>${safety.eu_ai_act_high_risk?'✅':'—'} · CE ${safety.ce_marking_done?'✅':'❌'}</td></tr>
-    <tr><td>危险分析</td><td>${safety.hazard_analysis_done?'✅':'❌'}</td></tr>
+    <tr><td>ISO 10218 评估</td><td>${yn(safety.iso10218_assessed)}</td></tr>
+    <tr><td>EU AI Act 高风险</td><td>${safety.eu_ai_act_high_risk?yn(true):'—'} · CE ${safety.ce_marking_done?yn(true):yn(false)}</td></tr>
+    <tr><td>危险分析</td><td>${yn(safety.hazard_analysis_done)}</td></tr>
     ${safety.risk_assessment_notes?`<tr><td>评估备注</td><td>${esc(safety.risk_assessment_notes)}</td></tr>`:''}`
     : '<tr><td colspan="2" class="meta">非工业 profile，无功能安全数据</td></tr>';
   // 产物与交付
   const evRows = Object.entries(assets.eval_metrics||{}).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
   const links = [];
-  if (assets.runbook) links.push(`<a class="btn" href="/${esc(assets.runbook)}" target="_blank">📘 Runbook</a>`);
-  if (assets.corpus_report) links.push(`<a class="btn" href="/${esc(assets.corpus_report)}" target="_blank">📄 语料报告</a>`);
+  if (assets.runbook) links.push(`<a class="btn" href="/${esc(assets.runbook)}" target="_blank">${icon('i-book')} Runbook</a>`);
+  if (assets.corpus_report) links.push(`<a class="btn" href="/${esc(assets.corpus_report)}" target="_blank">${icon('i-doc')} 语料报告</a>`);
   const mon = assets.monitoring||{};
   const known = (assets.known_limitations||[]).map(k=>`<li>${esc(k)}</li>`).join('');
   return `<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
-    <div class="card"><h2>干系人</h2><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div>
+    <div class="card"><h2>干系人</h2><div class="tablewrap"><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div></div>
     <div class="card"><h2>成功标准</h2><ul style="padding-left:18px">${crit}</ul></div>
-    <div class="card"><h2>SLO</h2><table><thead><tr><th>名称</th><th>目标</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div>
-    <div class="card"><h2>功能安全</h2><table><tbody>${safetyHtml}</tbody></table></div>
+    <div class="card"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
+    <div class="card"><h2>功能安全</h2><div class="tablewrap"><table><tbody>${safetyHtml}</tbody></table></div></div>
     <div class="card"><h2>产物与交付</h2>
       <div class="row"><label>语料</label>${esc(assets.corpus_summary||'—')}</div>
       <div class="row"><label>模型</label>${esc(assets.model_name||'—')}</div>
-      ${evRows?`<table style="margin-top:8px"><thead><tr><th>评估指标</th><th>值</th></tr></thead><tbody>${evRows}</tbody></table>`:''}
+      ${evRows?`<div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>评估指标</th><th>值</th></tr></thead><tbody>${evRows}</tbody></table></div>`:''}
       <div class="row" style="margin-top:10px">${links.join(' ')||'—'}</div>
       ${known?`<div class="row"><label>已知局限</label><ul style="padding-left:18px">${known}</ul></div>`:''}
-      <div class="row"><label>监控</label>漂移 ${mon.data_drift&&mon.data_drift.enabled?'✅ 每日':'❌ 未启用'} · 质量 ${mon.quality_drift&&mon.quality_drift.enabled?'✅ 每周':'❌ 未启用'}</div>
+      <div class="row"><label>监控</label>漂移 ${mon.data_drift&&mon.data_drift.enabled?dot(true)+' 每日':dot(false)+' 未启用'} · 质量 ${mon.quality_drift&&mon.quality_drift.enabled?dot(true)+' 每周':dot(false)+' 未启用'}</div>
     </div>`;
 }
 
@@ -1542,7 +1822,7 @@ async function advance(force) {
   const r = await api(`/api/engagements/${current}/advance?force=${force}`,{method:'POST'});
   if (!r.advanced) {
     const res = r.result;
-    alert('推进被拦截:\\n' + (res.blockers||[]).join('\\n'));
+    toast('推进被拦截：' + (res.blockers||[]).join('；'), 'bad', 7000);
   }
   selectEng(current);
 }
@@ -1566,7 +1846,7 @@ async function forge() {
       <div class="kpi"><div class="k">PII masked</div><div class="v">${r.pii_masked}</div></div>
     </div>
     <p>缺口: ${(r.gaps||[]).map(g=>escapeHtml(g.category)+'('+g.current_count+')').join(', ')||'无'}</p>
-    <a class="btn" href="${r.html_url}" target="_blank">📄 查看完整 HTML 报告</a>`;
+    <a class="btn" href="${r.html_url}" target="_blank">${icon('i-doc')} 查看完整 HTML 报告</a>`;
 }
 
 async function runKpi() {
@@ -1583,20 +1863,198 @@ async function runKpi() {
 
 async function loadProfiles() {
   const p = await api('/api/profiles');
-  alert('Profiles:\\n' + Object.entries(p).map(([k,v])=>`\\n${escapeHtml(k)}: ${escapeHtml(v.name)} (${v.industrial?'工业':'SaaS'})`).join(''));
+  document.getElementById('dlg-profiles-body').innerHTML = Object.entries(p).map(([k,v])=>
+    `<div class="row"><span class="pill tkt">${escapeHtml(k)}</span><b>${escapeHtml(v.name)}</b>
+     <span class="meta" style="margin-left:auto">${v.industrial?'工业':'SaaS'}</span></div>`).join('');
+  document.getElementById('dlg-profiles').showModal();
+}
+
+// ---- Ontology 视图（只读：与 CLI `ontology` 子命令同源数据） ----
+async function loadOntology() {
+  const [schemas, stores] = await Promise.all([
+    api('/api/ontology/schemas'), api('/api/ontology/stores')]);
+  const esc = escapeHtml;
+  const originPill = o => o === 'builtin'
+    ? '<span class="pill ind">内置</span>'
+    : '<span class="pill tkt">工作区</span>';
+  const sCards = schemas.map(s => `
+    <div class="card" style="margin-bottom:8px">
+      <div class="row"><b>${esc(s.id)}</b> <span class="pill">${esc(s.version)}</span> ${originPill(s.origin)}
+        ${s.imports && s.imports.length ? `<span class="meta">${icon('i-flow')} imports: ${s.imports.map(esc).join(', ')}</span>` : ''}</div>
+      <div class="meta" style="margin:4px 0">类 ${s.classes} · 对象属性 ${s.object_properties} · 数据属性 ${s.data_properties} · 概念体系 ${s.concept_schemes}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" onclick="showSchema('${esc(s.id)}')">详情</button>
+        <button class="btn ghost" onclick="showJsonld('${esc(s.id)}','')">${icon('i-doc')} JSON-LD</button>
+      </div>
+    </div>`).join('') || '<div class="empty">无 schema</div>';
+  const stCards = stores.map(t => `
+    <div class="card" style="margin-bottom:8px">
+      <div class="row"><b>${esc(t.id)}</b> <span class="pill tkt">${esc(t.ontology_ref)}</span>
+        <span class="meta" style="margin-left:auto">${t.individuals} individuals</span></div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn ghost" onclick="showJsonld('${esc(t.id)}','')">${icon('i-doc')} JSON-LD（含 TBox）</button>
+      </div>
+    </div>`).join('') || '<div class="empty" style="padding:14px">工作区暂无实例库（ontology/stores/*.json）</div>';
+  document.getElementById('view-ontology').innerHTML = `
+    <div class="sec-head"><svg class="ic"><use href="#i-globe"/></svg><h2>本体库 · TBox + ABox</h2></div>
+    <div class="card"><h2>Schema（TBox）</h2>${sCards}</div>
+    <div class="card" style="margin-top:12px"><h2>实例库（ABox）</h2>
+      <p class="meta">ontology_ref 指向 schema@version；导出时自动并入其 TBox 上下文（JSON-LD 1.1）。</p>${stCards}</div>`;
+  if (window.glossify) glossify(document.getElementById('view-ontology'));
+}
+
+async function showSchema(sid) {
+  const s = await api(`/api/ontology/schema/${encodeURIComponent(sid)}`);
+  const esc = escapeHtml;
+  const dep = d => d ? '<span class="pill" style="color:var(--warn)">deprecated</span>' : '';
+  const classRows = (s.classes||[]).map(c => `
+    <div class="row"><span class="pill tkt">${esc(c.curie)}</span><b>${esc(c.label)}</b>
+      ${c.label_zh ? `<span class="meta">${esc(c.label_zh)}</span>` : ''}${dep(c.deprecated)}
+      ${c.sub_class_of && c.sub_class_of.length ? `<span class="meta" style="margin-left:auto">⊆ ${c.sub_class_of.map(esc).join(', ')}</span>` : ''}</div>`).join('')
+    || '<div class="empty">无</div>';
+  const objRows = (s.object_properties||[]).map(p => `
+    <div class="row"><span class="pill tkt">${esc(p.curie)}</span><b>${esc(p.label)}</b>
+      <span class="meta" style="margin-left:auto">${esc(p.domain)} → ${esc(p.range)}</span></div>`).join('')
+    || '<div class="empty">无</div>';
+  const dataRows = (s.data_properties||[]).map(p => `
+    <div class="row"><span class="pill tkt">${esc(p.curie)}</span><b>${esc(p.label)}</b>
+      <span class="meta" style="margin-left:auto">${esc(p.domain)} : ${esc(p.range)}</span></div>`).join('')
+    || '<div class="empty">无</div>';
+  const schemeBlocks = (s.concept_schemes||[]).map(sc => `
+    <div style="margin-top:10px">
+      <div class="row"><b>${esc(sc.label)}</b>${sc.label_zh ? `<span class="meta">${esc(sc.label_zh)}</span>` : ''}
+        <span class="pill">${(sc.concepts||[]).length} concepts</span></div>
+      <div style="margin-top:4px">${conceptTree(sc)}</div>
+    </div>`).join('') || '<div class="empty">无概念体系</div>';
+  document.getElementById('view-ontology').innerHTML = `
+    <div class="sec-head"><svg class="ic"><use href="#i-globe"/></svg><h2>${esc(s.id)}@${esc(s.version)}</h2>
+      <button class="btn ghost" style="margin-left:auto" onclick="loadOntology()">← 返回</button></div>
+    ${s.base_iri ? `<p class="meta">base IRI: ${esc(s.base_iri)}</p>` : ''}
+    <div class="card" style="margin-top:8px"><h2>类（${(s.classes||[]).length}）</h2>${classRows}</div>
+    <div class="card" style="margin-top:8px"><h2>对象属性（${(s.object_properties||[]).length}）</h2>${objRows}</div>
+    <div class="card" style="margin-top:8px"><h2>数据属性（${(s.data_properties||[]).length}）</h2>${dataRows}</div>
+    <div class="card" style="margin-top:8px"><h2>概念体系（SKOS）</h2>${schemeBlocks}</div>`;
+  if (window.glossify) glossify(document.getElementById('view-ontology'));
+}
+
+function conceptTree(scheme) {
+  const cs = scheme.concepts || [];
+  const esc = escapeHtml;
+  const byCurie = Object.fromEntries(cs.map(c => [c.curie, c]));
+  const kidsOf = {}; const roots = [];
+  const known = new Set(cs.map(c => c.curie));
+  cs.forEach(c => {
+    const parents = (c.broader||[]).filter(b => known.has(b));
+    if (!parents.length) roots.push(c.curie);
+    else parents.forEach(b => { (kidsOf[b] = kidsOf[b]||[]).push(c.curie); });
+  });
+  const visited = new Set();
+  const node = (curie, depth) => {
+    if (visited.has(curie))
+      return `<div class="meta" style="padding-left:${depth*16}px">↺ ${esc(curie)}（环引用，仅渲染一次）</div>`;
+    visited.add(curie);
+    const c = byCurie[curie] || {};
+    const label = `${esc(c.label || curie)}${c.label_zh ? ` <span class="meta">${esc(c.label_zh)}</span>` : ''}${c.deprecated ? ' <span class="pill" style="color:var(--warn)">deprecated</span>' : ''}`;
+    const kw = (c.match_keywords||[]).length ? `<span class="meta"> · 关键词: ${c.match_keywords.map(esc).join(' / ')}</span>` : '';
+    const kids = (kidsOf[curie]||[]).map(k => node(k, depth+1)).join('');
+    return `<div style="padding-left:${depth*16}px">• ${label}${kw}</div>${kids}`;
+  };
+  const rendered = roots.map(r => node(r, 0)).join('');
+  const orphans = cs.filter(c => !visited.has(c.curie))
+    .map(c => `<div class="meta" style="padding-left:16px">↻ ${esc(c.curie)}（仅存在于环中）</div>`).join('');
+  return rendered + orphans;
+}
+
+async function showJsonld(target, backSid) {
+  const doc = await api(`/api/ontology/export/${encodeURIComponent(target)}`);
+  const esc = escapeHtml;
+  const back = backSid
+    ? `<button class="btn ghost" onclick="showSchema('${esc(backSid)}')">← 返回详情</button>`
+    : `<button class="btn ghost" onclick="loadOntology()">← 返回</button>`;
+  document.getElementById('view-ontology').innerHTML = `
+    <div class="sec-head"><svg class="ic"><use href="#i-doc"/></svg><h2>JSON-LD · ${esc(target)}</h2>${back}</div>
+    <p class="meta">与 CLI <code>fde-scope ontology export ${esc(target)}</code> 同一实现；store 导出自动并入其 TBox。</p>
+    <div class="card" style="margin-top:8px"><pre style="max-height:60vh;overflow:auto">${esc(JSON.stringify(doc, null, 2))}</pre></div>`;
+  if (window.glossify) glossify(document.getElementById('view-ontology'));
 }
 
 refreshList();
-if (location.hash === '#skills') go('skills'); else loadWorkbench();
+if (location.hash === '#skills') go('skills');
+else if (location.hash === '#deploy') go('deploy');
+else if (location.hash === '#ontology') go('ontology');
+else loadWorkbench();
 window.addEventListener('hashchange', () => {
   if (location.hash === '#skills') go('skills');
+  else if (location.hash === '#deploy') go('deploy');
+  else if (location.hash === '#ontology') go('ontology');
   else if (location.hash) go('workbench');
 });
 </script>
+<dialog id="dlg-edit" aria-labelledby="dlg-edit-title">
+  <div class="dlg-h"><svg class="ic"><use href="#i-doc"/></svg><b id="dlg-edit-title">编辑技能正文（Markdown）</b></div>
+  <div class="dlg-b">
+    <textarea id="dlg-body" rows="10" placeholder="粘贴新的 Markdown 正文…"></textarea>
+    <div class="row" style="margin:12px 0 0;justify-content:flex-end">
+      <button class="ghost" onclick="document.getElementById('dlg-edit').close()">取消</button>
+      <button onclick="dlgEditSave()">保存</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="dlg-profiles" aria-label="Profiles &amp; Phases">
+  <div class="dlg-h"><svg class="ic"><use href="#i-layers"/></svg><b>Profiles &amp; Phases</b></div>
+  <div class="dlg-b" id="dlg-profiles-body"></div>
+</dialog>
+<div id="toast-host" aria-live="polite"></div>
 __GLOSSARY__
 </body>
 </html>
 """
 
-_OVERVIEW_HTML = _OVERVIEW_HTML.replace("__GLOSSARY__", _glossary_snippet())
-_DASHBOARD_HTML = _DASHBOARD_HTML.replace("__GLOSSARY__", _glossary_snippet())
+
+_ICON_SPRITE = """<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-gauge" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.7 12a5.3 5.3 0 1 1 10.6 0"/><path d="M8 12l2.4-3.4"/><circle cx="8" cy="12" r=".9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-library" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5v-9M6.5 13.5v-9M9.6 4.8l2.7 8.4"/><path d="M2 13.5h12"/></symbol>
+<symbol id="i-bot" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="10" height="7.5" rx="1.8"/><path d="M8 5.5V3.4"/><circle cx="8" cy="2.4" r=".9"/><circle cx="6" cy="9" r=".9" fill="currentColor" stroke="none"/><circle cx="10" cy="9" r=".9" fill="currentColor" stroke="none"/><path d="M1.4 8.7v2.2M14.6 8.7v2.2"/></symbol>
+<symbol id="i-folder" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5v-8a1 1 0 0 1 1-1h3l1.5 2h5.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-map" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 4.2 5.5 3l5 1.6 3.7-1.3v9.5l-3.7 1.3-5-1.6-3.7 1.3z"/><path d="M5.5 3v9.5"/><path d="M10.5 4.6v9.5"/></symbol>
+<symbol id="i-shield" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 13.2 3.6v4.2c0 3.2-2.2 5.4-5.2 6.3-3-.9-5.2-3.1-5.2-6.3V3.6z"/><path d="M6 7.7l1.4 1.4 2.6-2.8"/></symbol>
+<symbol id="i-plug" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 2.3V6M10.5 2.3V6"/><path d="M4 6h8v2.3a4 4 0 0 1-8 0z"/><path d="M8 12.3v1.7"/></symbol>
+<symbol id="i-gears" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><path d="M8 1.6v1.9M8 12.5v1.9M1.6 8h1.9M12.5 8h1.9M3.5 3.5l1.3 1.3M11.2 11.2l1.3 1.3M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3"/></symbol>
+<symbol id="i-layers" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 14.2 5 8 8.2 1.8 5z"/><path d="M2.5 8 8 10.8 13.5 8"/><path d="M2.5 11 8 13.8 13.5 11"/></symbol>
+<symbol id="i-check-badge" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M5.4 8.2l1.8 1.8 3.4-3.7"/></symbol>
+<symbol id="i-trend" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 11.6 6 7.6l2.5 2.5 5.2-5.2"/><path d="M10.4 4.9h3.3v3.3"/></symbol>
+<symbol id="i-rocket" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.6c2.3 1.5 3.5 3.9 3.5 6.4L9.9 11H6.1L4.5 8c0-2.5 1.2-4.9 3.5-6.4z"/><circle cx="8" cy="6.3" r="1.2"/><path d="M6.1 11 4.5 14l2.4-1.2M9.9 11l1.6 3-2.4-1.2"/></symbol>
+<symbol id="i-box" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.2 5 8 2.2 13.8 5v6L8 13.8 2.2 11z"/><path d="M2.2 5 8 7.8l5.8-2.8"/><path d="M8 7.8v6"/></symbol>
+<symbol id="i-doc" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.8 1.8h5.4l3 3v9.4H3.8z"/><path d="M9.2 1.8v3h3"/><path d="M6 8.2h4M6 10.7h4"/></symbol>
+<symbol id="i-docs" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5V2.5h5.2"/><path d="M5.8 4.2h4l2.7 2.7v7.1H5.8z"/><path d="M9.8 4.2v2.7h2.7"/></symbol>
+<symbol id="i-db" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="3.8" rx="5.2" ry="1.9"/><path d="M2.8 3.8v8.4c0 1.1 2.3 1.9 5.2 1.9s5.2-.8 5.2-1.9V3.8"/><path d="M2.8 8c0 1.1 2.3 1.9 5.2 1.9s5.2-.8 5.2-1.9"/></symbol>
+<symbol id="i-broadcast" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="1.6"/><path d="M5.2 10.8a4 4 0 0 1 0-5.6M10.8 5.2a4 4 0 0 1 0 5.6"/><path d="M3.3 12.7a6.7 6.7 0 0 1 0-9.4M12.7 3.3a6.7 6.7 0 0 1 0 9.4"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="8" height="8" rx="1.2"/><rect x="6.7" y="6.7" width="2.6" height="2.6"/><path d="M6 1.8V4M10 1.8V4M6 12v2.2M10 12v2.2M1.8 6H4M1.8 10H4M12 6h2.2M12 10h2.2"/></symbol>
+<symbol id="i-ticket" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5.6V4.3a.8.8 0 0 1 .8-.8h10.4a.8.8 0 0 1 .8.8v1.3a2.4 2.4 0 0 0 0 4.8v1.3a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8v-1.3a2.4 2.4 0 0 0 0-4.8z"/><path d="M10 3.7v8.6" stroke-dasharray="1.7 1.6"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.7 13h6.6a2.9 2.9 0 0 0 .5-5.8 4.3 4.3 0 0 0-8.3-.6A2.9 2.9 0 0 0 4.7 13z"/></symbol>
+<symbol id="i-factory" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5V6.8l3.4 2.2V6.8l3.4 2.2V4.4l5.2 2v7.1z"/><path d="M2 13.5h13"/></symbol>
+<symbol id="i-flask" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.8 1.8h4.4"/><path d="M6.6 1.8v4.1L3 12.3a1.6 1.6 0 0 0 1.4 2.4h7.2a1.6 1.6 0 0 0 1.4-2.4L9.4 5.9V1.8"/><path d="M4.8 9.8h6.4"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13.2 8A5.2 5.2 0 1 1 11.6 4.3"/><path d="M13.6 1.9v3h-3"/></symbol>
+<symbol id="i-flow" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="1.8" width="4.6" height="3.6" rx="1"/><rect x="9.6" y="1.8" width="4.6" height="3.6" rx="1"/><rect x="5.7" y="10.6" width="4.6" height="3.6" rx="1"/><path d="M6.4 3.6h3.2"/><path d="M4.1 5.4V8h7.8"/><path d="M11.9 5.4V8"/><path d="M8 8v2.6"/></symbol>
+<symbol id="i-globe" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M2 8h12"/><ellipse cx="8" cy="8" rx="2.6" ry="6"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.8" width="12" height="8" rx="1.2"/><path d="M8 10.8v2.6M5.2 13.4h5.6"/></symbol>
+<symbol id="i-compass" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M10.6 5.4 9.1 9.1 5.4 10.6 6.9 6.9z"/></symbol>
+<symbol id="i-wrench" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.8 4.2a.67.67 0 0 0 0 .94l1.06 1.06a.67.67 0 0 0 .94 0l2.52-2.51a4 4 0 0 1-5.3 5.29l-4.6 4.61a1.41 1.41 0 0 1-2-2l4.61-4.6a4 4 0 0 1 5.29-5.3L9.8 4.2z"/></symbol>
+<symbol id="i-drive" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3.2" width="12" height="9.6" rx="1.4"/><path d="M2 8.4h12"/><circle cx="11.2" cy="10.4" r=".9" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-ban" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M4 12 12 4"/></symbol>
+<symbol id="i-alert" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.2 14.4 13H1.6z"/><path d="M8 6.4v3"/><circle cx="8" cy="11.4" r=".8" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-next" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5 9.5 8l-6 4.5z"/><path d="M12.5 3.5v9"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.9 12.5a4.7 4.7 0 1 1 4.2 0"/><path d="M6.2 12.5h3.6"/><path d="M6.7 14.6h2.6"/><path d="M8 10.2V8"/></symbol>
+<symbol id="i-book" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.67 13a1.67 1.67 0 0 1 1.66-1.67h9"/><path d="M4.33 1.33h9v13.34h-9A1.67 1.67 0 0 1 2.66 13V3a1.67 1.67 0 0 1 1.67-1.67z"/></symbol>
+<symbol id="i-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 8.6l3.4 3.4 7-8"/></symbol>
+<symbol id="i-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3.2"/><path d="M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M12.8 3.2l-1.3 1.3M4.5 11.5l-1.3 1.3"/></symbol>
+<symbol id="i-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8.53A6 6 0 1 1 7.47 2 4.67 4.67 0 0 0 14 8.53z"/></symbol>
+<symbol id="i-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></symbol>
+</defs></svg>"""
+
+_OVERVIEW_HTML = _OVERVIEW_HTML.replace("__GLOSSARY__", _glossary_snippet()).replace(
+    "__ICON_SPRITE__", _ICON_SPRITE
+)
+_DASHBOARD_HTML = _DASHBOARD_HTML.replace("__GLOSSARY__", _glossary_snippet()).replace(
+    "__ICON_SPRITE__", _ICON_SPRITE
+)
