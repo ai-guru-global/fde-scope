@@ -17,6 +17,12 @@
 
 **不用于**：公开 benchmark 跑分（→ [huggingface-community-evals](huggingface-community-evals.md) / [evaluating-llms-harness](evaluating-llms-harness.md)）；纯 APM/链路追踪（→ [sentry-mcp](../zone-c-operationalization/sentry-mcp.md)）。
 
+## 新人上手
+
+- **触发**："给回答是否解决工单写一个语义评估指标"、"bad case 想用 LLM-as-judge 规模化挖掘"
+- **第一步**：先安装 `npx skills add arize-ai/phoenix@phoenix-evals --directory ~/.qoder/skills -y`（官方 org、三项审计全绿可直接装；按规约补一次 [skill-criticagent](../cross-cutting/skill-criticagent.md) 结论回填本页），再让 agent 按 code-first 规则 + LLM-as-judge 范式实现指标，落地为 `fde_scope/eval/` 里的函数并注册进 `METRICS`
+- **常见坑**：judge 分数直接对客户讲话——skill 的核心主张是 "validate against humans"，先在同一批样本上做 human-judge 一致性抽检，一致率不足别用；judge 走外部 LLM 时客户原文会出境——气隙/合规客户必须换本地 judge（→ [vllm-deploy-docker](vllm-deploy-docker.md)），且每条样本至少一次 LLM 调用，1k 数据集成本要预估
+
 ## 最佳实践
 - 该 skill 三项安全审计全绿且来自官方 org，是本 catalog 里**风险最低的 📦 项之一**，可直接安装；仍按规约走一次 [skill-criticagent](../cross-cutting/skill-criticagent.md) 并把结论回填本页
 - Judge 也是模型：先在同一批样本上做 **human-judge 一致性抽检**（skill 的核心主张："validate against humans"），一致率不足就别拿分数对客户讲话

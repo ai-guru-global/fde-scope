@@ -12,6 +12,13 @@
 
 **不用于**：本地 GPU 训练（→ [trl-training](trl-training.md)）；百炼平台客户（→ [bailian-train-deploy](../zone-b-build/bailian-train-deploy.md)，数据不出阿里云）；视觉模型（→ [huggingface-vision-trainer](huggingface-vision-trainer.md)）；**含客户数据**的训练（HF Jobs 会把数据传到 Hub——合规红线）。
 
+## 新人上手
+
+- **触发**：对 agent 说「用 HF Jobs 微调一个模型」「fine-tune 后转成 GGUF 在客户内网跑」——SKILL.md 约定：用户提"train a model"它就必须建脚本并立即用 `hf_jobs()` 提交
+- **第一步**：先验证前置：`hf auth whoami` 确认登录（Jobs 需 Pro/Team/Enterprise 计划、token 有 write 权限），再校验数据集 `uv run scripts/dataset_inspector.py --dataset <user/dataset> --split train`，通过后才让 agent 用 `hf_jobs("uv", {...})` 提交训练
+- **常见坑**：job 默认 timeout 30 分钟对多数训练**太短**——超时即失败且丢失全部进度，提交前按预估时长把 timeout 调到 1–2 小时以上
+- **常见坑**：训练环境是临时的，不推 Hub 结果全丢——job 配置必须带 `secrets={"HF_TOKEN": "$HF_TOKEN"}` 且脚本开 `push_to_hub=True`、`hub_model_id="user/model-name"`；另外 TRL 配置参数是 `max_length`，写 `max_seq_length` 会直接 TypeError
+
 ## 最佳实践
 - ⚠️ **数据出境判断**：HF Jobs 需要把数据集上传 Hub（即便 private repo）。工业客户/政企默认视为不可接受，须书面确认后才用；否则一律走本地/私有云训练
 - 先成本预估再提交：明确 GPU 型号与时长，demo 用最小规格，跑通即停

@@ -30,6 +30,13 @@
 - 写代码的流程纪律 → [using-superpowers-family](using-superpowers-family.md)；发布/QA/安全审计流水线 → [gstack-suite](gstack-suite.md)
 - 已有本地等价物时：`documentation` vs [document-generate](../zone-d-handoff/document-generate.md)、`view-pdf` vs [pdf](../zone-a-pre-engagement/pdf.md)、`code-review` vs [code-review](code-review.md)、`search` vs [firecrawl-search](../zone-a-pre-engagement/firecrawl-search.md)
 
+## 新人上手
+
+- **触发**：先确认没装——本套件 230 件**未整包安装**（也禁止整包：会污染触发空间）；想用某件直接对 agent 点名，如「用 deploy-checklist 出上线清单」「用 runbook 写 XX 的运维手册」
+- **第一步**：install-first——按需单装：`npx skills add anthropics/knowledge-work-plugins@<skill> --directory ~/.qoder/skills -y`（推荐顺序：`deploy-checklist` → `runbook` → `documentation`，三者已源码取证），装完再点名调用
+- **常见坑**：`--directory ~/.qoder/skills` 必须带——这些 skill 源自 Claude 生态，缺这个参数会装进 `.claude/skills/`，Qoder 看不到
+- **常见坑**：同仓库条目也会抢触发——实测 `documentation` 的 description 含 `"write a runbook"`、与 `runbook` 直接重叠；`architecture` / `debug` / `analyze` 这类极通用名易与其他来源撞车，装前过 skill-criticagent 门禁并写清"它替代了谁的哪部分"
+
 ## 最佳实践
 - **一次只装一个，并写清"它替代了谁的哪部分职责"**——这是本 catalog 维护规约第 3 条（装前门禁）的落地点：先跑 [skill-criticagent](skill-criticagent.md) 评估，通过才装
 - 装完把该页从 📦 改 ✅、补安装日期，并在本页表格对应行标注"已装"

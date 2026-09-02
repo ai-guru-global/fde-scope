@@ -12,6 +12,13 @@
 
 **不用于**：Python 侧内存问题（fde-scope 主体是 Python，用 `tracemalloc`/`objgraph`/`memray`，此 skill 不适用）；单纯页面慢（→ [web-perf](web-perf.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「这个面板开一天就越来越卡」「Node 进程 OOM 了」「帮我分析 heapsnapshot」——高内存/OOM/泄漏检测都算（仅 JS/Node 侧，Python 侧不适用）
+- **第一步**：用 chrome-devtools MCP 在三个状态各存一份 `take_heapsnapshot`（基线 → 把可疑交互重复 10 次 → 还原页面），然后跑 `memlab` 自动找泄漏 trace，看 retained size 增长的对象类型
+- **常见坑**：**绝对不要**直接 `read_file`/`cat` 原始 `.heapsnapshot`——文件极大，会瞬间撑爆上下文；SKILL.md 强制走 `memlab`，没有 memlab 时用 fallback 脚本 `node references/compare_snapshots.js <baseline.heapsnapshot> <target.heapsnapshot>`
+- **常见坑**：先区分泄漏和高占用——增长后趋平不是泄漏，别急着改代码；detached DOM 节点有时是有意缓存，null 掉之前先问用户
+
 ## 最佳实践
 - 判定前先区分"泄漏"和"高占用"：增长后趋平不是泄漏，别急着改代码
 - 采集两次 heapsnapshot（操作前/重复 N 次操作后）做 diff，看** retained size 增长的对象类型**

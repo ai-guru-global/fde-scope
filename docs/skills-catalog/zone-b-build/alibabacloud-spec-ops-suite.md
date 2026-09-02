@@ -12,6 +12,12 @@
 
 **不用于**：单机 ECS 运维（→ [alibabacloud-workbench-cli](alibabacloud-workbench-cli.md)）；K8s 应用层部署（→ [kubernetes-specialist](kubernetes-specialist.md)）；非阿里云的 Terraform（本套件绑定 alicloud provider，通用流程自己写 plan）；只想查资源（→ [alibabacloud-core 套件](alibabacloud-core-suite.md)）。
 
+## 新人上手
+
+- **触发**：客户要"资源开通 / 组网 / 上云"的 IaC 交付时直接描述需求，如"在阿里云上给这套系统开 ECS、RDS 和安全组"——套件以 `alibabacloud-planning` 为唯一入口（其 SKILL.md 自称官方 entry point）
+- **第一步**：对 agent 说"我要在阿里云创建 xxx，先做规划"——planning 澄清需求后把设计产物写进 `.aliyun-ai-ops-spec/<name>/`，之后按 `alibabacloud-writing-plans` → `alibabacloud-terraform-codegen` → `alibabacloud-validate` → `alibabacloud-executing-plans` 顺序推进，不要跳步
+- **常见坑**：validate 没过就 apply——流水线顺序不可跳，跳步省下的时间会在回滚时加倍还；遇到 403/NoPermission 就盲改 RAM 策略——先跑 `alibabacloud-ram-permission-diagnose` 拿最小授权建议，别一上来给 `AdministratorAccess`
+
 ## 最佳实践
 - **流程顺序不可跳**：先 planning 再 codegen，validate 不过不 apply——跳步省下的时间都会在回滚时加倍还
 - apply 前把 plan diff 展示给用户确认（工具强制 `--yes` 是底线不是充分条件）

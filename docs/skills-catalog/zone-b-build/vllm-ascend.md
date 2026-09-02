@@ -15,6 +15,12 @@
 
 **不用于**：NVIDIA 卡（→ [vllm-deploy-docker](vllm-deploy-docker.md)）；昇腾**算子开发**（属另一类需求，registry 有 `ascend/agent-skills@ascendc-operator-*` 系列，超出 FDE 交付范围）。
 
+## 新人上手
+
+- **触发**：客户是昇腾环境（Atlas 800/300I、910B）时说"在昇腾上把模型起成 vLLM 服务"，或现场服务报 kernel/版本不匹配需要按插件矩阵定位
+- **第一步**：先过 [skill-criticagent](../cross-cutting/skill-criticagent.md) 门禁人工审 SKILL.md（重点看候选 B 是否自动执行远程命令），再安装 `npx skills add ascend/agent-skills@vllm-ascend-deploy --directory ~/.qoder/skills -y`（工作流型候选 B；只要知识参考就选候选 A `ascend-ai-coding/awesome-ascend-skills@vllm-ascend`，不改环境、风险更低）
+- **常见坑**：版本矩阵错配即失效——`vllm`/`vllm-ascend`/CANN/NPU driver 四元组强绑定，任一升级都可能起不来；候选 B 会自动执行 SSH 远程命令且安全审计三项均 Warn——绝不把 SSH key/密码明文交给 skill，凭据走 [alibabacloud-workbench-cli](alibabacloud-workbench-cli.md) 或客户跳板机审批流程
+
 ## 最佳实践
 - ⚠️ **安全审计现状**（skills.sh 页面可见，建档日 2026-08-27 复核）：候选 A = Agent Trust Hub **Fail** / Socket Pass / Snyk Warn；候选 B = 三项均 **Warn**。两者都**未通过干净审计**，属于必须先过门禁的类型
 - 强制门禁：装前用 [skill-criticagent](../cross-cutting/skill-criticagent.md) 人工审 SKILL.md 全文，重点看候选 B 是否会**自动执行远程命令**（SSH + 部署脚本）——这类 skill 相当于给 agent 一把现场钥匙

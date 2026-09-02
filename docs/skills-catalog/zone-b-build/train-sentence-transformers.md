@@ -11,6 +11,13 @@
 
 **不用于**：生成式 LLM 微调（→ bailian-train-deploy / trl-training）；只是调 API 检索（平台侧知识库解决）。
 
+## 新人上手
+
+- **触发**：要训/精调嵌入或重排模型时说「训练 sentence-transformers」「微调个 embedding 模型」「训个 reranker」（skill description：any sentence-transformers training task；先按双塔/重排/稀疏三类定位模型类型）
+- **第一步**：别让 agent 从零写训练脚本——SKILL.md 开头明说"this is a router, not a manual"：确定类型后复制对应生产模板 `scripts/train_<type>_example.py` 起步，并完整读 `references/losses_*.md` 的损失-数据形状映射
+- **常见坑**：CrossEncoder 非 BCE 损失必须 `activation_fn=Identity()`，漏了会"silent eval-rank collapse"（SKILL.md 原话）；MNRL 损失族要求 `BatchSamplers.NO_DUPLICATES` 采样器，随机负例直接训错
+- **常见坑**：精度别写 `torch_dtype=bfloat16`——规则是 fp32 加载 + autocast（bf16/fp16）；`save_steps` 必须是 `eval_steps` 的倍数，否则 `load_best_model_at_end` 不生效。训前先跑现成模型 baseline（recall@k），不够再训
+
 ## 最佳实践
 - Do：先拿现成模型跑 baseline 并量化（recall@k / 聚类纯度），不够再训——训练是最后手段
 - Do：难负例挖掘（hard-negative mining）是效果大头，别只喂随机负例

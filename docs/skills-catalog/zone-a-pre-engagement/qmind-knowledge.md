@@ -12,6 +12,13 @@ QMind 知识库工具箱：知识检索、notebook 管理、批量上传文件�
 
 **不用于**：代码仓库理解（→ zread）；fde-scope 自身语料（→ `fde_scope.corpus` 管道，不要混仓）。
 
+## 新人上手
+
+- **触发**：提到 知识库 / RAG / 上传文档 / notebook / compile / lint / 知识卡片 等关键词即命中（SKILL.md 原文触发词）
+- **第一步**：`$QMIND login`（浏览器 OAuth，凭据落 `~/.qmind/credentials.json`）→ `$QMIND notebook list -format json` 看现有知识库
+- **常见坑**：PROD ONLY——不要设 `QMIND_ENV` 等环境变量；`notebook create` 不幂等（不去重），创建前先 `notebook list`，新建后等 5-10 秒再上传，否则同步延迟会报 404
+- **常见坑**：`compile` 是最贵操作（消耗 LLM token），批量上传完只触发一次；`notebook delete` / `source delete` 必须先跟用户确认
+
 ## 最佳实践
 - Do：批量上传后先 compile 出卡片再 lint，把质量问题在入库阶段解决
 - Do：按"知识域"建 notebook（如 05-网络/），与用户既有的目录习惯对齐

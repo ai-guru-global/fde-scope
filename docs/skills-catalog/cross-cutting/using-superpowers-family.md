@@ -32,6 +32,13 @@
 
 **不用于**：纯只读问答与检索（族内 skill 会说"先检查 skill"，但不代表每个都要跑）；`using-superpowers` 明确写了 **SUBAGENT-STOP**——被派发去执行特定任务的子 agent 应忽略它，不要在工作子进程里再套一层方法论；紧急生产事故止血阶段先恢复再补流程（但事后仍要走 `systematic-debugging` 复盘）。
 
+## 新人上手
+
+- **触发**：装好即生效、无需手动触发——`hooks/session-start` 在每次会话启动注入 `using-superpowers` 的强制规则（"哪怕 1% 可能适用也必须先调用 skill"），是本目录唯一主动改变 agent 默认行为的套件
+- **第一步**：正常开工并观察 agent 是否"先查 skill 再动手"（连澄清问题之前都要查）；要定点拉起就点名成员：「用 writing-plans 写计划」「按 systematic-debugging 查这个 bug」「先 brainstorming 再动手」
+- **常见坑**：`using-superpowers` 带有 `<SUBAGENT-STOP>`——被派发执行特定任务的子 agent 应忽略它，别在工作子进程里再套一层方法论
+- **常见坑**：`~/.qoder/skills/` 下有早期散装的同名镜像，插件升级后以插件版（v5.1.0）为准，别两边各改各的；它的规则让位于用户指令——在 fde-scope 里按仓库维护规约裁剪，别为改一行 README 走完整 TDD
+
 ## 最佳实践
 - **冲突时以本仓约定为准**：superpowers 的规则很强硬（"哪怕 1% 可能适用也必须调用"）。在 fde-scope 里，文档/小改动场景按 [../README.md](../README.md) 的维护规约裁剪，别为改一行 README 走完整 TDD
 - 计划文件要落盘可评审（`writing-plans` 的产物），别只在会话里说过——`executing-plans` 依赖它做检查点

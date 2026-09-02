@@ -15,6 +15,13 @@
 
 **不用于**：日常小 bug（→ [systematic-debugging](systematic-debugging.md)）；已知故障的按步处置（→ [sre-runbooks](sre-runbooks.md)，runbook 是"平时写、事件时读"）；根因分析工具链（→ [starops](starops.md) / [sentry-mcp](sentry-mcp.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「启动 incident response，这事按 P1 处理」「给客户出一份事件说明/复盘」——真的在生产炸了才用，日常小 bug 不走这套
+- **第一步**：先安装：`npx skills add anthropics/knowledge-work-plugins@incident-response --directory ~/.qoder/skills -y`，然后让 agent 按流程开时间线（谁/何时/做了什么/观察到什么）并做严重度分级与角色分工
+- **常见坑**：事件期只做"分级 → 遏制 → 通信"三件事，根因留到复盘——别让它边查边猜，遏制永远优先于根因
+- **常见坑**：对外沟通禁止承诺未经确认的恢复时间（用"影响 + 现状 + 下次更新时间"三段式）；涉及停线/安全的事件，agent 只出建议不执行，处置动作必须客户授权人在场
+
 ## 最佳实践
 - 事件期只做三件事：**分级 → 遏制 → 通信**。根因留到复盘阶段，别在群里边查边猜
 - 时间线从事件第一分钟开始记（谁在何时做了什么、观察到什么），这是复盘与免责的唯一凭据

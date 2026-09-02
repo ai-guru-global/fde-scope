@@ -12,6 +12,13 @@
 
 **不用于**：火山方舟 ark 精调；本地 GPU 训练（→ trl-training / huggingface-llm-trainer）；纯选型（→ bailian-model-recommend）。
 
+## 新人上手
+
+- **触发**：提到百炼/DashScope 的「训练模型」「微调」「fine-tune」「部署模型/上线」「SFT/DPO/LoRA」任一环节即触发，用户没点名 `bl` 也算（skill description 触发语 + 页面"何时使用"）
+- **第一步**：按固定链路推进：`bl dataset validate` 校验数据格式对齐模板 → `bl dataset upload` 拿 file-id → `bl finetune create` 建任务 → watch 到完成 → export 最佳 checkpoint → `bl deploy`——不要跳步；所有写操作先加 `--dry-run` 预览
+- **常见坑**：顺序不可省：未 watch 完成就 export 会拿到未就绪 checkpoint（页面 Don't 明令）；数据格式没在 validate 阶段对齐模板，训练跑到一半才失败，白烧按时长计费的额度
+- **常见坑**：不要凭记忆拼 `bl` 参数（页面 Don't，百炼 skill 家族要求先读命令文档）；API key 只走环境变量（项目不变量），禁止写进脚本/日志
+
 ## 最佳实践
 - Do：链路固定为 validate 数据 → upload 拿 file-id → finetune create → watch → export → deploy，**不要跳步**
 - Do：所有写操作先 `--dry-run` 预览再执行

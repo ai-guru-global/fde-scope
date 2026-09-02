@@ -27,6 +27,13 @@
 
 **不用于**：普通问答、编程、写作、翻译、摘要、泛搜索、图片理解——**宿主自己能做的任务不触发本 skill**（skill 描述里写明了反触发边界）；用户点名火山方舟/ark 的训练不走 `bailian-finetune`；调已上线的百炼应用走 `bl app`，不是 `managed-agent`。
 
+## 新人上手
+
+- **触发**：点名「百炼 / DashScope / `bl`」或续跑既有 `bl` 工作流——skill 描述写明反触发边界：普通问答、编程、写作、翻译、摘要、泛搜索不触发
+- **第一步**：首次环境先跑 `bl skill init` 整包安装（hub + protocol + 各业务 skill 同装，别只装 hub），之后 `bl app list --output json`、`bl usage stats`、`bl model list --model qwen` 都是入口级命令
+- **常见坑**：执行前必读 `bailian-protocol/SKILL.md`（consent / 版本预检 / 鉴权），协议文件缺失就停下重跑 `bl skill init`，不要猜鉴权；命令不凭记忆拼——先查 `reference/<group>.md` 或 `bl <cmd> --help`，跑前先 `bl --version`
+- **常见坑**：console 登录必须显式带 `--console-site domestic|international`；未指明产品先问清再跑 `bl usage` / `bl quota`（否则查的额度是错的对象）；写操作先 `--dry-run`，`managed-agent apply/destroy` 必须 `plan` 看 diff 后带 `--yes`
+
 ## 最佳实践
 - **执行前必读 `bailian-protocol/SKILL.md`**（provider 选择与 consent、版本与更新预检、setup/auth、错误上报）。协议文件缺失就停下先跑 `bl skill init`，**不要猜鉴权和 consent**
 - 版本预检是硬步骤：`bl` 是快速迭代的 CLI，旧版本上的"正确命令"可能已改名；先看 `bl --version` 与 `bl <cmd> --help`

@@ -11,6 +11,13 @@
 
 **不用于**：非空间的普通数据分析（→ query）；地图渲染类产品开发。
 
+## 新人上手
+
+- **触发**：问题里带 lat/lng、距离、「离 X 最近的」、区域包含判断或 GeoJSON/Shapefile/GeoPackage 文件（SKILL.md 触发清单原文）；没给文件的真实地点问题会自动走 Overture Maps（S3 免费无 key）
+- **第一步**：任何空间查询都以这两行开头（SKILL.md Step 2 规定）：`LOAD spatial;` + `SET geometry_always_xy = true;`——CSV 坐标转点用 `ST_Point(longitude, latitude)`，经度在前
+- **常见坑**：球面距离函数 `ST_Distance_Spheroid` 只吃 `POINT_2D` 类型，Overture 的 `GEOMETRY` 列要先 `ST_Point(ST_X(geometry), ST_Y(geometry))::POINT_2D` 抽坐标，直接传会算错；平面 `ST_Distance` 对经纬度结果无意义
+- **常见坑**：查 Overture 必须先用 `bbox.xmin/xmax/ymin/ymax` 粗筛再做空间函数——否则绕过 Parquet 谓词下推，等于把全球数据集整段拉下来
+
 ## 最佳实践
 - Do：先确认坐标系（WGS84 vs 投影坐标），距离计算错坐标系是最常见事故
 - Do：大表空间 join 前用边界框粗筛再精算

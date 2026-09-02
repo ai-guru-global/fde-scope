@@ -12,6 +12,13 @@ Cloudflare 全平台决策树 + 实现指导：Workers / Pages / KV / D1 / R2 / 
 
 **不用于**：客户内网离线部署（Cloudflare 依赖公网 → [docker-build-deploy](docker-build-deploy.md) / [kubernetes-specialist](kubernetes-specialist.md)）；GPU 推理（→ [vllm-deploy-docker](vllm-deploy-docker.md)，Workers AI 只适合小模型）。
 
+## 新人上手
+
+- **触发**：任何 Cloudflare 开发任务（Workers/Pages/KV/D1/R2/Vectorize/WAF…）都适用（skill description）；选型问题直接问「这段逻辑该放 Worker、Pages Function 还是 Durable Object」
+- **第一步**：确认 `wrangler --version`（要求 v4.x+，缺则先装），本地验证一律 `wrangler dev`——同插件的 wrangler skill 要求敲命令前先读它，保证语法与配置字段不凭记忆
+- **常见坑**：引用限额/定价/API 签名前必须先拉 Cloudflare docs（SKILL.md 强约束："trust the docs"，references 与 docs 冲突以 docs 为准）——凭记忆写数字必错
+- **常见坑**：别在生产 Worker 上试错，先 `wrangler dev` 本地过；客户数据入边缘存储前确认可出境/合规（工业客户通常禁止），默认只放配置与匿名指标
+
 ## 最佳实践
 - 严格遵守 skill 的 retrieval 规则：引用数字/价格/限额前先拉最新 docs，reference 文件与 docs 冲突时**以 docs 为准**
 - 用 `wrangler` 做本地 dev + 类型校验，别在生产 Worker 上试错

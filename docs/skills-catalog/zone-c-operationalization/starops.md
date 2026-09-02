@@ -12,6 +12,13 @@
 
 **不用于**：客户自建 Prometheus/Grafana 栈（→ [gke-observability](gke-observability.md) 或直接读 Prometheus）；无云监控的离线现场（→ [investigate](investigate.md) + 手工日志）；代码级 bug 复现（→ [systematic-debugging](systematic-debugging.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「排查根因」「接口超时」「告警分析」「链路追踪」这类词（SKILL.md 内置触发词还包括「影响面分析」「故障复盘」「k8s诊断」等）
+- **第一步**：先确认 `~/.starops/config.json` 里有 `employeeId`、`workspace`、`uid` 三项，再跑 `python3 scripts/check_starops_setup.py` 做本地自检，通过后用 `python3 scripts/call_starops_agent.py --question "<时间窗+服务名+现象>" --pipe` 发起首次诊断
+- **常见坑**：调用必须带 `--pipe`（SKILL.md 标注 MANDATORY），否则输出没有 `THREAD`/`=== STAROPS ANSWER ===` 分隔符，后续无法解析续问；追问必须复用 `--thread <id>`，另起新线程会丢弃整次排查上下文
+- **常见坑**：配置键名必须精确写 `employeeId`/`workspace`/`uid`，写 `employee`、`workspaceName` 这类别名会直接报 ConfigError；HTTP 401 说明凭证缺 `starops:CreateThread`/`starops:CreateChat` 权限，404 多半是 Digital Employee ID 或 workspace 与 UID 不匹配
+
 ## 最佳实践
 - 提问题时带上**时间窗 + 服务名 + 现象**三要素，否则 agent 会给出泛化结论
 - 把它的根因结论当"假设"：要求给出支撑的 trace/指标证据，再落到 runbook

@@ -12,6 +12,13 @@ shadcn/ui 全套能力：CLI 初始化（非交互）、组件添加（`npx shad
 
 **不用于**：纯静态单页原型（→ [ui-designer](ui-designer.md) 或 [frontend-design](frontend-design.md) 足够）；非 React 技术栈（Vue/Svelte）不要硬套。
 
+## 新人上手
+
+- **触发**：路径命中 `components.json`、`components/ui/**` 或命令出现 `npx shadcn init/add` 时自动激活（SKILL.md metadata 的 pathPatterns/bashPatterns，priority=6）；对 agent 说「加一个 Dialog 组件」「调主题」同样命中
+- **第一步**：项目根跑 `npx shadcn@latest init` 用非交互参数初始化（页面 Do：避免 agent 卡在交互提示上），然后按需 `npx shadcn@latest add <component>`
+- **常见坑**：项目用 AI Elements 时必须 `npx shadcn@latest init -d --base radix -f`——SKILL.md 内置校验规则：Base UI 与 Radix API（asChild/openDelay）不兼容，装错基底组件会带类型错
+- **常见坑**：别 `add` 全家桶——组件是复制进仓库的源码不是 npm 依赖，一次性 add 全部会塞满没人维护的副本；主题统一走 CSS 变量 + Tailwind token，逐组件改颜色后面改不动
+
 ## 最佳实践
 - Do：`npx shadcn@latest init` 用非交互参数，避免 agent 卡在提示上
 - Do：只 add 真正用到的组件——一次性 add 全部会把仓库塞满没人维护的副本

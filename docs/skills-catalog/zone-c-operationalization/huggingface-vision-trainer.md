@@ -12,6 +12,13 @@
 
 **不用于**：LLM/文本微调（→ [trl-training](trl-training.md) / [huggingface-llm-trainer](huggingface-llm-trainer.md)）；ROS2 bag 的解析与数据集导出（→ `fde_scope/connectors/ros2_bag.py`）；数据不出厂客户（HF Jobs 需上传数据，先做合规判断）。
 
+## 新人上手
+
+- **触发**：对 agent 说「微调一个缺陷检测模型」「用几张标注图 fine-tune SAM 做分割」——SKILL.md 触发词覆盖 object detection / image classification / SAM2 / DETR / timm 等
+- **第一步**：先 `hf auth whoami` 确认认证（Jobs 需付费计划），再跑 `uv run scripts/dataset_inspector.py --dataset <user/dataset> --split train` 校验数据格式，✓ READY 后让 agent 按 `scripts/object_detection_training.py` / `image_classification_training.py` / `sam_segmentation_training.py` 提交
+- **常见坑**：格式不匹配是训练失败的头号原因——目标检测注记必须在 `objects` 列（`bbox` + `category`），分类必须有 `image` + `label` 列，SAM 数据必须带 `prompt`/`bbox`/`point` prompt 列（bbox 用 xyxy 绝对像素）；GPU 训练前必跑 inspector
+- **常见坑**：job 默认 timeout 30 分钟太短，超时丢全部进度；先 10% 数据/1 个 epoch 验证收敛再放全量，Trackio 曲线存档进交付记录
+
 ## 最佳实践
 - 数据格式先对齐 COCO（bbox 归一化/类别映射最容易出错），再谈模型选择
 - 模型选择从任务反推：实时性优先 RT-DETR/MobileViT；精度优先 D-FINE/DINOv3；标注少考虑 SAM 交互式分割补标

@@ -12,6 +12,13 @@
 
 **不用于**：整站批量（用 [firecrawl-crawl](firecrawl-crawl.md)）、本地文件（用 [firecrawl-parse](firecrawl-parse.md)）。
 
+## 新人上手
+
+- **触发**：给 agent 一个 URL 并说 "scrape" / "grab" / "extract from this URL" / "read this webpage"（SKILL.md 原文触发词）——"给我这个链接的内容"
+- **第一步**：`firecrawl scrape "<url>" -o .firecrawl/page.md`；SPA/重 JS 页面加 `--wait-for 3000` 等渲染，只要正文再加 `--only-main-content`
+- **常见坑**：URL 必须加引号——shell 会把 `?` 和 `&` 当特殊字符截断参数，裸写会抓错页
+- **常见坑**：优先普通 scrape 落盘后自己搜内容，`--query` 问答模式一次多花 5 credits；要登录/点击的页面 scrape 拿不到，改走 interact + profile
+
 ## 最佳实践
 - Do：优先 scrape 而不是自己写 requests+BeautifulSoup
 - Do：需要页面上特定字段时用 extract/结构化模式，别拿全文再人肉找

@@ -59,6 +59,29 @@ def test_industrial_gates_skip_for_ticket() -> None:
     assert result.notes  # "not applicable"
 
 
+def test_not_applicable_gate_result_is_recorded() -> None:
+    # status().gate_passed reads gate_records only — a skipped gate must still
+    # leave a passing record, or multi-gate phases (slo_sla) report a false ❌.
+    eng = _eng(profile="ticket")
+    result = eng.evaluate_gate("shift_handover")
+    assert result.passed
+    rec = eng.ctx.gate_records["shift_handover"]
+    assert rec.passed
+
+
+def test_gate_passed_true_for_ticket_at_slo_sla() -> None:
+    from fde_scope.engagement import SLOSpec
+
+    eng = _eng(
+        profile="ticket",
+        current_phase="slo_sla",
+        slos=[SLOSpec(name="availability", target="99.5%")],
+    )
+    for slug in ("slo", "shift_handover"):
+        assert eng.evaluate_gate(slug).passed
+    assert eng.status()["gate_passed"] is True
+
+
 # -- FAT/SAT -----------------------------------------------------------------
 def test_fat_sat_blocks_without_records() -> None:
     eng = _eng()

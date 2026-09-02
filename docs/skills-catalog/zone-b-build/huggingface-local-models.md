@@ -13,6 +13,12 @@
 
 **不用于**：有 GPU 集群且要并发吞吐（→ [vllm-deploy-docker](vllm-deploy-docker.md)）；昇腾 NPU（→ [vllm-ascend](vllm-ascend.md)）；模型训练/微调（→ [huggingface-llm-trainer](../zone-c-operationalization/huggingface-llm-trainer.md)）；客户已采购商用 API（直接接，别自建）。
 
+## 新人上手
+
+- **触发**："我想在本机（Mac/CPU）上跑个开源模型试试"、"客户内网没有外网，LLM 只能本地化怎么办"
+- **第一步**：让 agent 按技能流程走：先跑 `hf-mem` 估内存选量化档，再从 Hub 用 `apps=llama.cpp` 过滤检索 GGUF，最后 `llama-server -hf <repo>:<QUANT>` 起 OpenAI 兼容本地服务
+- **常见坑**：下载前不估内存——现场机器爆内存是最难看的演示事故，长上下文还要把 KV cache 算进预算，别只看权重；猜 `.gguf` 文件名——必须用 `https://huggingface.co/api/models/<repo>/tree/main` 确认精确文件名，自定义命名要用 `--hf-repo` + `--hf-file`，gated 仓库先 `hf auth login`
+
 ## 最佳实践
 - 量化选档：Q4_K_M 是吞吐/质量默认起点；给客户演示优先 Q5/Q6 起步，"答得慢但对"好过"快但胡说"
 - 下载前先跑 `hf-mem` 估内存，现场机器爆内存是最难看的演示事故

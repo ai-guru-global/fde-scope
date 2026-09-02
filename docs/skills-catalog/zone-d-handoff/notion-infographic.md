@@ -12,6 +12,14 @@
 
 **不用于**：需要精确数据与坐标的正式图表（用 [data-visualization 类工具](../zone-b-build/frontend-design.md) 或 matplotlib）；工程图纸/架构图（→ [drawio](../zone-a-pre-engagement/drawio.md) / [architecture-communicator](../zone-a-pre-engagement/architecture-communicator.md)）；正式验收材料（风格过于随意）。
 
+## 新人上手
+
+- **触发**：对 agent 说"阅读 docs/xx.md，生成一组信息图" / "把这篇文稿做成 Notion 风格组图"（description_zh：根据参考文稿批量生成信息图组图）
+- **第一步**：对 agent 说"读 `docs/成果.md`，生成 5 张信息图"——可指定张数；不指定则按文章意图自动定（每图一个观点，硬上限 12 张），逐张调用 imageGen 出 16:9 中文标注图
+- **常见坑**：
+  - 风格前缀/后缀是硬性约束：每张图提示词必须完整保留同一段风格描述（纯黄主色、马克笔松弛笔触、禁止渐变/3D/阴影/密集文字），省略任何细节整组图风格就散了
+  - 单张图只放 1 个信息点，堆多个观点是明确禁止项；产物按 `infographic-01.png` 起顺序编号，便于整组分发
+
 ## 最佳实践
 - 输入文稿先分点（每点一张图），否则组图信息密度失衡
 - 风格一次定锚：先出 2~3 张确认风格，再批量，避免整批返工

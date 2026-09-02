@@ -20,6 +20,13 @@
 
 **不用于**：用户明确说要本地 Qoder CLI 或自托管 agent；一次性小任务（开云端会话的固定开销不划算）；需要读客户内网资源的任务（云端容器不在客户网络里，除非走 [alibabacloud-workbench-cli](../zone-b-build/alibabacloud-workbench-cli.md) 那类跳板）。
 
+## 新人上手
+
+- **触发**：说「创建一个 cloud agent」「把任务丢给云端跑」「合上电脑也要继续跑」——触发词覆盖 "cloud agent / remote agent / background agent / always-on agent"；明确要本地 Qoder CLI 或自托管 agent 时跳过
+- **第一步**：在 https://qoder.com/cloud/pat-keys 创建 PAT（请求带 `Authorization: Bearer <PAT>`，Base URL `https://api.qoder.com/api/v1/cloud`），按核心流程走：`POST /environments` 建环境 → `POST /agents` → `POST /sessions` → `POST /sessions/{id}/events` 发消息，等 `session.status_idle` 再发下一轮
+- **常见坑**：新账号没有默认 environment——不先 `POST /environments`（body 必须含 `"config": {"type":"cloud","networking":{"type":"unrestricted"}}`，只发 `{name}` 返回 400）直接起会话必失败，这是最常见的入门坑
+- **常见坑**：`POST /sessions` 的字段名是 `agent` 不是 `agent_id`（否则 400）；消息必须包在 `{"events":[…]}` 数组里；模型名用 `ultimate`（其他名字可能 `session.error`）；首轮事件有 5-60 秒容器冷启动，别过早判超时
+
 ## 最佳实践
 - **新账号没有默认 environment**：起会话前必须先 `POST /environments`，否则直接失败——这是最常见的入门坑
 - REST 侧鉴权：`Authorization: Bearer <PAT>`，PAT 在 https://qoder.com/cloud/pat-keys 创建；Base URL `https://api.qoder.com/api/v1/cloud`

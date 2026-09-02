@@ -12,6 +12,14 @@
 
 **不用于**：发布后的增量文档同步（→ [document-release](document-release.md)）；把文档排版成 PDF 交付物（→ [make-pdf](make-pdf.md)）；面向高管的架构讲法（→ [architecture-communicator](../zone-a-pre-engagement/architecture-communicator.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说 "document this feature" / "generate documentation" / "explain this module"（SKILL.md triggers 原词），或中文"给这个模块补文档"
+- **第一步**：指定范围开跑，例如："给 `fde_scope/deploy/` 生成文档，输出到 `deploy/README`"——它会先做代码考古（读代码 + 读测试 + 读现有文档）再动笔，并先问你文档落点（写进现有文件 / 独立 `docs/` / 两者都要，推荐"两者都要"）
+- **常见坑**：
+  - 别让它一次生成整仓文档：它按 Diataxis 四象限出文档计划，超过 5 份才会再次向你确认，整仓直跑极易留下已废弃签名的 API 说明——分模块跑，交付前逐条回代码核对引用
+  - 自动生成的数字与清单（路由数、gate 数、连接器数）必须来自可复跑命令，不要接受"约 10 个"这类模糊写法，否则验收时对不上数
+
 ## 最佳实践
 - 先定读者再定内容：客户运维手册 ≠ 开发者文档 ≠ 验收报告，一份文档只服务一类读者
 - 生成后**逐条核对代码引用**：自动生成的 API 说明最容易留下已废弃签名（本仓库刚做过同类校验，见 `docs/architecture-model/architecture-health-report.md`）

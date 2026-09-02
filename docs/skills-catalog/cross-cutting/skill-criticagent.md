@@ -13,6 +13,13 @@
 
 **不用于**：评估 MCP server（→ [mcp-criticagent](mcp-criticagent.md)）；代码评审（→ [code-review](code-review.md)）；架构评估（→ [risk-quality-reviewer](architecture-visualization-suite.md)）。
 
+## 新人上手
+
+- **触发**：把 skill 目录丢给 agent 问「这个 skill 能不能装 / is this skill any good」——SKILL.md 写明哪怕只问这一句也触发
+- **第一步**：在仓库根目录零提问默认评估，先跑合规 + 安全扫描：`uv run python -m src.main eval-skill <skill_dir> --strict --json`（依赖 `uv sync`，无需 API key）——报错即不可安装，直接给「先修复」结论并跳过后续
+- **常见坑**：`evals/evals.json` 里的自由句式断言会退化成字面子串匹配、with/without 两轮都无意义失败——要先在工作副本上把每句改写成可验证断言（具体字符串 / 正则）
+- **常见坑**：without-skill 基线必须用没读过 skill 的全新子 agent 跑，否则对比被污染；最终结论只有三种——建议安装 / 先修复 / 不建议安装，每种都要带证据
+
 ## 最佳实践
 - 评估三件套留档：verdict + 触发测试结果 + with/without 差异，写在对应 catalog 页面里，不要只留在对话
 - 安全扫描不通过直接拒（不要"先用着看"）；注意 skills.sh 页面的三项审计（Agent Trust Hub / Socket / Snyk）与本 skill 的结论互相印证

@@ -12,6 +12,13 @@
 
 **不用于**：只需看数据内容不关心格式（→ [read-file](../zone-b-build/read-file.md)）；超大数据文件分析（→ DuckDB [query](../zone-b-build/query.md)）。
 
+## 新人上手
+
+- **触发**：附 `.xlsx/.csv/.tsv` 文件，或提到 spreadsheet / 工作表 / 报表 / 数据分析
+- **第一步**：数据画像用 pandas：`pd.read_excel('file.xlsx', sheet_name=None)` 一次拿全部 sheet，再 `df.head()` / `df.info()` 确认列结构
+- **常见坑**：公式类需求必须生成真 Excel 公式（如 `=B5*(1+$B$6)`），不许在 Python 里算死硬编码；交付标准是零公式错误（#REF!/#DIV/0! 等）
+- **常见坑**：公式求值依赖 LibreOffice（`formula_processor.py`），环境里没有会跑不动；改既有文件要保住原模板格式，别用统一格式覆盖客户既有约定
+
 ## 最佳实践
 - Do：先 `read-file`/画像确认列结构，再决定转换或分析路径
 - Do：公式计算类需求直接生成带公式的 xlsx，不要预先在代码里算死

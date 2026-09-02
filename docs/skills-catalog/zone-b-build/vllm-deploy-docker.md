@@ -15,6 +15,12 @@ vLLM 官方容器部署指导：镜像选择（CUDA 版本/driver 匹配）、`-
 
 **不用于**：只用 MiMo Token Plan 的公有云路径（→ [bailian-train-deploy](bailian-train-deploy.md)）；边缘小设备（→ `nvidia/skills@jetson-llm-serve`，1.1K）；昇腾 NPU（→ [vllm-ascend](vllm-ascend.md)）。
 
+## 新人上手
+
+- **触发**：客户要私有化 LLM 时直接说"在这台 A100 上把 Qwen 起成 OpenAI 兼容服务"或"评估这个模型在这张卡上能撑多少并发"
+- **第一步**：先安装 `npx skills add vllm-project/vllm-skills@vllm-deploy-docker --directory ~/.qoder/skills -y`（官方 org 出品，装前仍过一次 [skill-criticagent](../cross-cutting/skill-criticagent.md) 门禁），再让 agent 按现场 GPU 卡型给出镜像选择与启动参数（`--gpu-memory-utilization`/`--max-model-len`/tensor-parallel）
+- **常见坑**：不算显存预算直接起服务——`模型权重 + KV cache` 超了就 OOM，`--gpu-memory-utilization` 从 0.9 起、OOM 时先降 `--max-model-len`；交付时不锁版本——vLLM/CUDA/driver/模型 revision 四元组不记录就无法复现，现场网络受限时镜像与权重还要提前 `docker save` + 镜像源离线搬运
+
 ## 最佳实践
 - 官方 org 出品，可信度高于社区同类，可直接作为主选；仍建议装前用 [skill-criticagent](../cross-cutting/skill-criticagent.md) 过一次门禁（版本迭代快，看是否与当前 vLLM 版本相符）
 - 与 fde-scope 的契约：vLLM 起来后以 **OpenAI 兼容 base_url + key** 接入，凭据仍走 `FDE_SCOPE_MIMO_API_KEY` 风格的环境变量注入，不落配置文件

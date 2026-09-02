@@ -18,6 +18,13 @@
 
 **不用于**：反复执行的操作步骤文档（→ [sre-runbooks](sre-runbooks.md)，runbook 是"怎么做"，本 skill 是"能不能做"）；事件发生时的处置（→ [incident-response](incident-response.md)）；架构层面的上线风险评估（→ 架构可视化插件 `risk-quality-reviewer`）；本地/演示环境的一次性部署（清单开销不划算）。
 
+## 新人上手
+
+- **触发**：对 agent 说「这次发布跑一遍上线核验清单」「这个版本要进客户生产，生成 readiness 清单」——每次向客户生产环境投递都该跑，包括"例行小版本"
+- **第一步**：先安装：`npx skills add anthropics/knowledge-work-plugins@deploy-checklist --directory ~/.qoder/skills -y`，然后告诉它场景（有 feature flag / 含 DB migration / 破坏性 API 变更），它会按 Pre-Deploy / Deploy / Post-Deploy / Rollback Triggers 四段生成清单并追加对应核验项
+- **常见坑**：Rollback Triggers 阈值必须填真实基线（`P50 超过 X ms` 的空占位符等于没写），并与客户**书面**确认后才算通过——口头共识不算
+- **常见坑**：清单要落成文件进交付包或 `.fde_scope/`，只留在会话里无法追溯；客户现场用它做核验留痕，别用自动改远端的发布流程替代
+
 ## 最佳实践
 - **上游信源已核**：该 skill 是纯模板（无可执行脚本、无外部依赖、无网络调用），风险面极小；且上游仓库对每个条目跑**强制的 Claude policy scan 状态检查**（`.github/workflows/scan-plugins.yml`，按 (plugin, sha) 缓存判定，未通过会由 `revert-failed-bumps.yml` 自动剔除），供应链治理在同类 skill 里属最强一档
 - 与已装的 [gstack-suite](../cross-cutting/gstack-suite.md) `land-and-deploy` / `setup-deploy` 有重叠：GStack 偏"自动化执行发布动作"，本 skill 偏"人工核验清单"。**在客户现场优先用本 skill**（核验留痕，不自动改远端）

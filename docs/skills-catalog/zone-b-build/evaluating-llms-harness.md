@@ -16,6 +16,12 @@ EleutherAI **lm-evaluation-harness**（`lm-eval`）的用法手册：一条命�
 
 **不用于**：客户工单/产线数据评估（→ `fde_scope.eval` + [phoenix-evals](phoenix-evals.md)）；生产回归测试（学术基准不是回归门禁）；只要一个 quick score 时用已装的 [huggingface-community-evals](huggingface-community-evals.md) 即可，不必双栈并存。
 
+## 新人上手
+
+- **触发**："用 lm-eval 在 MMLU/GSM8K 上跑一个可引用的标准分"、"怎么给本地业务基准写一个自定义 task"
+- **第一步**：先过 [skill-criticagent](../cross-cutting/skill-criticagent.md) 门禁，再安装 `npx skills add firecrawl/ai-research-skills@evaluating-llms-harness --directory ~/.qoder/skills -y`；然后另建独立 venv 跑 `pip install lm-eval`，让 agent 按 `--model hf|vllm` 选 backend 跑目标 task
+- **常见坑**：把 `lm-eval` 装进项目主环境——它的 transformers 版本约束常与主环境冲突，必须独立 venv；报告分数不注明 harness 版本 + task 配置 + few-shot 数——不同来源的数字混在一起会得出错误结论，气隙环境还要提前备好离线数据集与 `--include_path`
+
 ## 最佳实践
 - ⚠️ 定位判断：这是**知识型** skill（教 `lm-eval` 用法），不是执行器。装的唯一理由是"经常要用 lm-eval 且记不住参数矩阵"。若已覆盖在 huggingface-community-evals 里，**可以不装**，避免评估栈碎片化
 - 热度只有 22、repo 17★、Snyk Warn：属于"内容看着没问题但社区验证薄"，按规约先过 [skill-criticagent](../cross-cutting/skill-criticagent.md)

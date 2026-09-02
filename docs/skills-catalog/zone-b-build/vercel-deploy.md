@@ -12,6 +12,13 @@
 
 **不用于**：客户内网/离线场景（Vercel 出网不可用 → 走 [docker-build-deploy](docker-build-deploy.md) 或 [alibabacloud-workbench-cli](alibabacloud-workbench-cli.md)）；纯后端 Python 服务（fde-scope 的 FastAPI 主体）更适合容器化交付。
 
+## 新人上手
+
+- **触发**：说「部署到 Vercel」「给个能分享的链接」，或排障时问 deployment status / vercel logs / deploy failing 这类短语（vercel-cli SKILL.md promptSignals 原文）
+- **第一步**：项目目录跑 `vercel`（或 `npx vercel`）拿 preview URL 给客户看，确认后再 `vercel --prod` 上生产；排障用 `vercel logs <deployment>` / `vercel inspect`
+- **常见坑**：不要拿 production 部署当冒烟测试（页面 Don't）：preview → `vercel promote` 才是安全路径；Secret 一律走 `vercel env`，写进仓库或命令行历史即泄漏
+- **常见坑**：构建重复耗时长改用 `vercel build` + `vercel deploy --prebuilt` 只传产物（deployments-cicd SKILL.md 覆盖的流程）；客户真实数据/工单不得进 public preview，demo 只用合成数据
+
 ## 最佳实践
 - Do：先 preview 再 promote——preview URL 是给客户"看一眼"的最小暴露面
 - Do：Secret 走 `vercel env`，不要写进仓库或命令行历史

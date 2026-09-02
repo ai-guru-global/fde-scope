@@ -12,6 +12,13 @@
 
 **不用于**：单步小改动（直接做）；探索性原型（先 [brainstorming](../zone-a-pre-engagement/brainstorming.md) 再回来）；已有计划要执行（→ [executing-plans](executing-plans.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「用 writing-plans 把这个需求写成实施计划」——SKILL.md 触发描述是"有 spec/需求、动代码之前"（3 步以上的任务就该用它）
+- **第一步**：产物落盘到 `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`；计划由 2~5 分钟粒度的步骤组成（写失败测试 → 跑它确认失败 → 最小实现 → 跑通过 → commit），开头必须带固定头（Goal / Architecture / Tech Stack / Global Constraints + REQUIRED SUB-SKILL 行）
+- **常见坑**：每个步骤必须写验证方式（跑什么命令、期望什么输出）——没有验证点的计划无法判定完成；spec 覆盖多个独立子系统时必须拆成多份计划，每份单独产出可测试的软件
+- **常见坑**：计划头是固定模板不是可选项——漏掉它，`executing-plans` / `subagent-driven-development` 就不知道按哪个 skill 接手执行
+
 ## 最佳实践
 - 步骤要含**验证方式**（跑什么命令、期望什么输出），否则计划无法判定完成
 - 计划里显式标注"需要人工确认"的节点（生产变更、客户环境写操作、删数据）

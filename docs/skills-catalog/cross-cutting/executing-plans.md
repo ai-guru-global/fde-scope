@@ -12,6 +12,13 @@
 
 **不用于**：没有计划的小改动；探索性试验（会破坏"按计划执行"的前提）；纯调研（→ [research-*](../zone-a-pre-engagement/firecrawl-search.md) 系列）。
 
+## 新人上手
+
+- **触发**：有一份已写好的计划要落地，对 agent 说「用 executing-plans 执行 <plan 文件>」——SKILL.md 触发描述是"有书面实施计划、带评审检查点地在独立会话执行"
+- **第一步**：它先批判性通读计划、有疑问先向人提出，然后逐任务勾选执行（每步照计划跑、按计划跑验证）；宿主有子 agent 能力时会建议改走 `subagent-driven-development`
+- **常见坑**：遇阻塞（缺依赖、测试失败、指令不明）立即停下问人，禁止靠猜推进；验证反复失败同样是停止条件——"强行穿过 blocker"是 skill 明令禁止的行为
+- **常见坑**：未经用户明确同意不得在 main/master 上直接实施（"Never start implementation on main/master branch without explicit user consent"）；开工前先用 using-git-worktrees 确认隔离工作区，收尾走 `finishing-a-development-branch`
+
 ## 最佳实践
 - 执行前先把计划读进来再动手，别凭上一轮的记忆
 - 每个检查点做三件事：跑验证命令 → 对照计划验收标准 → 更新状态（不要"看起来做完了"）

@@ -1,0 +1,24 @@
+{
+  "entries": [
+    {
+      "scope": "app",
+      "date": "2026-09-02",
+      "verb": "redesign",
+      "target": "GTM/index.html + docs/skills-catalog/site/index.html + fde_scope/web/app.py (/ + /console)",
+      "system": "design.md (Enterprise Light, custom)",
+      "genre": "modern-minimal",
+      "macrostructure": "board-console (GTM) / directory (portal) / long-document+workbench (console)",
+      "notes": "Enterprise-light system across the three marketing/product surfaces: light-default tokens (accent engineering blue oklch(0.5 0.095 235)), GTM left Shift-Board dark/neon for Public Sans light palette, portal generator rethemes to same tokens with GTM cross-link, console keeps dual [data-theme] and gains GTM + skills-library topbar links. Verified: ruff clean, pytest test_web.py + test_ontology_web.py green, TestClient asserts both console pages render the cross-link anchors."
+    },
+    {
+      "scope": "app",
+      "date": "2026-08-31",
+      "verb": "redesign",
+      "target": "fde_scope/web/app.py (overview / + console /console)",
+      "system": "design.md (Graphite, custom)",
+      "genre": "modern-minimal",
+      "macrostructure": "long-document (overview) / workbench (console)",
+      "notes": "Enterprise-grade Graphite system: OKLCH tokens, dark default + light override via [data-theme], steel-blue accent, semantic status as 7px dots, all emoji replaced with inline SVG sprite (_ICON_SPRITE), no hover transforms, 120-160ms transitions, sticky topbar with backdrop-filter. IA/routes/JS logic/glossify tooltips preserved. Verified via raw CDP (headless Chrome): 11 screenshots (dark/light x 1440/390 x both pages + tooltip/toast/theme-toggle), zero horizontal overflow at all widths, theme persistence via localStorage fde-theme. Test contract synced: emoji nav assertions -> structural >工作台</button> / >技能库</button>."
+    }
+  ]
+}

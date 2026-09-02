@@ -13,6 +13,13 @@
 
 **不用于**：只读分析、答疑、生成文档（不写代码就别开销）；已经在 linked worktree 里（先检测，别套娃再建一层）；submodule 内部——`GIT_DIR != GIT_COMMON` 在 submodule 里同样成立，要用 `git rev-parse --show-superproject-working-tree` 排除误判。
 
+## 新人上手
+
+- **触发**：开工前对 agent 说「建一个隔离工作区」或「先起个 worktree」——SKILL.md 触发描述是"starting feature work that needs isolation… or before executing implementation plans"
+- **第一步**：它先检测再动手：比对 `git rev-parse --git-dir` 与 `--git-common-dir`，两者不等说明已在 worktree 里（直接复用，不套娃）；确认要新建时优先用平台原生工具（`EnterWorktree` / `/worktree` / `--worktree`），没有才回退 `git worktree add`
+- **常见坑**：submodule 里 `GIT_DIR != GIT_COMMON` 同样成立，会误判成"已在 worktree"——必须用 `git rev-parse --show-superproject-working-tree` 排除
+- **常见坑**：project-local 的 `.worktrees/` 建前必须 `git check-ignore -q .worktrees` 验证已被 gitignore——没忽略就先加 ignore 再提交，否则 worktree 内容会被误提交进仓库；建区后装依赖 + 跑基线测试两步不能省，基线红了先报告
+
 ## 最佳实践
 - **同意优先**：用户没表达过 worktree 偏好时，先问一句"要不要建隔离工作区"；已经声明过偏好就直接执行，不重复问
 - 有原生工具（如 `EnterWorktree` / `/worktree` 命令 / `--worktree` 标志）就必须用它——手动 `git worktree add` 会造出 harness 看不见的"幽灵状态"，清理时踩坑

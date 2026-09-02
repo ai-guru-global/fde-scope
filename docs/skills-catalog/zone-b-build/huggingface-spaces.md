@@ -12,6 +12,12 @@
 
 **不用于**：客户真实数据上云（出境/合规不过就别想，→ 本地部署）；生产负载（Spaces 会休眠、无 SLA）；客户内网访问不到外网的演示（准备离线版）；包含客户敏感配置的镜像（公开 Space = 公开代码）。
 
+## 新人上手
+
+- **触发**："给干系人做一个点开就能玩的 demo 页"、"把这个模型/LoRA 发成 HF Space"
+- **第一步**：先确认 `which hf` 有 CLI 且 `hf auth whoami` 已登录（未登录跑 `hf auth login`，需要 write token），再让 agent 用 `hf spaces search "<模型或任务>" --sdk gradio --limit 10` 找同类先例，参考其 `app.py` 的工作模式再动手
+- **常见坑**：密钥写进代码或 requirements——公开 Space 默认一切可见，密钥只能走 Space secrets；ZeroGPU 忘加 `@spaces.GPU` 装饰、免费 `cpu-basic` Space 演示当天没提前唤醒预热——冷启动 30s+ 足以让干系人失去兴趣
+
 ## 最佳实践
 - 密钥走 Space secrets，永远不进代码和 requirements；公开 Space 默认一切可见
 - ZeroGPU 记得 `@spaces.GPU` 装饰，注意配额余量；演示前先自己跑一遍热身

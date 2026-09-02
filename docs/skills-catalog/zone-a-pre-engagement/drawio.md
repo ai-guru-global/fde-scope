@@ -11,6 +11,13 @@
 
 **不用于**：默认出图路径（文本型 DOT/DSL 更可维护）；把 `.drawio` 当事实源。
 
+## 新人上手
+
+- **触发**：用户**明确**点名 Draw.io / `.drawio` / diagrams.net / "可编辑的图"才触发；只说"画个架构图"不走它（先经 `explore` 路由）
+- **第一步**：让 agent 先出规范源文件（Mermaid / DOT / Structurizr DSL），再经本地 Draw.io MCP 转 `.drawio`——MCP 配置 `npx -y @drawio/mcp`，提供 `open_drawio_mermaid` / `open_drawio_xml` 等工具
+- **常见坑**：`.drawio` 只是派生的可编辑交付层，证据模型（JSON/DOT/DSL）才是事实源——手改了 `.drawio` 不同步回模型，下次重生成会覆盖手工修改
+- **常见坑**：转换时保留稳定的节点/边 ID 与 `sourceRefs`；MCP 工具不可用时让它给安装步骤并照常交付源文件，别硬造不存在的工具
+
 ## 最佳实践
 - Do：证据模型（JSON/DOT/DSL）永远是 source of truth，Draw.io 只是派生的可编辑交付层
 - Do：改了 `.drawio` 要同步回证据模型，否则下次重生成会覆盖手工修改

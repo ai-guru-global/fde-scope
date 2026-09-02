@@ -440,6 +440,186 @@
     );
   }
 
+  // -- deploy plan panel ----------------------------------------------------
+  function DeployPanel() {
+    var _tenant = useState("acme");
+    var tenant = _tenant[0];
+    var setTenant = _tenant[1];
+    var _profile = useState("ticket");
+    var profile = _profile[0];
+    var setProfile = _profile[1];
+    var _mode = useState("balanced");
+    var mode = _mode[0];
+    var setMode = _mode[1];
+    var _model = useState("qwen-max");
+    var model = _model[0];
+    var setModel = _model[1];
+    var _agents = useState("数据员:数据分析\n日志员:日志分析:qwen3-14b");
+    var agents = _agents[0];
+    var setAgents = _agents[1];
+    var _sources = useState("csv=examples/quickstart_csv/sample_tickets.csv");
+    var sources = _sources[0];
+    var setSources = _sources[1];
+    var _plan = useState(null);
+    var plan = _plan[0];
+    var setPlan = _plan[1];
+    var _running = useState(false);
+    var running = _running[0];
+    var setRunning = _running[1];
+    var _err = useState(null);
+    var err = _err[0];
+    var setErr = _err[1];
+
+    function parseAgents(text) {
+      return text
+        .split("\n")
+        .map(function (s) { return s.trim(); })
+        .filter(Boolean)
+        .map(function (line) {
+          var parts = line.split(":").map(function (s) { return s.trim(); });
+          var a = { name: parts[0], role: parts[1] || "" };
+          if (parts[2]) a.model = parts[2];
+          return a;
+        })
+        .filter(function (a) { return a.name && a.role; });
+    }
+
+    function parseSources(text) {
+      var out = {};
+      text.split("\n").map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (line) {
+        var i = line.indexOf("=");
+        if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      });
+      return out;
+    }
+
+    function run() {
+      setRunning(true);
+      setErr(null);
+      api("/deploy/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant: tenant.trim() || "acme",
+          profile: profile,
+          approval_mode: mode,
+          model: model.trim() || "qwen-max",
+          agents: parseAgents(agents),
+          sources: parseSources(sources),
+        }),
+      })
+        .then(function (r) {
+          setPlan(r);
+          message.success("部署计划已生成（dry-run）");
+        })
+        .catch(function (e) {
+          setPlan(null);
+          setErr(String(e.message || e));
+        })
+        .then(function () {
+          setRunning(false);
+        });
+    }
+
+    var muted = { fontSize: 12, color: "#8b98a9" };
+
+    function agentCard(a) {
+      var tools = (a.tools || []).map(function (t) {
+        return t.bound
+          ? h(Tag, { color: "green", key: t.tool, title: t.note || "" }, t.tool + " → " + (t.source || ""))
+          : h(Tag, { color: "red", key: t.tool, title: t.note || "" }, t.tool + " ✕");
+      });
+      var unbound = (a.unbound || []).length;
+      return h(Card, { size: "small", key: a.name + a.role, style: { marginBottom: 8 } },
+        h("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+          h("b", null, a.name),
+          h(Tag, { color: a.role_bucket === "corpus" ? "orange" : "cyan" }, a.role + " · " + (a.role_bucket || "corpus-only")),
+          h(Tag, null, a.model || "runtime 注入"),
+          h("span", { style: { marginLeft: "auto" } },
+            h("span", { style: muted }, "bound " + (a.bound || []).length + " · unbound " + unbound)
+          )
+        ),
+        h("div", { style: { marginTop: 4 } }, tools.length ? tools : h("span", { style: muted }, "仅语料工具")),
+        unbound
+          ? h("div", { style: { marginTop: 4, fontSize: 12, color: "#fbbf24" } },
+              "⚠ " + unbound + " 个工具未绑定 — 在「数据源」里给对应连接器配 slug=源 即可绑定")
+          : null
+      );
+    }
+
+    var m = plan && plan.manifest;
+    var sum = plan && plan.summary;
+    var perm = m && m.permissions;
+    var ruleLine = function (label, rules) {
+      return h("div", { style: muted },
+        label + "：" +
+        ((rules || []).map(function (r) { return r[0] + (r[1] ? " (" + r[1] + ")" : ""); }).join(" · ") || "—"));
+    };
+
+    return h("div", null,
+      h(Card, { size: "small", title: "Agent 部署计划 · dry-run" },
+        h("div", { style: Object.assign({ marginBottom: 10 }, muted) },
+          "与 CLI deploy / Web 控制台走同一 build_deploy_plan：纯数据预览「哪个角色 Agent 拿到哪个连接器工具、对着哪个数据源」，不 import AgentScope、不调模型。"
+        ),
+        h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
+          h("div", null, h("div", { style: muted }, "Tenant"), h(Input, { value: tenant, onChange: function (e) { setTenant(e.target.value); } })),
+          h("div", null, h("div", { style: muted }, "模型"), h(Input, { value: model, onChange: function (e) { setModel(e.target.value); } })),
+          h("div", null, h("div", { style: muted }, "Profile"),
+            h(Select, { value: profile, style: { width: "100%" }, onChange: setProfile, options: [
+              { value: "ticket", label: "ticket / 客服" },
+              { value: "manufacturing", label: "manufacturing / 制造业" },
+            ] })),
+          h("div", null, h("div", { style: muted }, "审批模式"),
+            h(Select, { value: mode, style: { width: "100%" }, onChange: setMode, options: [
+              { value: "conservative", label: "conservative · 例行外呼也 ASK" },
+              { value: "balanced", label: "balanced · 仅高风险 ASK" },
+              { value: "autonomous", label: "autonomous · 未匹配 DENY" },
+            ] }))
+        ),
+        h("div", { style: { marginTop: 8 } },
+          h("div", { style: muted }, "Agents（每行：名字:角色[:模型]）"),
+          h(Input.TextArea, { rows: 3, value: agents, onChange: function (e) { setAgents(e.target.value); } })
+        ),
+        h("div", { style: { marginTop: 8 } },
+          h("div", { style: muted }, "数据源（每行：slug=路径或URL）"),
+          h(Input.TextArea, { rows: 2, value: sources, onChange: function (e) { setSources(e.target.value); } })
+        ),
+        h("div", { style: { marginTop: 10, display: "flex", gap: 8, alignItems: "center" } },
+          h(Button, { type: "primary", loading: running, onClick: run }, "生成部署计划"),
+          h("span", { style: muted }, "角色是自由文本 → 自动归 数据/日志/文件 工具桶；匹配不上 → corpus-only")
+        )
+      ),
+      err && h(Card, { size: "small", style: { marginTop: 10, borderColor: "rgba(248,113,113,0.4)" } },
+        h("b", null, "校验失败（422）"), h("pre", { style: { fontSize: 11, whiteSpace: "pre-wrap" } }, err)),
+      m && h("div", { style: { marginTop: 10 } },
+        h(Space, { size: 24, wrap: true },
+          h(Statistic, { title: "Agents", value: sum ? sum.agents : m.agents.length }),
+          h(Statistic, { title: "Bound 工具", value: sum ? sum.bound_tools.length : 0, valueStyle: { color: "#4ade80" } }),
+          h(Statistic, {
+            title: "Unbound 工具",
+            value: sum ? sum.unbound_tools.length : 0,
+            valueStyle: { color: sum && sum.unbound_tools.length ? "#fbbf24" : undefined },
+          }),
+          h(Statistic, { title: "Sandbox", value: (m.sandbox || {}).backend || "—", valueStyle: { fontSize: 16 } })
+        ),
+        h("div", { style: { marginTop: 10 } }, m.agents.map(agentCard)),
+        perm && h(Card, { size: "small", title: "权限规则（" + ((m.approval_policy || {}).mode || "—") + "）" },
+          ruleLine("ALLOW", perm.allow),
+          ruleLine("DENY", perm.deny),
+          ruleLine("ASK", perm.ask))
+      ),
+      h(Card, { size: "small", title: "注意事项", style: { marginTop: 10 } },
+        h("ul", { style: Object.assign({ margin: 0, paddingLeft: 18, lineHeight: 1.8 }, muted) },
+          h("li", null, "数据源优先级：Agent 级 toolkit.sources → tenant sources → 隐式字段（ticket 下 ticket_api 隐式喂 zammad/salesforce）；三处都没配的工具诚实标注 unbound，不进 Toolkit。"),
+          h("li", null, "审批模式决定未匹配工具命运：绑定工具自动 ALLOW；conservative/balanced 未匹配 → ASK（HITL），autonomous → DENY。deny 恒含 access_other_tenant / delete_any / exec_shell。"),
+          h("li", null, "skills_dirs 必须真实存在（含 SKILL.md），技能经 Toolkit(skills_or_loaders=…) 注册。"),
+          h("li", null, "凭据只走环境变量（FDE_SCOPE_MIMO_API_KEY 等），不进 manifest / tenant_config。"),
+          h("li", null, "连接器 sample 每调用最多 50 行（MAX_TOOL_ROWS），是预览不是导出通道。"),
+          h("li", null, "装配 ≠ 服务：--serve 需 .[agentscope] extra + Redis + 可达模型；2.0 无 Agent.stop，停服用 TenantDeployer.stop()。")
+        ))
+    );
+  }
+
   // -- main page ----------------------------------------------------------
   function FdeScopePage() {
     var _list = useState([]);
@@ -630,6 +810,7 @@
           { key: "forge", label: "📄 语料锻造", children: h(ForgePanel) },
           { key: "kpi", label: "📈 KPI", children: h(KpiPanel) },
           { key: "skills", label: "📚 技能库", children: h(SkillsPanel) },
+          { key: "deploy", label: "🤖 Agent 部署", children: h(DeployPanel) },
           { key: "handoff", label: "📦 交接", children: h(HandoffPanel, { eid: detail ? detail.engagement_id : null }) },
         ],
       }),

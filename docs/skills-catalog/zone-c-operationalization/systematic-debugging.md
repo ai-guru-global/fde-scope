@@ -12,6 +12,13 @@
 
 **不用于**：纯需求变更（不是 bug）；性能调优（→ [web-perf](web-perf.md) / [debug-optimize-lcp](debug-optimize-lcp.md)）；跨系统监控类排障（→ [investigate](investigate.md)）。
 
+## 新人上手
+
+- **触发**：遇到任何 bug、测试失败、非预期行为时说「用 systematic-debugging 流程排查」——SKILL.md 的 description 就是"before proposing fixes"，即你想"直接改一下试试"的那一刻就该触发
+- **第一步**：把报错原文完整贴给 agent（别截断 stack trace），让它先走 Phase 1：读错误信息、确认可稳定复现步骤、`git log`/`git diff` 查最近改动
+- **常见坑**：Iron Law「NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST」——Phase 1 没走完它不会（也不该）提修复，别催它"先改了再说"；3 次修复都失败时必须停下质疑架构，禁止第 4 次盲改
+- **常见坑**：Phase 3 假设验证一次只改一个变量，失败要**回滚**再换假设——叠加改动会让你无法定位是哪个改动"看起来修好了"
+
 ## 最佳实践
 - 与 [test-driven-development](../cross-cutting/using-superpowers-family.md) 配套：先用失败测试固化 bug，再修
 - 写下"当前假设 + 证伪方式"再继续，避免无限层猜测

@@ -12,6 +12,12 @@ Qoder 内的完整 API 生命周期：同步 Collection、生成类型化客户�
 
 **不用于**：工业协议（OPC UA / MQTT / ROS2 不是 HTTP，→ [mqtt-development](mqtt-development.md) 与连接器代码）；一次性验证（为一次 curl 建 Collection 是负资产）；客户 API 无 OpenAPI/无文档时先做发现，别凭空猜端点。
 
+## 新人上手
+
+- **触发**：提 API 需求即可由 `postman-routing` 自动路由到正确命令，如"把这个 OpenAPI 同步成 Collection"、"给这个接口起个 mock"、"我的 API 对 agent 友好吗"
+- **第一步**：首次先跑 `/postman:setup` 连接 Postman（配 API key），然后 `/postman:sync` 从客户的 OpenAPI/抓包生成 Collection——不要手写请求，断言写进请求的 Tests 标签
+- **常见坑**：手写请求替代导入——两周后就没人信了，契约必须沉淀在 Collection 里随 Collection Runner 回归；与客户共享前不清历史与变量快照——Postman 同步会把敏感值带上去，生产密钥只放按 dev/staging/prod 隔离的 environment
+
 ## 最佳实践
 - 先导入 OpenAPI/抓包生成 Collection，**不要手写请求**——手写版本两周后就没人信了
 - Mock 先行：前端/agent 开发不必等客户排期联调，契约先冻结

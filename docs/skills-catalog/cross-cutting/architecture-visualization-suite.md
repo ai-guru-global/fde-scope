@@ -29,6 +29,13 @@
 - Zone D 交接 → `architecture-health`（文档与代码一致性）+ `drawio`（客户可编辑交付图）
 - 遗留系统接手 → `legacy-system-visualizer` + `evolution-planner`
 
+## 新人上手
+
+- **触发**：宽泛架构请求直接说「帮我理解这个系统的架构」「画出这个 repo 的架构图」「这次改动会影响什么」——入口是 `explore` 路由（13 件套的 router，"Use this skill first"），由它按场景选最小技能集
+- **第一步**：对 agent 说「用 explore 帮我建模 fde-scope 的当前架构」；路由器先读共享门禁 references（`architecture-contract.md` / `architecture-evidence-model.md` / `diagram-output-formats.md`），再按场景表路由到 `system-modeler`、`flow-visualizer` 等具体 skill
+- **常见坑**：绕过 `explore` 直接点某个场景 skill，容易产出与问题不匹配的视图——路由原则是"先定架构任务、再定图格式"，不按产物类型选 skill
+- **常见坑**：每个节点/边必须有 `sourceRefs` 指向代码/配置/文档等证据，低置信度必须显式标注——这是插件的硬门禁，无证据的图过不了 `architecture-health` 校验
+
 ## 最佳实践
 - **先 `explore` 再选场景**：直接点某个场景 skill 容易产出不匹配问题的视图
 - 视图分级不要越界：L1 上下文 / L2 容器 / L3 代码 / L4 运行时 / L5 演进；问错层就是噪声

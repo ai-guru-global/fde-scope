@@ -34,6 +34,13 @@
 - 纯数据/工业接入任务（Zone B 的 connector/corpus 工作没有对应 gstack skill，用 DuckDB/Firecrawl/HF 那一族）
 - 需要严格证据链的架构建模 → [architecture-visualization-suite](architecture-visualization-suite.md)（GStack 的图偏沟通，不带 sourceRefs 门禁）
 
+## 新人上手
+
+- **触发**：直接敲 slash command——`/ship`、`/qa`、`/cso`、`/investigate` 等；模糊需求收敛走 `/spec`（其触发短语：「spec this out」「file an issue」「write up a ticket」）
+- **第一步**：Zone B 常用链：`/spec` 五阶段收敛需求 → `/plan-eng-review` 锁架构 → `/careful` 或 `/guard` 夹住改动范围再动代码
+- **常见坑**：客户仓库禁用 `/ship` 与 `/land-and-deploy`——它们会自动 commit、push、开 PR、改 VERSION/CHANGELOG（为"自己产品高速迭代"设计），客户现场必须先问再提交
+- **常见坑**：打包 53 个但会话只注册 43 个——`spec`、`retro`、`qa-only` 等 10 个未注册，用前先 `Read ~/.qoder/plugins/cache/qoder-marketplace/gstack/1.58.5/<name>/SKILL.md` 按其步骤手工执行；与 superpowers 同开会互相抢触发，主线二选一
+
 ## 最佳实践
 - **与 superpowers 族二选一做主线**：两套都主张强流程，同开会互相抢触发。本项目建议：**主线用 superpowers（纪律+TDD），需要某个 GStack 强项时定点调用**（`cso`、`canary`、`make-pdf`、`document-*`、`benchmark`）
 - `guard`/`freeze` 在客户现场是很好用的"防手滑"开关：进入只读分析阶段前 `freeze`，改动阶段 `guard` 限定目录

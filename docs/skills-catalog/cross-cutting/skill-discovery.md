@@ -13,11 +13,18 @@
 
 **不用于**：已经知道要装什么（直接 `add`）；评估质量与安全（→ [skill-criticagent](skill-criticagent.md) / [mcp-criticagent](mcp-criticagent.md)）；生态内没有时（→ [create-skill](create-skill.md) 自建）。
 
+## 新人上手
+
+- **触发**：对 agent 说「find a skill for X」「is there a skill that can…」或「怎么实现 X」——SKILL.md 的 description 就是靠这三类问句路由的
+- **第一步**：`npx skills find <query>`（检索词要具体，如 `npx skills find pr review`），结果自带安装命令 `npx skills add <owner/repo@skill> --directory ~/.qoder/skills -y`；registry 站点：https://skills.sh/
+- **常见坑**：`--directory ~/.qoder/skills` 不能省——装到默认目录 Qoder 看不到，或多处安装造成同名 skill 路由冲突
+- **常见坑**：检索无结果先换词再试（"deploy" 换 "docker deploy"，同义词 evaluation / evals / benchmark 多试几组），确认生态真没有再走 `npx skills init` 自建
+
 ## 最佳实践
 - 检索词要具体："docker deploy" 优于 "deploy"；同义词多试几组（evaluation / evals / benchmark）
 - **以热度 + 官方 org + 安全审计三项做初筛**，再进 critic 门禁：热度高不代表适合本项目
 - 安装目录固定在 `~/.qoder/skills`，避免多处安装导致同名 skill 路由冲突
-- 装完立刻在本 catalog 建档（五段模板）+ 更新 README 索引——否则一个月后没人记得为什么装它
+- 装完立刻在本 catalog 建档（六段模板）+ 更新 README 索引——否则一个月后没人记得为什么装它
 - 同名条目要甄别来源（例：`evaluating-llms-harness` 有 firecrawl 与第三方两个同名版本）
 - 巡检节奏：季度一次 `npx skills check`，只处理真正在用的 skill，不追求"全部最新"
 

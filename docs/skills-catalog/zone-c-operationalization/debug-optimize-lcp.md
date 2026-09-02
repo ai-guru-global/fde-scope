@@ -12,6 +12,13 @@ LCP（最大内容绘制）专项：用 DevTools MCP 工具找出拖慢首屏主
 
 **不用于**：全面性能体检（→ [web-perf](web-perf.md)）；交互延迟 INP 问题（→ web-perf）；后端接口本身慢（先看服务端）。
 
+## 新人上手
+
+- **触发**：用户提「largest contentful paint」「首屏慢」「hero 图渲染太慢」这类词（SKILL.md 触发词还包括 page load speed / CWV）——只要 LCP 单点深挖就用它，全面体检走 [web-perf](web-perf.md)
+- **第一步**：`navigate_page` 打开目标页 → `performance_start_trace(reload: true, autoStop: true)` 录 trace → 用 `performance_analyze_insight(insightSetId, insightName: "LCPBreakdown")` 看 TTFB / 资源加载延迟 / 加载时长 / 渲染延迟四段哪段超标
+- **常见坑**：别只压图不看其他段——SKILL.md 点名常见错误是只优化一个 subpart；若渲染延迟才是瓶颈，图片再小也没用（省下的时间只是挪到 render delay）
+- **常见坑**：LCP 图**永远不要** `loading="lazy"`——这是 resource load delay 最常见根因；正确做法是标准 `<img src>` + `fetchpriority="high"`，不在 HTML 里的再加 `<link rel="preload">`
+
 ## 最佳实践
 - 先确认 LCP 元素是谁（DevTools 里高亮），不同元素对应完全不同的修法，别猜
 - 高频有效手段排序：预加载/优先级设置 LCP 资源 → 图片格式与尺寸 → 消除同步阻塞脚本 → 字体 `display: swap` + 预加载

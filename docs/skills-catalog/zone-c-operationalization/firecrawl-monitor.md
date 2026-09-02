@@ -12,6 +12,13 @@
 
 **不用于**：一次性抓取（→ [firecrawl-scrape](../zone-a-pre-engagement/firecrawl-scrape.md)）；站内多页首次建库（→ [firecrawl-crawl](../zone-a-pre-engagement/firecrawl-crawl.md)）；内部代码/配置变更监测（用 git CI，不用外网工具）。
 
+## 新人上手
+
+- **触发**：对 agent 说「monitor 这个定价页，变了就邮件通知我」「alert me when 文档 changelog 更新」——同一 URL 要查第二次以上就上 monitor，别反复 scrape
+- **第一步**：`firecrawl monitor create --name "竞对定价" --schedule "every 30 minutes" --goal "Alert when pricing changes." --page https://example.com/pricing --email alerts@example.com`（盯全网新结果则换成 `--queries` + `--goal` 的 web monitor 模式）
+- **常见坑**：web monitor 模式 `--queries` 必须配 `--goal`（缺了直接报错）；`--goal` 同时是 AI judge 的降噪开关，不写它整页改动（推荐位、时间戳）都会告警
+- **常见坑**：最小调度间隔 15 分钟，高频会快速消耗额度；更新状态用 `--state paused` 而不是 `--status`（参数名写错不生效）
+
 ## 最佳实践
 - 明确"什么算变化"：盯价格就锁 price 元素区域，整页监测会被推荐位噪声打爆
 - 频率按业务定：定价类日/周一次足够，状态页类可高频；高频会快速消耗额度

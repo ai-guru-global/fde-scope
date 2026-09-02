@@ -12,6 +12,14 @@
 
 **不用于**：从零补缺失文档（→ [document-generate](document-generate.md)）；代码评审（→ gstack `review` 或 [code-review](../cross-cutting/code-review.md)）；架构性变更的模型更新（→ [architecture-health](../cross-cutting/architecture-visualization-suite.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说 "post-ship docs" / "update docs after ship" / "document what changed"（SKILL.md triggers 原词），或中文"同步一下本次改动涉及的文档"
+- **第一步**：先切到 feature 分支再让它跑——在基线分支上它会直接中止（"Run from a feature branch"）；随后它拉 `git diff <base>...HEAD` 建 Diataxis 覆盖表，逐文件审计并直接修正明显的事实性漂移
+- **常见坑**：
+  - CHANGELOG 只润色不重写：它对 `CHANGELOG.md` 只做精确匹配的局部编辑、保留全部历史条目，别指望它重排或重新生成 changelog；本仓库还没有 `CHANGELOG.md`，首次需新建并全项目统一一种格式（如 Keep a Changelog）
+  - VERSION 不会被悄悄 bump：它一定会先问你；文档覆盖缺口只标记进 PR 描述并建议跑 document-generate，不会自动补写缺失页面
+
 ## 最佳实践
 - 把"文档同步"当作 Definition of Done 的一条，而不是"有空再做"——交付项目里文档滞后就是验收阻滞
 - 与 [architecture-health](../cross-cutting/architecture-visualization-suite.md) 协作：改了架构事实（模块/路由/连接器/gate）必须同时更新 `docs/architecture.md` 与 `docs/architecture-model/`

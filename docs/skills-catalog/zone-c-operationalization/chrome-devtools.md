@@ -12,6 +12,13 @@
 
 **不用于**：后端逻辑与数据问题（→ [investigate](investigate.md)）；连接失败本身（→ [troubleshooting](troubleshooting.md)）；只需要抓公开网页数据（→ [firecrawl-scrape](../zone-a-pre-engagement/firecrawl-scrape.md)）。
 
+## 新人上手
+
+- **触发**：说「打开 <URL> 看看 console 有没有报错」「截图验证一下这个页面」「分析下这个页面的网络请求」——凡是调试网页、浏览器自动化、看网络请求都算
+- **第一步**：标准四步闭环：`navigate_page`（或 `new_page`）→ `wait_for` 等内容加载 → `take_snapshot` 拿页面结构与元素 `uid` → 用 `uid` 做 `click`/`fill`，最后 `take_screenshot` 留证
+- **常见坑**：交互前必须先 `take_snapshot` 拿元素 `uid`；元素找不到说明页面已变化，要重新 snapshot 而不是复用旧 `uid`
+- **常见坑**：扩展类工具（`install_extension` 等）要在 MCP server 配置加 `--categoryExtensions` flag 并重启才出现；`--slim` 模式不适用本 skill，内存分析要加 `--memoryDebugging`
+
 ## 最佳实践
 - 验证 UI 改动时的最小闭环：navigate → 关键交互 → 截图 → 看 console/network 四步，缺一步结论就不算验证过
 - 用无头/隔离 profile 跑自动化，避免污染自己的登录态；需要客户登录态时走人工授权而不是拷 cookie

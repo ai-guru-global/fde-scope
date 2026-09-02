@@ -12,6 +12,14 @@
 
 **不用于**：需要复杂图文混排与精确页位的设计稿（用专业排版/设计工具）；PowerPoint 类演示（→ [pptx](pptx.md) / [slidev](slidev.md)）；只做 Markdown 解析（→ [pdf](../zone-a-pre-engagement/pdf.md) 的读取能力）。
 
+## 新人上手
+
+- **触发**：对 agent 说 "make a pdf" / "export to pdf" / "turn this markdown into a pdf"（SKILL.md 触发原句）
+- **第一步**：对 agent 说"把 `docs/architecture.md` 转成 PDF，加封面和目录"——对应命令 `pdf generate docs/architecture.md out.pdf --cover --toc`（二进制在 `~/.claude/skills/gstack/make-pdf/dist/pdf`）；初稿可加 `--watermark DRAFT`
+- **常见坑**：
+  - 二进制未构建时会报 `MAKE_PDF_NOT_AVAILABLE`：先在 gstack 仓库根目录跑 `./setup` 构建出 `make-pdf/dist/pdf` 再重试
+  - 远程图片（http/https）默认被拦截、渲染成 "[remote image blocked]" 占位块：把图下载到 Markdown 同目录用相对路径，或显式加 `--allow-network`；中文交付前打印一页实测字体，缺中文字体会整页豆腐块
+
 ## 最佳实践
 - 先内容后排版：Markdown 结构（标题层级/表格/图）干净，PDF 才不会到处断裂
 - 图片必须本地路径且分辨率足够（现场打印机 300dpi 起）；Mermaid/DOT 图先导出 SVG/PNG 再嵌入

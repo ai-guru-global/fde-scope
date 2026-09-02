@@ -13,6 +13,13 @@
 
 **不用于**：本地文件、内网系统、代码仓库内部检索（走 SearchCodebase/sourcegraph）。
 
+## 新人上手
+
+- **触发**：没给 URL、只要资料时对 agent 说 "search for …" / "find articles about …" / "what are people saying about X"（SKILL.md 原文触发词），即"帮我搜下竞品/行业最新说法"
+- **第一步**：`firecrawl search "你的关键词" -o .firecrawl/result.json --json`；要连带全文就加 `--scrape`，一次调用顶 search→scrape 两步
+- **常见坑**：结果必须用 `-o` 落到 `.firecrawl/` 再处理（`jq -r '.data.web[].url'` 提取链接），直接打屏会撑爆上下文窗口
+- **常见坑**：一次 search 计 2 credits——先窄关键词加 `--limit` 锁定 2-3 条高相关结果再动；拿到结果列表后别逐条重新抓，该用 `--scrape` 一步到位
+
 ## 最佳实践
 - Do：先窄关键词锁定 2-3 条高相关结果再抽全文，控制 token 与费用
 - Do：对时效敏感话题限定时间范围

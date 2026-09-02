@@ -880,6 +880,8 @@ __ICON_SPRITE__
     <a href="#arch">架构清单</a>
     <a href="#practices">最佳实践</a>
     <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
+    <a href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
+    <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
   </nav>
   <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
     <svg class="ic when-dark"><use href="#i-sun"/></svg>
@@ -1266,6 +1268,8 @@ __ICON_SPRITE__
   <span class="sub">72h from raw data to a deployed agent · 全 SOP 工作台</span>
   <div class="hdr-right">
     <a class="back" href="/">&#8592; 功能总览</a>
+    <a class="back" href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
+    <a class="back" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
     <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
       <svg class="ic when-dark"><use href="#i-sun"/></svg>
       <svg class="ic when-light"><use href="#i-moon"/></svg>

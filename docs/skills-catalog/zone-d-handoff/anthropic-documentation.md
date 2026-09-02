@@ -19,6 +19,14 @@
 
 **不用于**：文档内容的技术正确性校验（→ [architecture-health](../cross-cutting/architecture-visualization-suite.md)）；PPT/演示（→ [visual-deck-builder](visual-deck-builder.md)）；一次性内部备忘。
 
+## 新人上手
+
+- **触发**：未安装时这些话不生效——先装（见下一步）；装后可用 "write a runbook" / "write API documentation" 这类触发句（其触发词含 `"write a runbook"`）
+- **第一步**：先执行安装命令 `npx skills add anthropics/knowledge-work-plugins@documentation --directory ~/.qoder/skills -y`（本页头部给出的命令），装完再对 agent 说"用 documentation 模板给本项目补一份 onboarding/架构文档"
+- **常见坑**：
+  - 命名陷阱：registry 真名是 `documentation`（`anthropics/knowledge-work-plugins@documentation`），按旧名 `anthropic-documentation` 执行 `npx skills add` 会找不到条目
+  - 抢触发：它和 [runbook](../zone-c-operationalization/sre-runbooks.md) 都响应 "write a runbook"——两个都装时必须先定分工（documentation 管整套交付文档体系、runbook 管单份运维手册），否则路由抖动
+
 ## 最佳实践
 - **它不是 Diátaxis**：本 skill 是“按文档类型给骨架 + 五条原则”。真要四象限约束，用备选 `sammcj/agentic-coding@writing-documentation-with-diataxis`（573），**两者只选一个**
 - **与 runbook 的抢触发如何共处**：`documentation` 管“整套交付文档体系”，[runbook](../zone-c-operationalization/sre-runbooks.md) 管“单份运维手册”；只装一个的话选 `runbook`（它的模板更深：逐步 Expected result / If it fails）

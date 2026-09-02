@@ -12,6 +12,12 @@
 
 **不用于**：百炼/DashScope（→ [bailian-cli 家族](../cross-cutting/bailian-cli.md)）；无公网 IP 的单机 ECS 运维（→ [alibabacloud-workbench-cli](alibabacloud-workbench-cli.md)）；带评审与执行门禁的 IaC 全流程交付（→ [alibabacloud-spec-ops 套件](alibabacloud-spec-ops-suite.md)）。
 
+## 新人上手
+
+- **触发**：客户资源在阿里云时直接提需求，如"列出 cn-hangzhou 区域所有 ECS 实例"、"有没有管理 ECS/RDS/OSS 的 skill"；跨账号场景说"把这两个账号（RD Member）的资源盘一遍"
+- **第一步**：对 agent 说清目标产品与操作即可，套件经 MCP Core 的 `AlibabaCloud___SearchApis` 找到目标 API，再由 `GenerateCLICommand`/`CallCLI` 生成并执行命令；不确定入口就先让 agent 读 `mcp-core-best-practices` 总纲，技能发现走 `alibabacloud-find-skills`
+- **常见坑**：多账号直接查只会看到主账号——先 `ListAccounts` 把 alias 解析成 UID，再用 `x_assume_account_id` 代入目标账号；让 agent 手拼 OpenAPI URL/签名——签名、版本、region 应由 MCP server 保证，写操作先 dry-run、输出用 JMESPath 过滤只取需要的字段
+
 ## 最佳实践
 - 只读查询直连；**写操作先 dry-run/plan 思维**，确认 diff 再发，AccessKey/Secret 永不进命令行与日志
 - 多账号先 `ListAccounts` 解析 alias → UID，再用 `x_assume_account_id` 切换，别手工翻控制台

@@ -12,6 +12,13 @@
 
 **不用于**：写一次性脚本（直接写代码）；知识性内容整理（走 `.fde_scope/skills/` 文件库或 [qmind-knowledge](../zone-a-pre-engagement/qmind-knowledge.md)）；把 skill 打包分发（→ [create-plugin](create-plugin.md)）；写作规范与部署校验（→ [writing-skills](writing-skills.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「把这个流程固化成一个 skill」「帮我创建一个 skill」——同一类现场任务做过三次以上就该这样说
+- **第一步**：直接对 agent 描述"这个 skill 解决什么问题、何时该被触发"，让它生成标准 `SKILL.md` 骨架（name / description / 触发词 / 工作流 / 质量门）并放对目录：通用流程 → `~/.qoder/skills/`，项目专属 → 仓库内项目级 skills
+- **常见坑**：description 只写"做什么"不写"何时用 + 触发词"——agent 只靠它路由，路由不到就等于没装
+- **常见坑**：写完必须真跑一次同类任务验证触发与产出再提交，装前先过 skill-criticagent 门禁——未验证的 skill 是负资产
+
 ## 最佳实践
 - **description 决定生死**：写清"做什么 + 何时用 + 触发词"，agent 只靠它路由；模糊描述等于没装
 - 一个 skill 只解决一类问题；宽泛的"万能交付 skill"不会被触发也不可维护

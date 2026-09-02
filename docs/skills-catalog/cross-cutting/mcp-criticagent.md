@@ -13,6 +13,13 @@
 
 **不用于**：评估 skill（→ [skill-criticagent](skill-criticagent.md)）；MCP 的线上故障排障（→ [troubleshooting](../zone-c-operationalization/troubleshooting.md)）；写 MCP server（用 SDK 直接开发）。
 
+## 新人上手
+
+- **触发**：贴一个 GitHub URL 或 npm 包名问 agent「这个 MCP 能不能接 / does this MCP work」——SKILL.md 声明只贴链接也触发
+- **第一步**：仓库根目录先 `uv sync`（另需 Node 18+ 供 npx 部署），再跑三层评估：`uv run python -m src.main test-url "https://github.com/OWNER/REPO" --no-db-export`，报告落在 `data/test_results/`（JSON + HTML）
+- **常见坑**：没配 `DASHSCOPE_API_KEY` 时第 2 层智能测试会退化为基础协议测试——报告必须说清哪层跑了、哪层跳过，不许把部分结果当完整评估
+- **常见坑**：部署会在本机执行第三方 npm 包，不受信的包放沙箱/容器里跑；`final_score` 只评仓库可持续性（星标/提交活跃），第 1 层部署或调用失败照样判"不可用"，别被高分迷惑
+
 ## 最佳实践
 - 先在**隔离环境**部署评估，再进个人/团队配置：MCP server 会拿到工具调用权限，等于给 agent 手
 - 重点看三件事：凭据处理方式（是否明文/env）、工具副作用（有没有写操作）、错误语义是否可诊断

@@ -12,6 +12,12 @@
 
 **不用于**：HF Jobs 云端编排（→ [huggingface-llm-trainer](../zone-c-operationalization/huggingface-llm-trainer.md)）、model-card PR / `.eval_results` 发布自动化（skill 自身声明的边界）、客户私有数据评估（→ 用 `fde_scope.eval`，数据不出机）。
 
+## 新人上手
+
+- **触发**："帮我在本地 GPU 上跑 MMLU/GSM8K，证明这个模型比那个强"、"现场只有消费级显卡，eval 用哪个 backend"
+- **第一步**：先做环境预检：`uv --version`、`printenv HF_TOKEN`、`nvidia-smi`，然后让 agent 选框架（inspect-ai 或 lighteval）与 backend（vLLM/Transformers/accelerate），加 `--limit 10`（lighteval 为 `--max-samples 10`）跑 smoke test，通过后再全量
+- **常见坑**：跳过 smoke test 直接全量——显存/依赖问题会浪费半天，固定顺序是先 5~10 题小样本打通 backend；对比两个模型时 chat template / `max_gen_toks` / few-shot 数不一致——结论直接作废，这是现场最常见的坑
+
 ## 最佳实践
 - 顺序固定：先 smoke test（小样本 5~10 题）打通 backend，再全量——直接全量最容易在显存/依赖上浪费半天
 - backend 优先级：本地 GPU 大模型用 vLLM，小模型/需要 logits 的用 Transformers，多卡分片用 accelerate

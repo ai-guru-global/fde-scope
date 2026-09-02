@@ -12,6 +12,13 @@
 
 **不用于**：网页业务逻辑 bug（→ [chrome-devtools](chrome-devtools.md)）；性能问题（→ [web-perf](web-perf.md)）；MCP server 的选型评估（→ [mcp-criticagent](../cross-cutting/mcp-criticagent.md)）。
 
+## 新人上手
+
+- **触发**：当 `list_pages`、`new_page`、`navigate_page` 报错或 MCP server 初始化失败时说「排查一下 chrome-devtools-mcp 连不上」
+- **第一步**：它会先找工作区里的 MCP 配置文件（`.mcp.json`、`.vscode/launch.json` 等）读配置；自己动手可先跑 `npx chrome-devtools-mcp@latest --help` 验证安装与 Node 环境，再按报错对照它的分诊流程
+- **常见坑**：报 `Could not find DevToolsActivePort` 是 `--autoConnect` 专属错误——先确认 Chrome 在运行、并到 `chrome://inspect/#remote-debugging` 勾选 "Enable remote debugging"，别一上来就改 `--browserUrl`
+- **常见坑**：server 起来了但只有 9 个左右工具，是 MCP client 处于只读模式，`click`/`navigate_page` 这类 `readOnlyHint: false` 的工具被禁用了；`Tool not found` 则常见于 `--slim` 模式（只保留导航与截图）
+
 ## 最佳实践
 - 顺序：确认 Chrome 进程与远程调试端口 → 确认 MCP server 日志 → 再动配置；不要一上来就重装
 - `--slim` 模式不支持该 skill 的能力，注意配置差异

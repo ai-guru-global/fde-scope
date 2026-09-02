@@ -77,6 +77,7 @@ class GateRecord(BaseModel):
     passed: bool
     blockers: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
     checked_at: str = ""
 
 

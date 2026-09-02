@@ -3,7 +3,7 @@
 
 两种模式：
 
-    make check-catalog              # 仓库自检（已挂 CI）：页数 / 五段结构 / README 索引与状态 / 断链
+    make check-catalog              # 仓库自检（已挂 CI）：页数 / 六段结构 / README 索引与状态 / 断链
     make check-local                # 本地对账：页内 ✅/📦 状态 vs 本机 ~/.qoder 下的真实安装
 
 仓库自检不读任何外部目录，所以在 CI 里结果确定。本地对账（--local）额外读
@@ -33,10 +33,12 @@ SECTIONS = {
     "Zone C": "zone-c-operationalization",
     "Zone D": "zone-d-handoff",
     "横切": "cross-cutting",
+    "MCP": "mcp",
+    "工具": "tools",
 }
 
-# 页内五段（按前缀匹配，允许带括号补充说明）
-REQUIRED_HEADS = ("## 能做什么", "## 何时使用", "## 最佳实践", "## 项目应用位点", "## 相关")
+# 页内六段（按前缀匹配，允许带括号补充说明）
+REQUIRED_HEADS = ("## 能做什么", "## 何时使用", "## 新人上手", "## 最佳实践", "## 项目应用位点", "## 相关")
 
 ROW_RE = re.compile(r"^\|\s*\[([^\]]+)\]\(([^)]+)\)\s*\|\s*(✅|📦|⚰️)", re.M)
 STATUS_RE = re.compile(r"^>\s*状态：(✅|📦|⚰️)", re.M)
@@ -56,10 +58,11 @@ def readme_rows() -> list[tuple[str, str, str]]:
 QODER = Path.home() / ".qoder"
 LOCAL_ROOTS = (QODER / "skills", QODER / "plugins" / "cache")
 
-# 页名 -> 本机身份。缺省用页文件名 slug；只在下面三种情况下需要登记：
+# 页名 -> 本机身份。缺省用页文件名 slug；只在下面四种情况下需要登记：
 #   skill:<安装名>   真实目录名与建档名不同
 #   plugin:<插件名>  整页代表一个插件/套件（不对应单一 skill 目录）
 #   builtin          随客户端注入，磁盘上无 SKILL.md，不做校验
+#   meta             索引/规约页（总览、纪律），不是可安装能力，静默跳过对账
 IDENTITY: dict[str, str] = {
     "skill-discovery": "skill:find-skills",
     "vercel-deploy": "skill:deployments-cicd",  # 合页档案：实为 deployments-cicd + vercel-cli
@@ -78,6 +81,19 @@ IDENTITY: dict[str, str] = {
     "datadog": "plugin:datadog",  # skill 为 ddsetup/ddconfig/ddtoolsets
     "alibabacloud-core-suite": "plugin:alibabacloud-core",
     "alibabacloud-spec-ops-suite": "plugin:alibabacloud-spec-ops",
+    # MCP 区：server 页对账到提供它的插件；客户端内置的 server 无磁盘痕迹
+    "firecrawl-mcp": "plugin:firecrawl",
+    "chrome-devtools-mcp": "plugin:chrome-devtools-mcp",
+    "cloud-agents-qca": "plugin:qoder-cloud-agents",
+    "computer-use": "plugin:computer-use",  # qoder-bundler 布局，无版本层
+    "cloudflare-docs-mcp": "plugin:cloudflare",
+    "browser-use": "builtin",
+    "qmind-mcp": "builtin",
+    "extension-market": "builtin",
+    "record-and-replay": "builtin",
+    # 总览/规约页（mcp/overview、tools/*）不参与对账
+    "overview": "meta",
+    "discipline": "meta",
 }
 
 
@@ -148,6 +164,8 @@ def reconcile_local(rows: list[tuple[str, str, str]]) -> tuple[list[str], list[s
         slug = page.stem
         spec = IDENTITY.get(slug, f"skill:{slug}")
         head = page.read_text(encoding="utf-8") if page.exists() else ""
+        if spec == "meta":
+            continue
         if spec == "builtin":
             notes.append(f"{rel}: 客户端内置，磁盘无文件可校验（不计入漂移）")
             continue
@@ -201,7 +219,7 @@ def main(local: bool = False) -> int:
         if not m or int(m.group(1)) != counts[d]:
             problems.append(f"README 头部 {label} 页数与磁盘不符：声明 {m and m.group(1)}，实际 {counts[d]}")
 
-    # 2) 五段结构 + 头部状态行
+    # 2) 六段结构 + 头部状态行
     for p, t in texts.items():
         heads = [ln for ln in t.splitlines() if ln.startswith("## ")]
         missing = [h for h in REQUIRED_HEADS if not any(ln.startswith(h) for ln in heads)]
@@ -259,7 +277,7 @@ def main(local: bool = False) -> int:
         for s in problems:
             print(f"  - {s}")
         return 1
-    print("✅ 全部通过（页数、五段结构、索引一一对应、状态一致、无断链）")
+    print("✅ 全部通过（页数、六段结构、索引一一对应、状态一致、无断链）")
     return 0
 
 

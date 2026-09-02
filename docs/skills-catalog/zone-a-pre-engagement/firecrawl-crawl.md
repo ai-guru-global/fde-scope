@@ -12,6 +12,13 @@
 
 **不用于**：只要 1-3 个页面（scrape 更快更省）；已知变更监控（用 monitor）。
 
+## 新人上手
+
+- **触发**：说 "crawl" / "get all the pages" / "extract everything under /docs"（SKILL.md 原文触发词），即"把这个站的 docs 全抓下来"
+- **第一步**：`firecrawl crawl "<url>" --include-paths /docs --limit 50 --wait -o .firecrawl/crawl.json`；大站先小 `--max-depth` 试跑一轮估量级
+- **常见坑**：不加 `--wait` 只返回异步 job ID，要立刻拿结果必须显式加上（之后可用 `firecrawl crawl <job-id>` 查进度）
+- **常见坑**：按页计 credits，大爬前先 `firecrawl credit-usage` 查余额；用 `--include-paths` 圈死范围，别对整站无差别开爬
+
 ## 最佳实践
 - Do：先用 map/URL 过滤确定范围，再 crawl；设置 `includePaths` 避免全站爆炸
 - Do：大站先小深度试跑一轮估量级

@@ -21,6 +21,13 @@
 
 **不用于**：一次性问题的口头答复（不值得建档）；把 runbook 写成架构图（图走 [architecture-communicator](../zone-a-pre-engagement/architecture-communicator.md)）；用 skill 生成的模板直接签字交付（必须客户会签）。
 
+## 新人上手
+
+- **触发**：对 agent 说「给 <服务> 的 <故障> 写一份 runbook」「把这次排查过程沉淀成可复用步骤」
+- **第一步**：先安装：`npx skills add anthropics/knowledge-work-plugins@runbook --directory ~/.qoder/skills -y`，然后让 agent 按 runbook 模板产出（Owner/Purpose/Procedure/Verification/Rollback/Escalation 固定结构）
+- **常见坑**：模板不含告警/指标阈值与影响面判定字段——要与客户告警一一对应必须手工加一节，直接签字交付就是缺斤短两
+- **常见坑**：Procedure 每步必须是"确切命令 + Expected result + If it fails"三件套，"Run the script"不算一步；未现场验证的命令标 `TODO-验证`，否则就是误导值班的人
+
 ## 最佳实践
 - 一页一故障：标题就是"现象 + 服务名"，不要写"通用排障指南"
 - 每条命令必须**现场验证过**再写进去；未验证的标 `TODO-验证`，否则就是误导

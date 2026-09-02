@@ -11,6 +11,13 @@
 
 **不用于**：一次性看一眼文件（→ read-file）；没有 DuckDB 环境时先 `install-duckdb`。
 
+## 新人上手
+
+- **触发**：拿到 `.duckdb`/`.db`/`.sqlite` 文件要连续做多轮 SQL 时，对 agent 说「attach 这个库」/「把这个库文件挂进会话」（SKILL.md：为 /duckdb-skills:query 准备会话）
+- **第一步**：先验库再挂：`duckdb <库文件> -c "PRAGMA version;"` + `duckdb <库文件> -csv -c "SELECT table_name, estimated_size FROM duckdb_tables();"`，skill 会把 `ATTACH '<path>' AS <alias>;` 写进状态文件，之后 `duckdb -init .duckdb-skills/state.sql -c "SHOW TABLES;"` 即恢复会话
+- **常见坑**：状态文件 `.duckdb-skills/state.sql`（或 `~/.duckdb-skills/<project-id>/state.sql`）是全 skill 共享、只追加不覆盖的——SKILL.md 明说 "Never overwrite it"，追加前先查重，别名冲突要让用户改名
+- **常见坑**：文件不存在时 skill 会问"要不要新建空库"——DuckDB 首次写入才落文件，路径拼错不报错，挂完必须 `SHOW TABLES` 核对绑定的确是预期路径
+
 ## 最佳实践
 - Do：挂完先看生成的状态文件确认绑定的是正确路径
 - Do：多文件分析优先直接对文件查询（DuckDB 可查 CSV/Parquet），不必都导入

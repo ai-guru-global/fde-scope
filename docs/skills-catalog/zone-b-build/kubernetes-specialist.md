@@ -14,6 +14,12 @@ K8s 现场交付与排障的通用专家技能：manifest/Helm 编写、Deployme
 
 **不用于**：单客户内网只有一台 ECS 的小规模交付（→ [alibabacloud-workbench-cli](alibabacloud-workbench-cli.md) 或 [docker-build-deploy](docker-build-deploy.md)）；纯本地 dev（docker compose 足够）。
 
+## 新人上手
+
+- **触发**：现场 Pod 起不来或要写交付清单时直接说，如"帮我看看为什么 Pod 一直 CrashLoopBackOff"、"给这个服务写一套 Deployment + Ingress 的 manifest"
+- **第一步**：先安装 `npx skills add jeffallan/claude-skills@kubernetes-specialist --directory ~/.qoder/skills -y`（社区源，装前按规约过一次 [skill-criticagent](../cross-cutting/skill-criticagent.md) 门禁），再让 agent 按该技能"先定位后修"的路径排障（如"排查 namespace prod 里 xxx 服务 Pod 卡在 Pending 的原因"），而不是逐个改 yaml 试
+- **常见坑**：让 agent 裸跑 `kubectl` 不带 `--context`/`--namespace`——context 漂移是 agent 误操作客户集群的最大来源，任何命令都要显式指定；把 skill 生成的 manifest 直接 apply 到客户集群——必须先 dry-run + diff 再由客户确认
+
 ## 最佳实践
 - 装前门禁：社区 skill（非官方），先用 [skill-criticagent](../cross-cutting/skill-criticagent.md) 评估；若不通过，可考虑热度更高的 `microsoft/azure-skills@azure-kubernetes`（375.4K）作为云平台特化替代
 - 生产红线：不要让 skill 生成的 manifest 直接 apply 到客户集群——必须 dry-run + diff 后再由客户确认

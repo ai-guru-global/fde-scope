@@ -12,6 +12,13 @@
 
 **不用于**：客户用 GKE/Google 栈（→ [gke-observability](gke-observability.md)）；以错误聚合/性能剖析为主、Sentry 已覆盖的场景（→ [sentry-mcp](sentry-mcp.md)）；自建 Prometheus/Grafana（直接查，别绕）；没有客户授权的 Datadog 账号时（先要只读 key，别拿自己的 demo 账号凑合）。
 
+## 新人上手
+
+- **触发**：对 agent 说「查一下 Datadog 里这个服务的报错日志」「看下 SLO 达成情况」「列出客户的 monitor 告警」——任何要取 Datadog 数据的请求都会先走 `ddsetup` 的状态检查
+- **第一步**：先跑 `ddsetup` 初始化：它检查 `datadog-server-state`，未配置时让你选客户站点域（如 us1 → `mcp.datadoghq.com`）写入注册文件，之后重启客户端并重新认证 `datadog` MCP server，工具才会出现在列表里
+- **常见坑**：工具列表里看不到 Datadog 工具 ≠ Datadog 不可用——ddsetup 明确要求继续跑 setup 而不是绕道开网页；setup 完成前任何 MCP 调用都会失败
+- **常见坑**：site 域名必须对齐客户（`datadoghq.com` / `datadoghq.eu` / `us5.datadoghq.com`…），连不上先跑 `/ddconfig` 查域与 org 切换；toolsets 全开会撑爆上下文，读类任务只开 logs/metrics 相关集
+
 ## 最佳实践
 - **ddsetup 先行**：未初始化就调查询工具必然失败；配置完成后所有读取走 MCP 工具
 - toolsets 按需开：读类任务只开 logs/metrics 相关集，全开会撑爆上下文还稀释触发精度

@@ -13,6 +13,14 @@ PowerPoint 文件级操作：从零建 deck、改现有内容、管理版式与�
 
 **不用于**：追求视觉冲击且无模板约束（→ [visual-deck-builder](visual-deck-builder.md)）；开发者技术分享（→ [slidev](slidev.md)）；只需打印分发（→ [make-pdf](make-pdf.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说"帮我改这份 PPT" / "读取这个 pptx 的内容" / "在客户模板上建 deck"（SKILL.md：generate、modify 或 analyze .pptx）
+- **第一步**：先解析再动手——只提文本用 `python -m markitdown 客户文件.pptx`；要看备注、批注、母版版式就用 `python openxml/scripts/extract.py 客户文件.pptx out/` 解包看 XML
+- **常见坑**：
+  - `extract.py` 不在预期路径时先 `find . -name "extract.py"` 定位；markitdown 只能拿到幻灯文本，备注（`ppt/notesSlides/`）、母版（`ppt/slideMasters/`）、版式（`ppt/slideLayouts/`）都在 XML 层
+  - 从零建 deck 走 slideConverter（HTML → PPTX），字体限通用字体（Arial/Helvetica/Times New Roman/Georgia 等）：客户模板带品牌字体时先确认客户机可用，否则导出丢字形
+
 ## 最佳实践
 - 图表优先用**数据驱动**（从 xlsx/CSV 生成后插入），避免手工贴截图数字（无法随数据更新）
 - 中文字体与客户机版本要检查；导出前用"兼容性检查"避免字体丢失

@@ -13,6 +13,13 @@ MQTT 协议开发模式与最佳实践参考（订阅/QoS/保留消息/遗嘱等
 
 **不用于**：fde-scope 已有自研 connector——以我方可控实现为主，该 skill 只做知识辅助，不要让外部 skill 改写核心连接器语义。
 
+## 新人上手
+
+- **触发**：对接客户 MQTT broker、排查设备掉线/重复/乱序上报时提到 MQTT/QoS/保留消息/遗嘱等协议词（页面"何时使用"；该 skill 尚未安装，先装再问）
+- **第一步**：装前先让 agent 过 [skill-criticagent](../cross-cutting/skill-criticagent.md) 评估，通过后执行 `npx skills add mindrally/skills@mqtt-development --directory ~/.qoder/skills -y` 安装，再对 agent 说「用 mqtt-development 的订阅/QoS 要点过一遍我的接入代码」
+- **常见坑**：它是知识参考件不接代码——Sparkplug 状态机（NDEATH/DBIRTH）细节未必覆盖，与 `fde_scope/connectors/mqtt_sparkplug.py` 实现或规范原文冲突时以后者为准，别让外部模板改写连接器语义
+- **常见坑**：908 installs 的社区件质量未经官方验证，跳过评估直接装遇到过时协议细节/虚构参数没有任何兜底；评估结论要回写本页"最佳实践"段
+
 ## 最佳实践
 - 装前门禁：先用 [skill-criticagent](../cross-cutting/skill-criticagent.md) 评估（社区 skill，质量未经官方验证）
 - Sparkplug 规范（状态机 NDEATH/DBIRTH）细节该 skill 未必覆盖，冲突时以 `fde_scope/connectors/mqtt_sparkplug.py` 的实现与规范原文为准

@@ -15,6 +15,13 @@ GKE/K8s 可观测性接入与查询：日志（Cloud Logging）、指标（Cloud
 
 **不用于**：阿里云客户（→ [starops](starops.md)）；单容器/ECS 部署（→ 直接 stdout 日志 + 平台监控，别为此上 K8s 观测栈）；应用内错误细节（→ [sentry-mcp](sentry-mcp.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「GKE 上看不到服务日志/指标，帮我排查采集链路」「给集群配告警规则和 SLO 预算视图」
+- **第一步**：先安装：`npx skills add google/skills@gke-observability --directory ~/.qoder/skills -y`，然后让 agent 从"要回答什么问题"出发定接入面（先指标 + 告警，trace 等有跨服务排障需求再上）
+- **常见坑**：K8s 默认全量采集在工业现场很容易爆盘/爆预算——装采集器前明确采样率与保留期并写进交付文档
+- **常见坑**：skill 强绑定 GCP（Cloud Logging / Cloud Monitoring / Workload Identity），非 GCP 客户装它收益有限；权限只要只读监控，绝不为排障给集群 admin
+
 ## 最佳实践
 - 先定义"要回答什么问题"再装采集器：只要 SLO（可用性/延迟）就先指标 + 告警，trace 等到有跨服务排障需求时再上
 - 采集成本可控：K8s 默认全量采集在工业现场很容易爆盘/爆预算，明确采样率与保留期并写进交付文档

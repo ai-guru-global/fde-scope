@@ -12,6 +12,13 @@
 
 **不用于**：规格已经完全明确的执行型任务；纯查询/纯排障。
 
+## 新人上手
+
+- **触发**：用户说"我们做个 X / 加个 X / 改一下 X"而没有明确规格时启用——SKILL.md 原话："You MUST use this before any creative work"
+- **第一步**：让 agent 先探索项目现状（文件、文档、最近提交），然后**一次只问一个问题**地厘清目的/约束/成功标准，尽量给选择题
+- **常见坑**：硬门禁（HARD-GATE）——设计未获用户批准前不许写任何代码或脚手架；"这事太简单不用设计"是 SKILL.md 点名的反模式，改个配置也要走流程
+- **常见坑**：终点是调用 writing-plans 出实施计划，不是直接实现；规格落盘到 `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` 并提交
+
 ## 最佳实践
 - Do：先问"为什么"再问"做什么"；把假设显式写出来
 - Do：产出物落成文字（计划/规格），供 [writing-plans](../cross-cutting/writing-plans.md) 接续

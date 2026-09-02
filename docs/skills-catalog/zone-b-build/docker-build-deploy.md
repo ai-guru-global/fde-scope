@@ -15,6 +15,12 @@
 
 **不用于**：sandbox 运行时隔离——那是 `fde_scope/deploy/sandbox_config.py` 通过 agentscope `DockerWorkspace` 做的事，已有自研实现，不要被外部 skill 改写语义；K8s 编排（→ [kubernetes-specialist](kubernetes-specialist.md)）。
 
+## 新人上手
+
+- **触发**：要把 Python 服务容器化交付时直接说"给 fde-scope 写一个多阶段 Dockerfile"或"现场镜像太大帮我瘦身"
+- **第一步**：先安装 `npx skills add wu529778790/shenzjd-skills@docker-build-deploy --directory ~/.qoder/skills -y`（装前过一次 [skill-criticagent](../cross-cutting/skill-criticagent.md) 门禁），再让 agent 按该技能产出 `deploy/Dockerfile` + `deploy/docker-compose.yml`（本仓库当前正好缺失这两件）
+- **常见坑**：把 `FDE_SCOPE_MIMO_API_KEY` 等凭据写进镜像层——现场审计会跑 `docker history`，密钥只能运行时 `-e`/secret 注入；`pip install` 层和源码拷贝层不分离——改一行代码就重装全部依赖，层缓存全部失效
+
 ## 最佳实践
 - 装前门禁：社区个人源、热度中等 → 先用 [skill-criticagent](../cross-cutting/skill-criticagent.md) 评估；不通过就直接用官方 docker docs + 自建 `deploy/Dockerfile`
 - Python 服务必做：`pip install` 层与源码拷贝层分离（缓存命中）、`--no-cache-dir`、锁定 `python3.12` 与 pyproject 一致、非 root `USER`

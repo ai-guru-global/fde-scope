@@ -12,6 +12,13 @@ Word 文档工具箱：内容/表格抽取、专业文档生成、页面操纵�
 
 **不用于**：`.pdf`（→ pdf）；`.txt/.md` 直接读。
 
+## 新人上手
+
+- **触发**：用户提到 "word doc / .docx / 报告 / 备忘录"，或消息附 `.docx` 文件
+- **第一步**：只读内容先转 Markdown：`pandoc --track-changes=all 文件.docx -o output.md`（顺带保留修订痕迹）；要动 XML 先解包：`python openxml/scripts/extract.py <office_file> <输出目录>`
+- **常见坑**：改第三方/法务/学术类文档必须走 revision tracking 工作流，且只标记真正变化的文本（保留原 `<w:r>` 的 RSID）——整句 del+ins 重写会被评审打回
+- **常见坑**：生成新文档用 docx-js 前必须完整读完 word-generator.md（约 500 行），SKILL.md 明令禁止带范围限制跳读
+
 ## 最佳实践
 - Do：改现有 docx 用编辑能力而非重生成，保住客户的模板/修订痕迹
 - Do：生成的文档用统一公司模板，移交时观感一致

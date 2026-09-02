@@ -52,13 +52,15 @@ class Engagement:
         if gate is None:
             raise KeyError(f"Unknown gate: {slug!r}")
         if not gate.applies(self.ctx):
-            return GateResult(slug=slug, passed=True, notes=[f"gate {slug!r} not applicable to profile"])
-        result = gate.check(self.ctx)
+            result = GateResult(slug=slug, passed=True, notes=[f"gate {slug!r} not applicable to profile"])
+        else:
+            result = gate.check(self.ctx)
         self.ctx.gate_records[slug] = GateRecord(
             slug=slug,
             passed=result.passed,
             blockers=result.blockers,
             warnings=result.warnings,
+            notes=result.notes,
             checked_at=_now(),
         )
         return result

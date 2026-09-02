@@ -12,6 +12,13 @@ GStack（YC CEO Garry Tan 的技能包）里的**根因导向系统排查**流�
 
 **不用于**：已知原因的小修改（直接改）；纯前端性能问题（→ [debug-optimize-lcp](debug-optimize-lcp.md) / [web-perf](web-perf.md)）；需要方法论约束的测试失败（→ [systematic-debugging](systematic-debugging.md)，superpowers 版更严格）。
 
+## 新人上手
+
+- **触发**：对 agent 说 `/investigate`，或直接说「debug this」「why is this broken」「root cause analysis」（SKILL.md 声明的触发短语）
+- **第一步**：把现象原样丢给 agent：`/investigate 接口 500，但昨天还是好的`——它会按"investigate → analyze → hypothesize → implement"四阶段先建可复现证据链，而不是直接改代码
+- **常见坑**：它有 Iron Law「NO FIXES WITHOUT ROOT CAUSE」——没定位到根因前别指望它动手修；3 个假设都验证失败时它会强制停下问你，而不是继续猜
+- **常见坑**：形成假设后它会把编辑范围锁定到受影响目录（freeze），想恢复全量编辑要跑 `/unfreeze`；gstack 是 53 个 skill 的大插件，与 superpowers 的 `systematic-debugging` 同时存在时要在指令里写明用哪个
+
 ## 最佳实践
 - 先固定"复现三件套"：环境、输入、期望 vs 实际，再动代码
 - 排查日志与结论落盘（`docs/incidents/` 或 engagement 记录），这是 Zone C→D 的交接资产

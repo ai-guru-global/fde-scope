@@ -12,6 +12,13 @@
 
 **不用于**：一次性事实查询（直接搜代码）；非代码文档库（→ qmind-knowledge）。
 
+## 新人上手
+
+- **触发**：想"理解/上手/总结一个陌生 repo"、"这个项目是干嘛的"，或直接点名 zread / repo walkthrough——触发的是意图，不必说出"zread"这个词
+- **第一步**：先看 `./.zread/wiki/current` 是否存在：存在就直接读 `wiki.json` 和页面 Markdown，无需再跑 CLI；不存在才经用户确认后 `zread generate -y`
+- **常见坑**：无人值守跑 `generate` 必须带 `-y`，否则会停在目录确认门上不动；`generate` 消耗 LLM token 且大 repo 要跑很多分钟，启动前先跟用户确认
+- **常见坑**：看到 `.zread/wiki/drafts/` 说明上次没跑完——`--draft resume` 续跑或 `--draft clear` 重来；静默失败查 `~/.zread/log/zread.log`
+
 ## 最佳实践
 - Do：先看 `./.zread/wiki/current` 是否存在，存在就读现成页面
 - Do：大 repo 首次生成放后台跑，别阻塞主任务

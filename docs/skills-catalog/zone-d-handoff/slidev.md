@@ -12,6 +12,14 @@
 
 **不用于**：客户方用 PowerPoint 流程且要交 .pptx 源件（→ [pptx](pptx.md)，Slidev 导出的 pptx 可编辑性有限）；视觉冲击型汇报（→ [visual-deck-builder](visual-deck-builder.md)）；无技术背景的听众为主的场合（交互与代码块反而是干扰）。
 
+## 新人上手
+
+- **触发**：对 agent 说"用 Slidev 做一份代码讲解 slides" / "把这次架构走查做成 web 幻灯"（description：technical presentations、code walkthroughs、developer decks）
+- **第一步**：`pnpm create slidev` 建项目 → `pnpm run dev` 起预览并确认 `http://localhost:3030` 能打开；幻灯片用 `---` 分隔，演讲者备注写在 HTML 注释里
+- **常见坑**：
+  - 导出 PDF 用 `pnpm run export`，依赖 `playwright-chromium`——内网/客户机提前 `npm i` 装好，别在现场装包
+  - 投影前实测字体与渲染（Slidev 跑在浏览器里，客户机可能缺字体、不能联网取资源）；代码块只放关键几行，用 `{2,3}` 行高亮配合 `lineNumbers: true`，整屏代码投影上不可读
+
 ## 最佳实践
 - 代码块只放**关键几行**（`line-numbers`、`highlight` 配合），整屏代码在投影上不可读
 - 现场投影前验证字体与终端渲染（Slidev 依赖浏览器，客户机上可能缺字体/不能联网取资源）

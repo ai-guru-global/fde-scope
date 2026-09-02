@@ -12,6 +12,13 @@
 
 **不用于**：架构层面的取舍判断（→ [risk-quality-reviewer](architecture-visualization-suite.md)）；文档一致性（→ [architecture-health](architecture-visualization-suite.md)）；纯格式化（用 ruff/black，别浪费评审额度）。
 
+## 新人上手
+
+- **触发**：对 agent 说「review my code」「看看这次改动有什么问题」或直接点名 coderabbit——它是默认评审入口，显式请求与 agent 自主触发都走它
+- **第一步**：先确认 CLI 就绪：`coderabbit --version`、`coderabbit auth status`（未装从 https://www.coderabbit.ai/cli 安装，未登录跑 `coderabbit auth login`），然后 `coderabbit review --agent` 拿 agent 可读的评审与修复指引
+- **常见坑**：`--agent` 需要 CodeRabbit CLI v0.4.0+，旧版本直接不支持；`--dir <path>` 指定的目录必须已初始化 Git 仓库
+- **常见坑**：CLI 会把代码 diff 发送到 CodeRabbit API 分析——跑评审前先确认暂存区无凭据/密钥；客户气隙环境这条要走线下评审路径，别默认直连
+
 ## 最佳实践
 - 三层不重复：lint/typecheck 机械层 → AI 评审模型推理层 → 人工业务与安全判断（`docs/code_review_checklist.md` 就是人工层）
 - 小 diff 才有好评审：大改动先拆 PR，评审质量与 diff 大小反比

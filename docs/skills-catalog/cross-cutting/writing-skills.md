@@ -12,6 +12,13 @@
 
 **不用于**：评估**外部**待装 skill 的质量与安全（→ [skill-criticagent](skill-criticagent.md)）；创建插件包（→ [create-plugin](create-plugin.md)）。
 
+## 新人上手
+
+- **触发**：对 agent 说「帮我写一个 skill」「改进这个 skill」或「装了却没被触发」——SKILL.md 触发描述覆盖 creating / editing / verifying skills before deployment
+- **第一步**：先别写指令——按 RED-GREEN-REFACTOR 先跑基线：用子 agent 在"没有该 skill"的场景下执行同类任务，记录它怎么失败、找什么借口（RED），再针对这些失败写最小 SKILL.md（GREEN）
+- **常见坑**：Iron Law「NO SKILL WITHOUT A FAILING TEST FIRST」对改 skill 同样生效——没看过 agent 没有它时怎么失败，就不知道它教的对不对；未测试就部署等于部署未测试的代码
+- **常见坑**：description 只写触发条件（"Use when…"），绝不概括工作流——实测 agent 会照 description 抄近路跳过正文（description 写 "code review between tasks" 导致只评审一次，实际流程要求两次）
+
 ## 最佳实践
 - description 要包含"不使用边界"——本 catalog 每页的 **不用于** 段就是这个思路的来源
 - 指令写成可验证的动作（"跑 X 命令并检查输出含 Y"），不写成愿望（"确保质量"）
