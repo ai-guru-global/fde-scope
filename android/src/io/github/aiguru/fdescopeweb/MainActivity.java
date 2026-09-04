@@ -4,18 +4,26 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.InputType;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -27,17 +35,24 @@ public class MainActivity extends Activity {
     private static final String DEMO_URL = "file:///android_asset/demo/index.html";
 
     private WebView web;
-    private LinearLayout setup;
+    private View setup;
     private EditText serverInput;
     private SharedPreferences prefs;
+    private boolean themeSeeded;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences("fde_scope", Context.MODE_PRIVATE);
 
+        int bg = getColor(R.color.fde_bg);
+        getWindow().setStatusBarColor(bg);
+        if (!isNight()) {
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
+
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(0xF7, 0xF9, 0xFC));
+        root.setBackgroundColor(bg);
 
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
@@ -49,6 +64,7 @@ public class MainActivity extends Activity {
                         ViewGroup.LayoutParams.WRAP_CONTENT));
 
         web = new WebView(this);
+        web.setBackgroundColor(bg);
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
         web.setWebViewClient(new WebViewClient() {
@@ -64,6 +80,19 @@ public class MainActivity extends Activity {
                 } catch (Exception ignored) {
                 }
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if (!themeSeeded) {
+                    themeSeeded = true;
+                    String t = isNight() ? "dark" : "light";
+                    view.evaluateJavascript(
+                            "(function(){try{if(!localStorage.getItem('fde-theme')){"
+                                    + "localStorage.setItem('fde-theme','" + t + "');"
+                                    + "document.documentElement.dataset.theme='" + t + "';}}catch(e){}})();",
+                            null);
+                }
             }
         });
         column.addView(web, new LinearLayout.LayoutParams(
@@ -85,106 +114,176 @@ public class MainActivity extends Activity {
     }
 
     private View buildToolbar() {
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(12), dp(8), dp(12), dp(8));
-        bar.setBackgroundColor(Color.WHITE);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(14), dp(8), dp(8), dp(8));
+        bar.setBackgroundColor(getColor(R.color.fde_panel));
+
+        TextView brand = new TextView(this);
+        brand.setText("FDE Scope Console");
+        brand.setTextSize(14);
+        brand.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        brand.setTextColor(getColor(R.color.fde_fg));
+        bar.addView(brand);
+
+        View spacer = new View(this);
+        bar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1f));
 
         bar.addView(toolbarButton("演示", v -> web.loadUrl(DEMO_URL)));
         bar.addView(toolbarButton("换址", v -> showSetup()));
         bar.addView(toolbarButton("刷新", v -> web.reload()));
-        return bar;
+
+        wrap.addView(bar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        View line = new View(this);
+        line.setBackgroundColor(getColor(R.color.fde_border));
+        wrap.addView(line, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(1)));
+        return wrap;
     }
 
     private View toolbarButton(String label, View.OnClickListener onClick) {
         TextView b = new TextView(this);
         b.setText(label);
         b.setTextSize(13);
-        b.setTypeface(Typeface.DEFAULT_BOLD);
-        b.setTextColor(Color.rgb(0x30, 0x3F, 0x54));
-        b.setPadding(dp(14), dp(6), dp(14), dp(6));
-        b.setBackgroundResource(android.R.drawable.dialog_holo_light_frame);
-        b.setOnClickListener(v -> {
-            b.setBackgroundColor(Color.rgb(0xED, 0xF1, 0xF7));
-            onClick.onClick(v);
-            b.setBackgroundColor(Color.TRANSPARENT);
-        });
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setTextColor(textStates(getColor(R.color.fde_muted), getColor(R.color.fde_fg)));
+        b.setPadding(dp(12), dp(7), dp(12), dp(7));
+        b.setBackground(ghostBg());
+        b.setOnClickListener(onClick);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = dp(8);
+        lp.leftMargin = dp(4);
         return b;
     }
 
-    private LinearLayout buildSetupPanel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setGravity(Gravity.CENTER);
-        panel.setPadding(dp(28), dp(28), dp(28), dp(28));
-        panel.setBackgroundColor(Color.rgb(0xF7, 0xF9, 0xFC));
+    private View buildSetupPanel() {
+        FrameLayout scrim = new FrameLayout(this);
+        scrim.setBackgroundColor(getColor(R.color.fde_bg));
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(24), dp(26), dp(24), dp(22));
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(getColor(R.color.fde_panel));
+        cardBg.setCornerRadius(dp(10));
+        cardBg.setStroke(dp(1), getColor(R.color.fde_border));
+        card.setBackground(cardBg);
+        card.setElevation(dp(3));
 
         TextView title = new TextView(this);
         title.setText("连接 FDE Scope");
         title.setTextSize(22);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setTextColor(Color.rgb(0x1D, 0x29, 0x39));
-        panel.addView(title);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        title.setTextColor(getColor(R.color.fde_fg));
+        card.addView(title);
 
         TextView hint = new TextView(this);
-        hint.setText("输入 fde-scope web 服务器地址\n（与电脑同一局域网，如 http://192.168.1.10:8080）");
+        hint.setText("输入 fde-scope web 服务器地址（与电脑同一局域网，如 http://192.168.1.10:8080）");
         hint.setTextSize(14);
-        hint.setTextColor(Color.rgb(0x5A, 0x6B, 0x82));
-        hint.setPadding(0, dp(10), 0, dp(18));
-        panel.addView(hint);
+        hint.setTextColor(getColor(R.color.fde_muted));
+        hint.setLineSpacing(dp(3), 1f);
+        hint.setPadding(0, dp(10), 0, dp(20));
+        card.addView(hint);
 
         serverInput = new EditText(this);
         serverInput.setSingleLine(true);
         serverInput.setTextSize(15);
+        serverInput.setTypeface(Typeface.MONOSPACE);
+        serverInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        serverInput.setImeOptions(EditorInfo.IME_ACTION_GO);
+        serverInput.setTextColor(getColor(R.color.fde_fg));
+        serverInput.setHintTextColor(getColor(R.color.fde_faint));
         serverInput.setHint("http://192.168.1.10:8080");
         serverInput.setText(prefs.getString("server", "http://"));
-        panel.addView(serverInput, new LinearLayout.LayoutParams(
+        serverInput.setSelectAllOnFocus(true);
+        serverInput.setPadding(dp(12), dp(12), dp(12), dp(12));
+        serverInput.setBackground(inputBg(false));
+        serverInput.setOnFocusChangeListener((v, has) -> serverInput.setBackground(inputBg(has)));
+        serverInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_GO) {
+                connectFromInput();
+                return true;
+            }
+            return false;
+        });
+        card.addView(serverInput, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        row.setPadding(0, dp(18), 0, 0);
-
-        Button connect = new Button(this);
-        connect.setText("连接");
-        connect.setTextColor(Color.WHITE);
-        connect.getBackground().setColorFilter(Color.rgb(0x2F, 0x6F, 0xEB), android.graphics.PorterDuff.Mode.SRC_ATOP);
-        connect.setOnClickListener(v -> {
-            String url = serverInput.getText().toString().trim();
-            if (url.isEmpty()) {
-                Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (!url.contains("://")) {
-                url = "http://" + url;
-            }
-            connect(url);
-        });
-        row.addView(connect, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        Button demo = new Button(this);
-        demo.setText("内置演示");
-        demo.setTextColor(Color.rgb(0x30, 0x3F, 0x54));
-        demo.getBackground().setColorFilter(Color.rgb(0xE3, 0xE9, 0xF2), android.graphics.PorterDuff.Mode.SRC_ATOP);
-        demo.setOnClickListener(v -> {
+        row.setPadding(0, dp(20), 0, 0);
+        row.addView(primaryButton("连接", v -> connectFromInput()),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams ghostLp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        ghostLp.leftMargin = dp(10);
+        row.addView(secondaryButton("内置演示", v -> {
             setup.setVisibility(View.GONE);
             web.loadUrl(DEMO_URL);
-        });
-        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        dlp.leftMargin = dp(12);
-        row.addView(demo, dlp);
-
-        panel.addView(row, new LinearLayout.LayoutParams(
+        }), ghostLp);
+        card.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        return panel;
+
+        TextView meta = new TextView(this);
+        meta.setText("FDE Scope Console · v" + versionName());
+        meta.setTextSize(11);
+        meta.setTypeface(Typeface.MONOSPACE);
+        meta.setTextColor(getColor(R.color.fde_faint));
+        meta.setPadding(0, dp(20), 0, 0);
+        card.addView(meta);
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int cardWidth = Math.min(dp(420), dm.widthPixels - dp(40));
+        scrim.addView(card, new FrameLayout.LayoutParams(
+                cardWidth, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        return scrim;
     }
 
-    private void connect(String url) {
+    private TextView primaryButton(String label, View.OnClickListener onClick) {
+        TextView b = new TextView(this);
+        b.setText(label);
+        b.setGravity(Gravity.CENTER);
+        b.setTextSize(15);
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setTextColor(getColor(R.color.fde_accent_ink));
+        b.setPadding(dp(14), dp(12), dp(14), dp(12));
+        b.setBackground(fillBg(getColor(R.color.fde_accent), getColor(R.color.fde_accent_2), dp(7)));
+        b.setOnClickListener(onClick);
+        return b;
+    }
+
+    private TextView secondaryButton(String label, View.OnClickListener onClick) {
+        TextView b = new TextView(this);
+        b.setText(label);
+        b.setGravity(Gravity.CENTER);
+        b.setTextSize(15);
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setTextColor(getColor(R.color.fde_fg));
+        b.setPadding(dp(14), dp(12), dp(14), dp(12));
+        GradientDrawable content = new GradientDrawable();
+        content.setColor(getColor(R.color.fde_panel));
+        content.setCornerRadius(dp(7));
+        content.setStroke(dp(1), getColor(R.color.fde_border));
+        b.setBackground(rippleWith(content, getColor(R.color.fde_panel2)));
+        b.setOnClickListener(onClick);
+        return b;
+    }
+
+    private void connectFromInput() {
+        String url = serverInput.getText().toString().trim();
+        if (url.isEmpty()) {
+            Toast.makeText(this, "请输入服务器地址", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!url.contains("://")) {
+            url = "http://" + url;
+        }
+        hideKeyboard();
         prefs.edit().putString("server", url).apply();
         setup.setVisibility(View.GONE);
         web.loadUrl(url);
@@ -192,6 +291,15 @@ public class MainActivity extends Activity {
 
     private void showSetup() {
         setup.setVisibility(View.VISIBLE);
+    }
+
+    private void hideKeyboard() {
+        InputMethodManager imm =
+                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        View focus = getCurrentFocus();
+        if (imm != null && focus != null) {
+            imm.hideSoftInputFromWindow(focus.getWindowToken(), 0);
+        }
     }
 
     @Override
@@ -208,6 +316,58 @@ public class MainActivity extends Activity {
             }
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    private Drawable ghostBg() {
+        GradientDrawable content = new GradientDrawable();
+        content.setCornerRadius(dp(6));
+        content.setColor(Color.TRANSPARENT);
+        return rippleWith(content, getColor(R.color.fde_panel2));
+    }
+
+    private Drawable fillBg(int rest, int pressed, int radius) {
+        GradientDrawable content = new GradientDrawable();
+        content.setColor(rest);
+        content.setCornerRadius(radius);
+        return rippleWith(content, pressed);
+    }
+
+    private Drawable rippleWith(GradientDrawable content, int pressedColor) {
+        return new RippleDrawable(
+                new ColorStateList(
+                        new int[][]{{android.R.attr.state_pressed}, {}},
+                        new int[]{pressedColor, Color.TRANSPARENT}),
+                content, null);
+    }
+
+    private ColorStateList textStates(int rest, int pressed) {
+        return new ColorStateList(
+                new int[][]{{android.R.attr.state_pressed}, {}},
+                new int[]{pressed, rest});
+    }
+
+    private Drawable inputBg(boolean focused) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(getColor(R.color.fde_code));
+        d.setCornerRadius(dp(7));
+        d.setStroke(dp(1), focused
+                ? getColor(R.color.fde_accent)
+                : getColor(R.color.fde_border_strong));
+        return d;
+    }
+
+    private String versionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception e) {
+            return "?";
+        }
+    }
+
+    private boolean isNight() {
+        int mask = getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK;
+        return mask == Configuration.UI_MODE_NIGHT_YES;
     }
 
     private int dp(int v) {

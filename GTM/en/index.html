@@ -7,11 +7,11 @@
 <meta name="description" content="FDE Scope turns the complete Forward-Deployed-Engineer SOP (4 zones, 18 phases, 10 executable gates) into a gate-enforced state machine. Software desks and factory floors alike.">
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M5 11h21l18 13H23Z" fill="%231C64D2"/><path d="M23 24h21L9 46l9-14Z" fill="%2315448E"/></svg>'>
 <style>
-@font-face{font-family:"Public Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/public-sans-latin-400-normal.woff2) format("woff2")}
-@font-face{font-family:"Public Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/public-sans-latin-600-normal.woff2) format("woff2")}
-@font-face{font-family:"Public Sans";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/public-sans-latin-700-normal.woff2) format("woff2")}
-@font-face{font-family:"Spline Sans Mono";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/spline-sans-mono-latin-400-normal.woff2) format("woff2")}
-@font-face{font-family:"Spline Sans Mono";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/spline-sans-mono-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Public Sans";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/public-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Public Sans";font-style:normal;font-weight:600;font-display:swap;src:url(../fonts/public-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Public Sans";font-style:normal;font-weight:700;font-display:swap;src:url(../fonts/public-sans-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"Spline Sans Mono";font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/spline-sans-mono-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"Spline Sans Mono";font-style:normal;font-weight:600;font-display:swap;src:url(../fonts/spline-sans-mono-latin-600-normal.woff2) format("woff2")}
 :root{
   --steel-0:oklch(0.973 0.003 255);
   --steel-1:oklch(1 0 0);
@@ -487,10 +487,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <div class="brand">FDE SCOPE<small>FORWARD-DEPLOYED OPERATING SYSTEM · MIT</small></div>
     <nav aria-label="Site">
       <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GITHUB</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP DOCS</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS · 技能库</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP DOCS</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS</a>
       <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">RESOLVEAGENT ↗</a>
-      <a href="#crib">QUICK START</a>
+      <a href="https://e6cllzitarii.meoo.fun" target="_blank" rel="noopener">PRODUCT DEMO ↗</a>
+      <a href="#crib">QUICK START</a><a href="../index.html" hreflang="zh-CN" lang="zh-CN">中文</a>
     </nav>
   </div>
 </header>
@@ -511,11 +512,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <span class="ps-label">SCENARIO PROFILE</span>
           <button class="ps-btn ps-ticket" id="ps-ticket" aria-pressed="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4h9v17M14 9h5v12M8.5 8h2M8.5 12h2M8.5 16h2M17 13h.01M17 17h.01"/></svg>
-            TICKET · 客服工单
+            TICKET
           </button>
           <button class="ps-btn ps-mfg" id="ps-mfg" aria-pressed="true">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>
-            MANUFACTURING · 工厂
+            MANUFACTURING
           </button>
         </div>
       </div>
@@ -523,7 +524,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="cta-strip cta-top">
         <button class="pushbtn" id="install-btn" type="button">pip install -e ".[dev]"<span class="copied">COPIED ✓</span></button>
         <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.8 6.3.8-4.6 4.3 1.2 6.1L12 17l-5.6 3 1.2-6.1L3 9.6l6.3-.8Z"/></svg>Star on GitHub</a>
-        <a class="doclink" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">Read the full 18-phase SOP · 完整 SOP →</a>
+        <a class="doclink" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">Read the full 18-phase SOP · 完整 SOP →</a>
         <span class="cta-note">NO LLM KEY · NO DOCKER · PYTHON ≥ 3.11</span>
       </div>
 
@@ -742,15 +743,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <div class="shots">
       <figure class="shot slot">
-        <figcaption><b>ENGAGEMENT CONSOLE · 工作台</b><small>cross-project matrix · gates · recent skills</small></figcaption>
-        <img src="images/console.png" alt="FDE Scope macOS app — engagement console with cross-project matrix" loading="lazy" width="1440" height="900">
+        <figcaption><b>ENGAGEMENT CONSOLE</b><small>cross-project matrix · gates · recent skills</small></figcaption>
+        <img src="../images/console.png" alt="FDE Scope macOS app — engagement console with cross-project matrix" loading="lazy" width="1440" height="952">
       </figure>
       <figure class="shot slot">
-        <figcaption><b>FUNCTIONAL OVERVIEW · 功能总览</b><small>18 phases · 4 zones · 10 gates · 10 connectors</small></figcaption>
-        <img src="images/overview.png" alt="FDE Scope macOS app — 18-phase SOP functional overview" loading="lazy" width="1440" height="900">
+        <figcaption><b>FUNCTIONAL OVERVIEW</b><small>18 phases · 4 zones · 10 gates · 10 connectors</small></figcaption>
+        <img src="../images/overview.png" alt="FDE Scope macOS app — 18-phase SOP functional overview" loading="lazy" width="1440" height="952">
       </figure>
     </div>
-    <div class="ledger-note" style="border-top:none">LIVE CAPTURE · 实机截图 · FDE-Scope-0.1.0-universal2.app · 1440×900 @2x · $ ./appbuild/build_release.sh</div>
+    <div class="ledger-note" style="border-top:none">LIVE CAPTURE · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS window · $ ./appbuild/build_release.sh</div>
   </div>
 </section>
 
@@ -838,7 +839,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <h2 id="close-h">Show up with<br>the whole SOP.</h2>
     <div class="cta-strip">
       <a class="pushbtn" style="text-decoration:none;display:inline-block" href="https://github.com/ai-guru-global/fde-scope">Star · 安装 · 进场 →</a>
-      <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/manufacturing_scenario.md" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>Factory walkthrough · 工厂 walkthrough</a>
+      <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/manufacturing_scenario.md" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>Factory walkthrough · 工厂 walkthrough</a>
     </div>
   </div>
 </section>
@@ -848,13 +849,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <nav aria-label="Footer">
       <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/ontology.md" target="_blank" rel="noopener">Ontology</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">Skills 手册库</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/agentscope_api_mapping.md" target="_blank" rel="noopener">AgentScope mapping</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/ontology.md" target="_blank" rel="noopener">Ontology</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">Skills 手册库</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/agentscope_api_mapping.md" target="_blank" rel="noopener">AgentScope mapping</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>
       <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">ResolveAgent ↗</a>
+      <a href="https://e6cllzitarii.meoo.fun" target="_blank" rel="noopener">Product Demo ↗</a>
     </nav>
     <p class="colophon">FDE SCOPE · GTM BOARD<br>DIRECTION: ENTERPRISE LIGHT · SEED 773793EF<br><span lang="zh">门禁即工程 · 全程覆盖 · 现场优先</span></p>
   </div>

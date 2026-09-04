@@ -3,7 +3,7 @@
 > 本地维护的 skill 档案库：**每个 skill 一页 Markdown**，记录基本信息、触发时机、最佳实践、在 fde-scope 项目中的应用位点。
 > 建档日期：2026-08-27 · 2026-08-31 行业调研扩编（+21 📦）· **共 122 页**：Zone A 14 / Zone B 41 / Zone C 22 / Zone D 12 / 横切 21 / MCP 10 / 工具 2
 > 一致性门禁：`make check-catalog`（当前全绿）
-> **门户主页**：`site/index.html` —— GTM 风格单文件导航（场景入口 + 全部页面跳转 + 搜索），双击即开；改完本库跑 `make build-site` 重新生成
+> **门户主页**：`site/index.html`（中文）· `site/en/index.html`（英文：导航/搜索/元信息为英文，档案正文保持中文单一事实源）—— GTM 风格单文件导航（场景入口 + 全部页面跳转 + 搜索），双击即开；改完本库跑 `make build-site` 重新生成双语两份
 
 ## 目录结构
 

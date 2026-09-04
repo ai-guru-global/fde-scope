@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fde_bg">#0B0F14</color>
+    <color name="fde_panel">#12161C</color>
+    <color name="fde_panel2">#161B22</color>
+    <color name="fde_fg">#E5E8EC</color>
+    <color name="fde_muted">#9399A1</color>
+    <color name="fde_faint">#7E848B</color>
+    <color name="fde_border">#292E35</color>
+    <color name="fde_border_strong">#424850</color>
+    <color name="fde_accent">#71B5D7</color>
+    <color name="fde_accent_2">#8DC3E0</color>
+    <color name="fde_accent_ink">#001925</color>
+    <color name="fde_code">#06090E</color>
+</resources>

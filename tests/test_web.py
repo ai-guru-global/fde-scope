@@ -40,6 +40,48 @@ def test_console_html(client) -> None:
     assert "Engagement Console" in r.text
 
 
+# ---------------------------------------------------------------------------
+# bilingual routes（/en/* 英文壳，与 zh 同源模板经 to_en 生成）
+# ---------------------------------------------------------------------------
+def test_en_overview_html(client) -> None:
+    """/en/ serves the English overview shell."""
+    r = client.get("/en/")
+    assert r.status_code == 200
+    assert '<html lang="en">' in r.text
+    assert "Ontology semantic layer · TBox + ABox" in r.text
+    assert "Ontology 语义层" not in r.text
+
+
+def test_en_console_html(client) -> None:
+    """/en/console serves the English console shell."""
+    r = client.get("/en/console")
+    assert r.status_code == 200
+    assert '<html lang="en">' in r.text
+    assert "Workbench</button>" in r.text
+    assert "Skills</button>" in r.text
+    assert "工作台</button>" not in r.text
+
+
+def test_language_switcher_badges(client) -> None:
+    """zh pages badge to /en/*; EN pages flip the badge back to zh routes."""
+    zh_home = client.get("/").text
+    zh_console = client.get("/console").text
+    en_home = client.get("/en/").text
+    en_console = client.get("/en/console").text
+    assert 'href="/en/"' in zh_home
+    assert 'href="/en/console"' in zh_console
+    assert 'aria-label="Switch to English"' in zh_home
+    assert 'aria-label="切换到中文"' in en_home
+    assert 'aria-label="切换到中文"' in en_console
+
+
+def test_en_glossary_english_tips(client) -> None:
+    """EN pages ship the English glossary (Chinese terms kept as keys)."""
+    html = client.get("/en/").text
+    assert "__GLOSSARY__" not in html
+    assert "Standard Operating Procedure; here, the 18-phase project lifecycle." in html
+
+
 def test_glossary_tooltips_on_both_pages(client) -> None:
     """Both pages ship the ?-tooltip glossary: CSS + script + term data."""
     for path in ("/", "/console"):

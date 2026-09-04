@@ -3,11 +3,14 @@
 
     make build-site    # 等价 python3 scripts/build_catalog_site.py
 
-输出 docs/skills-catalog/site/index.html：零依赖、离线可用、双击即开。
+输出两个纯语言版本：docs/skills-catalog/site/index.html（中文）与
+site/en/index.html（英文）。零依赖、离线可用、双击即开。
 数据源是 README 表格与各页 Markdown，所以门户永远和手册库同源；
 改了 catalog 之后重新跑一次本脚本即可。
 
-仓库自检（make check-catalog）不读本文件产物，两边互不干扰。
+英文版覆盖：界面壳（导航/英雄区/分区/筛选/页脚）、大区标签、场景、
+每页一句话简介（BLURB_EN，缺一条直接构建失败）。档案正文仍以中文
+Markdown 为唯一事实源，英文版在正文页顶部显示语言提示条，不做机翻。
 """
 
 from __future__ import annotations
@@ -157,6 +160,225 @@ SCENARIOS = [
         ],
     ),
 ]
+
+
+# --------------------------------------------------------------------------- 英文文案（界面壳 + 大区 + 场景 + 简介翻译）
+
+# zone_id -> (英文大区名, 英文副题)；缺省回退中文
+ZONES_EN = {
+    "zone-a-pre-engagement": ("Zone A · Pre-engagement", "research · discovery · stakeholders · success criteria"),
+    "zone-b-build": ("Zone B · Build", "data ingest · corpus · prototype · validation · deploy · evaluation"),
+    "zone-c-operationalization": ("Zone C · Operationalization", "SLO · monitoring · incidents · training iteration"),
+    "zone-d-handoff": ("Zone D · Handoff", "docs · training · handover demo"),
+    "cross-cutting": ("Cross-cutting · Meta-skills", "skill engineering · review · planning · scheduling · platform suites"),
+    "mcp": ("MCP · Servers", "browser · scraping · cloud · desktop · knowledge · docs"),
+    "tools": ("Tools · Built-in", "execution-layer panorama · usage discipline"),
+}
+
+# 中文场景标题 -> (英文标题, 英文说明)
+SCENARIOS_EN = {
+    "新人第一周": ("First Week", "three-layer capability model → tool discipline → session methodology → fill scenarios by zone"),
+    "接手陌生系统": ("Taking Over an Unfamiliar System", "wiki recon → evidence modeling → root-cause investigation"),
+    "客户调研摸底": ("Customer Discovery", "web search → extraction → knowledge base → requirement exploration"),
+    "方案书与选型": ("Proposals & Model Selection", "model decisions → explain clearly → draw it → delivery formats"),
+    "数据接入与语料": ("Data Ingest & Corpus", "profile → convert → attach DB → query → protocol ingest"),
+    "训练与评估": ("Training & Evaluation", "datasets → embedding training → local evals → closed loop"),
+    "部署上线": ("Deploy to Production", "local inference → containers → orchestration → IaC → quick demo"),
+    "运维与排障": ("Ops & Troubleshooting", "root cause → browser forensics → observability → AIOps"),
+    "文档与移交": ("Docs & Handoff", "fill docs → publication-grade PDF → standards → courses → podcast"),
+    "工程纪律（横切）": ("Engineering Discipline (Cross-cutting)", "plan → execute → review → security → ecosystem & scheduling"),
+}
+
+# 页面路由（不含 .md）-> 英文一句话；英文构建缺任一条即失败
+BLURB_EN = {
+    # Zone A
+    "zone-a-pre-engagement/firecrawl-search": "Live web search with full-page extraction",
+    "zone-a-pre-engagement/firecrawl-scrape": "Any URL → clean Markdown",
+    "zone-a-pre-engagement/firecrawl-crawl": "Bulk extraction across whole sites or doc sections",
+    "zone-a-pre-engagement/firecrawl-parse": "Local files (PDF/DOCX/spreadsheets) → Markdown",
+    "zone-a-pre-engagement/zread": "One-shot wiki for an unfamiliar codebase",
+    "zone-a-pre-engagement/qmind-knowledge": "Knowledge-base retrieval / upload / compile",
+    "zone-a-pre-engagement/brainstorming": "Requirements exploration before creative work",
+    "zone-a-pre-engagement/architecture-communicator": "Explain architecture per audience",
+    "zone-a-pre-engagement/drawio": "Editable delivery diagrams",
+    "zone-a-pre-engagement/pdf": "PDF parsing / generation / forms",
+    "zone-a-pre-engagement/docx": "Word parsing / generation / processing",
+    "zone-a-pre-engagement/xlsx": "Excel parsing / generation / formulas",
+    "zone-a-pre-engagement/grill-me": "Interrogates vague requirements into a spec before you build (mattpocock/skills, 1M installs)",
+    "zone-a-pre-engagement/crm-lookup": "HubSpot official CLI for contacts / deals / associations (agent-cli-skills)",
+    # Zone B
+    "zone-b-build/read-file": "Profile any data file",
+    "zone-b-build/convert-file": "Convert between data file formats",
+    "zone-b-build/attach-db": "Attach databases to a DuckDB session",
+    "zone-b-build/query": "DuckDB SQL / natural-language queries",
+    "zone-b-build/spatial": "Geospatial data analysis",
+    "zone-b-build/mqtt-development": "MQTT development patterns reference",
+    "zone-b-build/bailian-train-deploy": "Bailian data → train → deploy loop",
+    "zone-b-build/huggingface-datasets": "HF Datasets Viewer API workflows",
+    "zone-b-build/train-sentence-transformers": "Embedding / reranker model training",
+    "zone-b-build/rag-agent-builder": "Build RAG agents",
+    "zone-b-build/frontend-design": "High-design-quality frontend",
+    "zone-b-build/ui-designer": "UI design systems + prototypes",
+    "zone-b-build/shadcn": "shadcn/ui component system",
+    "zone-b-build/vercel-deploy": "Ship demos fast",
+    "zone-b-build/cloudflare": "Workers / Pages / KV platform",
+    "zone-b-build/kubernetes-specialist": "K8s field delivery / troubleshooting",
+    "zone-b-build/docker-build-deploy": "Docker productionization",
+    "zone-b-build/alibabacloud-workbench-cli": "ECS ops without public IPs",
+    "zone-b-build/alibabacloud-core-suite": "Alibaba Cloud OpenAPI/CLI 9-piece suite (cross-account query / SDK gen / TF import)",
+    "zone-b-build/alibabacloud-spec-ops-suite": "Alibaba Cloud IaC pipeline 6-piece suite (plan → codegen → validate → apply)",
+    "zone-b-build/vllm-deploy-docker": "Official vLLM container deployment",
+    "zone-b-build/vllm-ascend": "Ascend NPU vLLM adaptation (registry name `vllm-ascend-deploy`)",
+    "zone-b-build/huggingface-local-models": "llama.cpp + GGUF local inference (air-gapped / intranet / Mac demos)",
+    "zone-b-build/huggingface-best": "Open-model selection decisions (complements bailian-model-recommend)",
+    "zone-b-build/huggingface-community-evals": "Local evals with inspect-ai / lighteval",
+    "zone-b-build/phoenix-evals": "Arize Phoenix evaluator development (rules + LLM judge)",
+    "zone-b-build/evaluating-llms-harness": "lm-evaluation-harness wrapper",
+    "zone-b-build/huggingface-spaces": "HF Spaces demo hosting (Gradio / Docker / ZeroGPU)",
+    "zone-b-build/postman": "Collection / Mock / agent-ready API lifecycle (3 skills)",
+    "zone-b-build/bigquery-basics": "Official Google BigQuery basics (`bq` CLI + SQL)",
+    "zone-b-build/using-dbt-for-analytics-engineering": "Official dbt analytics-engineering workflow (models / tests / breaking-change process)",
+    "zone-b-build/airflow": "Official Astronomer Airflow DAG orchestration (`af` CLI)",
+    "zone-b-build/qdrant-clients-sdk": "Official Qdrant vector-DB SDKs in six languages",
+    "zone-b-build/langgraph-persistence": "Official LangGraph checkpoint persistence (customer-stack fit; complements the AgentScope base)",
+    "zone-b-build/building-pydantic-ai-agents": "Official Pydantic AI agent building (`@agent.tool` / TestModel; pydantic v2 kinship)",
+    "zone-b-build/mlflow-agent-evaluation": "Official MLflow LLM evaluation / tracing (registry name `agent-evaluation`)",
+    "zone-b-build/wandb-primary": "Official W&B experiment-tracking entry (wandb/skills)",
+    "zone-b-build/playwright-cli": "Official Microsoft Playwright test-run CLI (137K installs; debugging defers to chrome-devtools)",
+    "zone-b-build/prompt-engineering-patterns": "Prompt-engineering pattern library (CoT / structured output / routing / guardrails)",
+    "zone-b-build/openapi-spec-generation": "OpenAPI 3.1 spec generation with Spectral / Redocly linting",
+    "zone-b-build/modbus-debug": "Register-level Modbus RTU/TCP line debugging (low-install community skill; gate before installing)",
+    # Zone C
+    "zone-c-operationalization/starops": "Alibaba Cloud AIOps diagnostics",
+    "zone-c-operationalization/investigate": "Root-cause-driven systematic investigation",
+    "zone-c-operationalization/systematic-debugging": "Debugging methodology (locate first, then fix)",
+    "zone-c-operationalization/troubleshooting": "Browser connection / target issues",
+    "zone-c-operationalization/chrome-devtools": "DevTools debugging & automation",
+    "zone-c-operationalization/sentry-mcp": "Sentry error / performance tracing",
+    "zone-c-operationalization/datadog": "Official Datadog MCP observability (ddsetup / ddconfig / ddtoolsets)",
+    "zone-c-operationalization/sre-runbooks": "SRE runbook templates (registry name `knowledge-work-plugins@runbook`)",
+    "zone-c-operationalization/incident-response": "Official Anthropic incident response",
+    "zone-c-operationalization/gke-observability": "GKE / K8s observability",
+    "zone-c-operationalization/firecrawl-monitor": "Web change monitoring & alerts",
+    "zone-c-operationalization/deploy-checklist": "Pre-launch verification checklist (registry name `knowledge-work-plugins@deploy-checklist`; source-verified)",
+    "zone-c-operationalization/huggingface-llm-trainer": "SFT / DPO / GRPO on HF Jobs",
+    "zone-c-operationalization/huggingface-vision-trainer": "Detection / classification / segmentation training",
+    "zone-c-operationalization/trl-training": "Local training with TRL CLI",
+    "zone-c-operationalization/web-perf": "Core Web Vitals analysis",
+    "zone-c-operationalization/debug-optimize-lcp": "LCP-focused optimization",
+    "zone-c-operationalization/memory-leak-debugging": "JS / Node memory leaks",
+    "zone-c-operationalization/grafana-dashboarding": "Official Grafana dashboards-as-code (registry name `dashboarding`; self-managed stack delivery)",
+    "zone-c-operationalization/llm-evaluation": "LLM evaluation methodology (metric choice / judges / consistency checks)",
+    "zone-c-operationalization/gdpr-data-handling": "GDPR data-processing compliance (Art. 6/9/17; one-month DSAR deadline)",
+    "zone-c-operationalization/terraform-style-guide": "Official HashiCorp Terraform style guide (`for_each` over count; keep state out of git)",
+    # Zone D
+    "zone-d-handoff/document-generate": "Generate missing docs from scratch",
+    "zone-d-handoff/document-release": "Post-release doc sync",
+    "zone-d-handoff/make-pdf": "Markdown → publication-grade PDF",
+    "zone-d-handoff/anthropic-documentation": "Documentation writing standards (registry name `knowledge-work-plugins@documentation`)",
+    "zone-d-handoff/shifu": "Knowledge base → teaching course",
+    "zone-d-handoff/remember": "K8s networking flashcards (scoped to K8s networking)",
+    "zone-d-handoff/visual-deck-builder": "Image-model-driven PPT decks",
+    "zone-d-handoff/pptx": "PowerPoint manipulation",
+    "zone-d-handoff/slidev": "Developer slides (Markdown / Vue)",
+    "zone-d-handoff/notion-infographic": "Docs → infographic series",
+    "zone-d-handoff/podcast": "Knowledge base → two-host podcast audio",
+    "zone-d-handoff/lark-openapi-explorer": "Official Feishu/Lark OpenAPI explorer (635.6K installs; owner is domain `open.feishu.cn`)",
+    # Cross-cutting
+    "cross-cutting/skill-discovery": "`find-skills`: search / install / audit the skill ecosystem (source of this catalog's 📦 items)",
+    "cross-cutting/create-skill": "Create new Qoder Agent Skills",
+    "cross-cutting/writing-skills": "Skill writing & deployment verification",
+    "cross-cutting/create-plugin": "Skills / external sources → distributable plugins",
+    "cross-cutting/skill-criticagent": "Pre-install skill vetting",
+    "cross-cutting/mcp-criticagent": "MCP server evaluation",
+    "cross-cutting/architecture-visualization-suite": "Architecture-visualization 13-piece suite (router + scenarios + foundations)",
+    "cross-cutting/code-review": "CodeRabbit code review",
+    "cross-cutting/security-scan": "Security scanning (L2/L3)",
+    "cross-cutting/writing-plans": "Plan first for multi-step tasks",
+    "cross-cutting/executing-plans": "Execute plans with review checkpoints",
+    "cross-cutting/dispatching-parallel-agents": "Dispatch independent tasks in parallel",
+    "cross-cutting/using-git-worktrees": "Isolated workspaces",
+    "cross-cutting/schedule": "Scheduled / recurring tasks",
+    "cross-cutting/cloud-agents": "Always-on cloud agents (**two plugins**: REST v1.1.0 + MCP v0.1.0)",
+    "cross-cutting/bailian-cli": "Bailian `bl` family hub (9 skills via `bl skill init`)",
+    "cross-cutting/using-superpowers-family": "Superpowers **14**-piece set (methodology family with session-start hooks)",
+    "cross-cutting/gstack-suite": "GStack bundled **53**-piece set / 43 registered-callable today (full YC dev workflow)",
+    "cross-cutting/knowledge-work-suite": "anthropics/knowledge-work-plugins: **230** skills / 497.5K installs (**install individually as needed, not wholesale**)",
+    "cross-cutting/anthropics-official-skills": "Anthropic official skills repo profile (19 skills; skill-creator at 367K installs; **install individually, not wholesale**)",
+    "cross-cutting/trailofbits-security-suite": "Trail of Bits security suite, 43 plugins (static analysis / differential audit / supply chain, via plugin marketplace)",
+    # MCP
+    "mcp/overview": "Three-layer capability model + panorama of 9 servers / 178 tools (start here)",
+    "mcp/cloud-agents-qca": "82 tools across the cloud-agent lifecycle (environments / sessions / files / memory / credentials / deploys)",
+    "mcp/chrome-devtools-mcp": "29 tools for full-stack browser debugging (perf / network / AX snapshots / heap snapshots)",
+    "mcp/firecrawl-mcp": "27 tools for web data (search / scrape / crawl / monitor / paper research)",
+    "mcp/browser-use": "16 lightweight browser-interaction tools (no perf/emulation; heavy work defers to chrome-devtools)",
+    "mcp/computer-use": "10 tools automating macOS native apps via the AX tree",
+    "mcp/qmind-mcp": "7 tools for QMind knowledge-base retrieval / ingest",
+    "mcp/record-and-replay": "Record human workflows → generate skills (3 tools)",
+    "mcp/extension-market": "Official extension-market search / install (2 tools; evaluate before installing)",
+    "mcp/cloudflare-docs-mcp": "Official Cloudflare docs retrieval / migration guides (2 tools; retrieval-first)",
+    # Tools
+    "tools/overview": "Built-in tool panorama: files / search / execution / web / tasks / delegation / MCP meta-tools / multi-session",
+    "tools/discipline": "Usage discipline: Read-before-Edit, dedicated tools first, parallel/background, risk & verification",
+}
+
+# 各语言界面固定文案；JS 经 DATA.l10n 读取
+L10N = {
+    "zh": {
+        "htmlLang": "zh-CN",
+        "docTitle": "FDE Skills 手册库 · 门户",
+        "brandSuffix": "手册库",
+        "gtaText": "GTM 官网 ↗",
+        "gtaHref": "../../../GTM/index.html",
+        "langHref": "./en/",
+        "langLabel": "ENGLISH",
+        "searchPh": "搜索 {n} 页 skills / tools / MCP…",
+        "heroH1": "FDE Skills 手册库",
+        "heroP": "每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。",
+        "statUnits": {"pages": "页能力档案", "installed": "已安装", "installable": "可安装", "zones": "大区", "scenarios": "场景入口"},
+        "secTaskT": "按任务开始",
+        "secTaskD": "GTM 场景速查：从任务进入，而不是从目录进入",
+        "secPhaseT": "按阶段浏览",
+        "secPhaseD": "FDE 四 Zone + 横切元能力 + MCP 服务器 + 内置工具",
+        "secAllT": "全部能力档案",
+        "secAllD": "支持搜索与状态筛选",
+        "filterAll": "全部",
+        "nohit": "没有匹配的 skill",
+        "itemsSuffix": "项",
+        "badgeTxt": {"ok": "已安装", "pkg": "可安装", "dead": "已移除"},
+        "crumbHome": "主页",
+        "langNote": "",
+        "footer1": "FDE Skills 手册库 · {total} 页（✅ {installed} · 📦 {installable}）· 建档 2026-08-27 · 数据源 README + 各页 Markdown",
+        "footer2": "一致性门禁 <code>make check-catalog</code> · 本地对账 <code>make check-local</code> · 改目录后 <code>make build-site</code> 重新生成本页",
+    },
+    "en": {
+        "htmlLang": "en",
+        "docTitle": "FDE Skills Handbook · Portal",
+        "brandSuffix": "Handbook",
+        "gtaText": "GTM Site ↗",
+        "gtaHref": "../../../../GTM/index.html",
+        "langHref": "../",
+        "langLabel": "中文",
+        "searchPh": "Search {n} skills / tools / MCP pages…",
+        "heroH1": "FDE Skills Handbook",
+        "heroP": "One profile page per capability: what it does · when to use it (including anti-boundaries) · best practices · where it plugs into the fde-scope project. Three layers — skills (FDE four zones + cross-cutting), MCP server surfaces, built-in tools. Pick a scenario first, then open a page.",
+        "statUnits": {"pages": "capability profiles", "installed": "installed", "installable": "installable", "zones": "zones", "scenarios": "scenario entries"},
+        "secTaskT": "Start by Task",
+        "secTaskD": "GTM scenario shortcuts: enter by task, not by catalog",
+        "secPhaseT": "Browse by Phase",
+        "secPhaseD": "FDE four zones + cross-cutting meta-skills + MCP servers + built-in tools",
+        "secAllT": "All Capability Profiles",
+        "secAllD": "searchable, filterable by status",
+        "filterAll": "All",
+        "nohit": "No matching skill",
+        "itemsSuffix": "items",
+        "badgeTxt": {"ok": "installed", "pkg": "installable", "dead": "removed"},
+        "crumbHome": "Home",
+        "langNote": "The profile body below is maintained in Chinese (single source of truth) — navigation, blurbs and metadata on this site are English.",
+        "footer1": "FDE Skills Handbook · {total} profiles (✅ {installed} · 📦 {installable}) · est. 2026-08-27 · sourced from README + per-page Markdown",
+        "footer2": "Consistency gate <code>make check-catalog</code> · local reconciliation <code>make check-local</code> · regenerate with <code>make build-site</code> after editing the catalog",
+    },
+}
 
 
 # --------------------------------------------------------------------------- README 解析
@@ -334,7 +556,7 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
 # --------------------------------------------------------------------------- 组装数据
 
 
-def build_data() -> dict:
+def build_data(lang: str) -> dict:
     readme = parse_readme()
     zone_rows = {zone_id: readme.get(zone_id, []) for zone_id, *_ in ZONES}
     page_set = {path[:-3] for rows in zone_rows.values() for _, path, _, _ in rows}
@@ -342,6 +564,8 @@ def build_data() -> dict:
     zones = []
     all_pages: list[dict] = []
     for zone_id, label, tag, accent in ZONES:
+        if lang == "en":
+            label, tag = ZONES_EN[zone_id]
         skills = []
         for name, rel, status, blurb in zone_rows[zone_id]:
             page_file = CATALOG / rel
@@ -351,6 +575,10 @@ def build_data() -> dict:
                 else f"# {name}\n\n页面缺失：{rel}"
             )
             page_rel = posixpath.splitext(rel)[0]
+            if lang == "en":
+                if page_rel not in BLURB_EN:
+                    raise SystemExit(f"BLURB_EN 缺少英文一句话：{page_rel}")
+                blurb = BLURB_EN[page_rel]
             # name/blurb 转录自 README（含第三方 skill 简介），route 进 href 与
             # JS 模板串：统一在此处转义，portal JS 直接注入，不再有第二层转义。
             skills.append(
@@ -377,6 +605,8 @@ def build_data() -> dict:
         missing = [rel for _, rel in items if rel[:-3] not in page_set]
         if missing:
             raise SystemExit(f"场景「{title}」引用了不存在的页面：{missing}")
+        if lang == "en":
+            title, desc = SCENARIOS_EN[title]
         scenarios.append(
             {
                 "title": title,
@@ -388,6 +618,8 @@ def build_data() -> dict:
     installed = sum(1 for p in all_pages if p["status"] == "✅")
     installable = sum(1 for p in all_pages if p["status"] == "📦")
     return {
+        "lang": lang,
+        "l10n": L10N[lang],
         "zones": zones,
         "scenarios": scenarios,
         "pages": all_pages,
@@ -503,70 +735,77 @@ border-radius:10px;padding:8px 14px;max-width:46%;overflow:hidden;text-overflow:
 footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 28px 40px;color:var(--muted);
 font-size:12.5px;text-align:center}
 footer code{font-family:var(--mono);background:color-mix(in oklab,var(--ink) 4%,var(--card));border-radius:5px;padding:1px 5px}
+.nav .lang{font:600 12px/1 var(--mono);letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);
+border-radius:99px;padding:6px 12px;white-space:nowrap;text-decoration:none}
+.nav .lang:hover{color:var(--accent);border-color:var(--accent);text-decoration:none}
+.lang-note{background:color-mix(in oklab,var(--warn) 8%,var(--card));border:1px solid color-mix(in oklab,var(--warn) 25%,var(--card));
+border-left:3px solid var(--warn);border-radius:10px;padding:10px 14px;margin:0 auto 10px;max-width:900px;font-size:13px;color:var(--ink)}
 @media(max-width:720px){.article{padding:22px 18px}.nav .zlinks{display:none}.nav input{width:150px}.nav{gap:10px}}
 """
 
 JS = r"""
 const DATA = JSON.parse(document.getElementById('catalog-data').textContent);
+const L = DATA.l10n;
 const PAGES = {}; DATA.pages.forEach((p,i)=>{PAGES[p.route]=i;});
 const app = document.getElementById('app');
 
 function badge(st){
   const cls = st==='✅' ? 'ok' : (st==='📦' ? 'pkg' : 'dead');
-  const txt = st==='✅' ? '已安装' : (st==='📦' ? '可安装' : '已移除');
+  const txt = st==='✅' ? L.badgeTxt.ok : (st==='📦' ? L.badgeTxt.pkg : L.badgeTxt.dead);
   return `<span class="badge ${cls}">${st} ${txt}</span>`;
 }
 function nav(){
   return `<nav class="nav">
-    <div class="brand" onclick="location.hash='#/'">FDE Skills <span>手册库</span></div>
-    <a class="gta" href="../../../../GTM/index.html">GTM 官网 ↗</a>
+    <div class="brand" onclick="location.hash='#/'">FDE Skills <span>${L.brandSuffix}</span></div>
+    <a class="gta" href="${L.gtaHref}">${L.gtaText}</a>
+    <a class="lang" href="${L.langHref}" hreflang="${DATA.lang==='zh'?'en':'zh-CN'}">${L.langLabel}</a>
     <div class="zlinks">${DATA.zones.map(z=>`<a href="#/" onclick="goZone('${z.id}')">${z.label.split('·')[0].trim()}</a>`).join('')}</div>
-    <input id="q" type="search" placeholder="搜索 ${DATA.stats.total} 页 skills / tools / MCP…" oninput="onSearch(this.value)">
+    <input id="q" type="search" placeholder="${L.searchPh.replace('{n}',DATA.stats.total)}" oninput="onSearch(this.value)">
   </nav>`;
 }
 function goZone(id){ location.hash='#/'; setTimeout(()=>{const el=document.getElementById('zone-'+id); if(el) el.scrollIntoView({behavior:'smooth'});},30); }
 
 function home(){
-  const s = DATA.stats;
+  const s = DATA.stats, u = L.statUnits;
   return `${nav()}
   <header class="hero">
-    <h1>FDE Skills 手册库</h1>
-    <p>每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。</p>
+    <h1>${L.heroH1}</h1>
+    <p>${L.heroP}</p>
     <div class="stats">
-      <span class="stat"><b>${s.total}</b>页能力档案</span>
-      <span class="stat"><b>${s.installed}</b>已安装</span>
-      <span class="stat"><b>${s.installable}</b>可安装</span>
-      <span class="stat"><b>${s.zoneCount}</b>大区</span>
-      <span class="stat"><b>${s.scenarioCount}</b>场景入口</span>
+      <span class="stat"><b>${s.total}</b> ${u.pages}</span>
+      <span class="stat"><b>${s.installed}</b> ${u.installed}</span>
+      <span class="stat"><b>${s.installable}</b> ${u.installable}</span>
+      <span class="stat"><b>${s.zoneCount}</b> ${u.zones}</span>
+      <span class="stat"><b>${s.scenarioCount}</b> ${u.scenarios}</span>
     </div>
   </header>
   <div class="wrap">
     <div id="scen-sec">
-      <div class="section-h"><h2>按任务开始</h2><p>GTM 场景速查：从任务进入，而不是从目录进入</p></div>
+      <div class="section-h"><h2>${L.secTaskT}</h2><p>${L.secTaskD}</p></div>
       <div class="scen-grid">
         ${DATA.scenarios.map(sc=>`<div class="scen"><h3>${sc.title}</h3><div class="d">${sc.desc}</div>
           <div class="links">${sc.items.map(i=>`<a href="#/${i.route}">${i.name}</a>`).join('')}</div></div>`).join('')}
       </div>
     </div>
     <div id="zones-sec" style="margin-top:40px">
-      <div class="section-h"><h2>按阶段浏览</h2><p>FDE 四 Zone + 横切元能力 + MCP 服务器 + 内置工具</p></div>
+      <div class="section-h"><h2>${L.secPhaseT}</h2><p>${L.secPhaseD}</p></div>
       <div class="zone-grid">
         ${DATA.zones.map(z=>`<div class="zone" id="zone-${z.id}">
-          <div class="zh" style="--accent:${z.accent}"><h3>${z.label}</h3><p>${z.tag} · ${z.skills.length} 项</p></div>
+          <div class="zh" style="--accent:${z.accent}"><h3>${z.label}</h3><p>${z.tag} · ${z.skills.length} ${L.itemsSuffix}</p></div>
           <div class="zs">${z.skills.map(k=>`<a href="#/${k.route}"><span class="st">${k.status}</span>${k.name}</a>`).join('')}</div>
         </div>`).join('')}
       </div>
     </div>
     <div id="all-sec" style="margin-top:40px">
-      <div class="section-h"><h2>全部能力档案</h2><p>支持搜索与状态筛选</p></div>
+      <div class="section-h"><h2>${L.secAllT}</h2><p>${L.secAllD}</p></div>
       <div class="toolbar">
-        <button class="chip on" data-f="all" onclick="setFilter(this)">全部</button>
-        <button class="chip" data-f="✅" onclick="setFilter(this)">✅ 已安装</button>
-        <button class="chip" data-f="📦" onclick="setFilter(this)">📦 可安装</button>
+        <button class="chip on" data-f="all" onclick="setFilter(this)">${L.filterAll}</button>
+        <button class="chip" data-f="✅" onclick="setFilter(this)">✅ ${L.badgeTxt.ok}</button>
+        <button class="chip" data-f="📦" onclick="setFilter(this)">📦 ${L.badgeTxt.pkg}</button>
         <span id="hit" style="color:var(--muted);font-size:12.5px"></span>
       </div>
       <div class="all-grid" id="all-grid"></div>
-      <div class="empty" id="nohit">没有匹配的 skill</div>
+      <div class="empty" id="nohit">${L.nohit}</div>
     </div>
   </div>
   ${footer()}`;
@@ -590,7 +829,7 @@ function renderAll(){
     <div class="t">${k.name} ${badge(k.status)}</div><div class="b">${k.blurb}</div>
     <div class="z">${z.label}</div></a>`).join('');
   document.getElementById('nohit').style.display=items.length?'none':'block';
-  const hit=document.getElementById('hit'); if(hit) hit.textContent=`${items.length} 项`;
+  const hit=document.getElementById('hit'); if(hit) hit.textContent=`${items.length} ${L.itemsSuffix}`;
 }
 function onSearch(v){
   const hasQ=!!v;
@@ -604,9 +843,11 @@ function page(route){
   const i=PAGES[route]; if(i===undefined){location.hash='#/';return '';}
   const p=DATA.pages[i];
   const prev=DATA.pages[i-1], next=DATA.pages[i+1];
+  const note = L.langNote ? `<div class="lang-note">${L.langNote}</div>` : '';
   return `${nav()}
   <div class="wrap">
-    <div class="crumb"><a href="#/">主页</a> › ${p.zone} › <b style="color:var(--ink)">${route.split('/').pop()}</b></div>
+    <div class="crumb"><a href="#/">${L.crumbHome}</a> › ${p.zone} › <b style="color:var(--ink)">${route.split('/').pop()}</b></div>
+    ${note}
     <article class="article">${p.html}</article>
     <div class="pager">
       ${prev?`<a href="#/${prev.route}">← ${prev.route.split('/').pop()}</a>`:'<span></span>'}
@@ -618,9 +859,11 @@ function page(route){
 
 function footer(){
   const s=DATA.stats;
+  const f1=L.footer1
+    .replace('{total}',s.total).replace('{installed}',s.installed).replace('{installable}',s.installable);
   return `<footer>
-    <div>FDE Skills 手册库 · ${s.total} 页（✅ ${s.installed} · 📦 ${s.installable}）· 建档 2026-08-27 · 数据源 README + 各页 Markdown</div>
-    <div style="margin-top:6px">一致性门禁 <code>make check-catalog</code> · 本地对账 <code>make check-local</code> · 改目录后 <code>make build-site</code> 重新生成本页</div>
+    <div>${f1}</div>
+    <div style="margin-top:6px">${L.footer2}</div>
   </footer>`;
 }
 
@@ -639,12 +882,13 @@ def build_html(data: dict) -> str:
     # <script id="catalog-data"> 的 JSON 块里不能出现任何裸 `<`：否则 `</script>`
     # 提前闭合、`<!--` + `<script` 吞掉整页。`\u003c` 是合法 JSON 转义，parse 后还原。
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+    l10n = data["l10n"]
     return f"""<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{l10n["htmlLang"]}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FDE Skills 手册库 · 门户</title>
+<title>{l10n["docTitle"]}</title>
 <style>{CSS}</style>
 </head>
 <body>
@@ -657,13 +901,15 @@ def build_html(data: dict) -> str:
 
 
 def main() -> None:
-    data = build_data()
-    SITE.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(build_html(data), encoding="utf-8")
-    s = data["stats"]
-    print(
-        f"OK {OUT.relative_to(ROOT)} ｜ {s['total']} 页（✅ {s['installed']} / 📦 {s['installable']}）｜ {OUT.stat().st_size // 1024} KB"
-    )
+    outputs = (("zh", OUT), ("en", SITE / "en" / "index.html"))
+    for lang, out in outputs:
+        data = build_data(lang)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(build_html(data), encoding="utf-8")
+        s = data["stats"]
+        print(
+            f"OK {out.relative_to(ROOT)} ｜ {s['total']} 页（✅ {s['installed']} / 📦 {s['installable']}）｜ {out.stat().st_size // 1024} KB"
+        )
 
 
 if __name__ == "__main__":

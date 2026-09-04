@@ -71,8 +71,8 @@ def _st(name: str, role: str, sponsor: bool = False, metric: str = "") -> Stakeh
     return Stakeholder(name=name, role=role, is_sponsor=sponsor, success_metric=metric)
 
 
-def _slo(name: str, target: str, route: str = "primary-oncall", window: str = "28d") -> SLOSpec:
-    return SLOSpec(name=name, target=target, alert_route=route, window=window)
+def _slo(name: str, target: str, route: str = "primary-oncall", window: str = "28d", budget: str = "") -> SLOSpec:
+    return SLOSpec(name=name, target=target, error_budget=budget, alert_route=route, window=window)
 
 
 def _run_gates(eng: Engagement, timeline: dict[str, str]) -> None:
@@ -189,9 +189,9 @@ def guming() -> EngagementContext:
             "≤120d 完成运维移交，SLO 达成 99.5%",
         ],
         slos=[
-            _slo("availability", "99.5%", window="14d"),
-            _slo("forecast_latency_p95", "<8s"),
-            _slo("bad_case_rate", "<10%", route="fde-oncall"),
+            _slo("availability", "99.5%", window="14d", budget="3.6h 停机预算 / 14d 滚动"),
+            _slo("forecast_latency_p95", "<8s", budget="预算内 · 近 7d P95 6.2s"),
+            _slo("bad_case_rate", "<10%", route="fde-oncall", budget="已耗 21% · 近 14d 均值 2.1%"),
         ],
         assets={
             "corpus_summary": "32.4k 门店样本 · 86 个 SKU 维度 · 3 个数据源",
@@ -301,9 +301,9 @@ def faw_vw() -> EngagementContext:
             risk_assessment_notes="HAZOP-lite 完成，覆盖焊接工位人机协作区。",
         ),
         slos=[
-            _slo("availability", "99.5%", window="14d"),
-            _slo("opcua_ingest_p95", "<1s"),
-            _slo("bad_case_rate", "<5%", route="fde-oncall"),
+            _slo("availability", "99.5%", window="14d", budget="50min 停机预算 / 14d 滚动"),
+            _slo("opcua_ingest_p95", "<1s", budget="预算内 · 熔断阈值 P99 <2.5s"),
+            _slo("bad_case_rate", "<5%", route="fde-oncall", budget="已耗 28% · 试运行实测 1.4%"),
         ],
         assets={
             "fat": {
@@ -486,9 +486,9 @@ def faw() -> EngagementContext:
             "≤120d 移交；bad_case_rate <10%",
         ],
         slos=[
-            _slo("availability", "99.5%", window="14d"),
-            _slo("qa_latency_p95", "<3s"),
-            _slo("bad_case_rate", "<10%", route="fde-oncall"),
+            _slo("availability", "99.5%", window="14d", budget="50min 停机预算 / 14d 滚动"),
+            _slo("qa_latency_p95", "<3s", budget="已耗 35% · 近 7d P95 2.4s"),
+            _slo("bad_case_rate", "<10%", route="fde-oncall", budget="抽检 200 条/周 · 已耗 46%"),
         ],
         assets={
             "corpus_summary": "制度库 12.8k 篇 · BI 指标 460 个 · 6 个业务域",
@@ -691,9 +691,9 @@ def bmw_brilliance() -> EngagementContext:
             risk_assessment_notes="气隙环境下人机协作区风险评估完成，edge 机柜 EHS 会审通过。",
         ),
         slos=[
-            _slo("availability", "99.5%", window="14d"),
-            _slo("diagnose_latency_p95", "<2s"),
-            _slo("bad_case_rate", "<4%", route="fde-oncall"),
+            _slo("availability", "99.5%", window="14d", budget="50min 停机预算 / 14d 滚动"),
+            _slo("diagnose_latency_p95", "<2s", budget="连续 5min 超 3s 触发产线告警"),
+            _slo("bad_case_rate", "<4%", route="fde-oncall", budget="已耗 38% · 产线验收基线 1.2%"),
         ],
         assets={
             "air_gap_plan": {
@@ -906,9 +906,9 @@ def mengniu() -> EngagementContext:
             "≤120d 移交；SLO 99.5%",
         ],
         slos=[
-            _slo("availability", "99.5%", window="14d"),
-            _slo("alert_response_p95", "<5min", route="cold-chain-oncall"),
-            _slo("bad_case_rate", "<8%", route="fde-oncall"),
+            _slo("availability", "99.5%", window="14d", budget="3.6h 停机预算 / 14d 滚动"),
+            _slo("alert_response_p95", "<5min", route="cold-chain-oncall", budget="已耗 52% · 温控超限工单 4.1min"),
+            _slo("bad_case_rate", "<8%", route="fde-oncall", budget="人工复核抽 5%/周 · 已耗 40%"),
         ],
         assets={
             "corpus_summary": "订奶工单 88k 条 · 冷链温控时序 3 个月 · PII 9.4k 实体脱敏",

@@ -76,7 +76,7 @@ def test_build_data_escapes_readme_derived_fields(tmp_path, monkeypatch) -> None
     _hostile_catalog(tmp_path)
     monkeypatch.setattr(bs, "CATALOG", tmp_path)
     monkeypatch.setattr(bs, "SCENARIOS", [])
-    data = bs.build_data()
+    data = bs.build_data("zh")
     skill = data["zones"][0]["skills"][0]
     assert "<b>" not in skill["name"]
     assert "<img" not in skill["blurb"]
@@ -88,7 +88,7 @@ def test_build_html_never_produces_injectable_output(tmp_path, monkeypatch) -> N
     _hostile_catalog(tmp_path)
     monkeypatch.setattr(bs, "CATALOG", tmp_path)
     monkeypatch.setattr(bs, "SCENARIOS", [])
-    html = bs.build_html(bs.build_data())
+    html = bs.build_html(bs.build_data("zh"))
     assert "<img" not in html
     assert "<script>alert" not in html
     payload = re.search(

@@ -27,6 +27,7 @@ from .. import paths
 from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
 from ..profiles import all_profiles, get_profile
+from .i18n import GLOSSARY_EN, to_en
 
 # Import-time resolution is safe here: under the CWD fallback reports_dir()
 # stays RELATIVE, so every use re-resolves against the current CWD (test
@@ -675,7 +676,7 @@ _GLOSSARY_JS = r"""(() => {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ASCII_TERM = /^[A-Za-z0-9][A-Za-z0-9 /+.-]*$/;
-// id/slug 内的子串不标注（如 eng-caocao-ticket-seed05 里的 ticket、prototype_real_data 里的 prototype）
+// don't annotate substrings inside ids/slugs (e.g. ticket in eng-caocao-ticket-seed05, prototype in prototype_real_data)
 const ADJACENT = /[-_A-Za-z0-9]/;
 const GLOSSARY = __GLOSSARY_DATA__.slice().sort((a, b) => b[0].length - a[0].length)
   .map(([term, tip]) => ({ term, tip, ascii: ASCII_TERM.test(term),
@@ -728,8 +729,8 @@ if (document.readyState === 'loading') {
 """
 
 
-def _glossary_snippet() -> str:
-    data = json.dumps(_GLOSSARY, ensure_ascii=False)
+def _glossary_snippet(lang: str = "zh") -> str:
+    data = json.dumps(_GLOSSARY if lang == "zh" else GLOSSARY_EN, ensure_ascii=False)
     js = _GLOSSARY_JS.replace("__GLOSSARY_DATA__", data)
     return f"<style>{_GLOSSARY_CSS}</style><script>{js}</script>"
 
@@ -749,13 +750,25 @@ def dashboard() -> str:
     return _DASHBOARD_HTML
 
 
+@app.get("/en/", response_class=HTMLResponse)
+def overview_en() -> str:
+    """English variant of the landing page."""
+    return _OVERVIEW_HTML_EN
+
+
+@app.get("/en/console", response_class=HTMLResponse)
+def dashboard_en() -> str:
+    """English variant of the engagement console."""
+    return _DASHBOARD_HTML_EN
+
+
 _OVERVIEW_HTML = """<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · 功能总览</title>
-<script>(function(){var t=null;try{t=localStorage.getItem('fde-theme')}catch(e){}if(!t)t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';document.documentElement.dataset.theme=t})();</script>
+<script>(function(){var t=null,q=null;try{t=localStorage.getItem('fde-theme')}catch(e){}try{q=new URLSearchParams(location.search).get('theme')}catch(e){}if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}document.documentElement.dataset.theme=t})();</script>
 <style>
 /* Hallmark · genre: modern-minimal · macrostructure: long-document · design-system: design.md (Graphite) · designed-as-app */
 :root{--bg:oklch(0.973 0.003 255);--bg2:oklch(1 0 0);--panel:oklch(1 0 0);--panel2:oklch(0.945 0.005 255);
@@ -789,6 +802,8 @@ background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10
 .nav a{color:var(--muted);font-size:.85rem;padding:6px 10px;border-radius:7px;transition:color .15s,background-color .15s}
 .nav a:hover{color:var(--fg);background:var(--panel2)}
 .nav a.active{color:var(--accent);background:var(--accent-dim)}
+.lang{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:7px 11px;transition:color .13s,border-color .13s;white-space:nowrap}
+.lang:hover{color:var(--fg);border-color:var(--border-strong)}
 .tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;
 border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s}
 .tbtn:hover{color:var(--fg);border-color:var(--border-strong)}
@@ -883,6 +898,7 @@ __ICON_SPRITE__
     <a href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
     <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
   </nav>
+  <a class="lang" href="/en/" title="English version" aria-label="Switch to English">EN</a>
   <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
     <svg class="ic when-dark"><use href="#i-sun"/></svg>
     <svg class="ic when-light"><use href="#i-moon"/></svg>
@@ -1129,7 +1145,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · Engagement Console</title>
-<script>(function(){var t=null;try{t=localStorage.getItem('fde-theme')}catch(e){}if(!t)t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';document.documentElement.dataset.theme=t})();</script>
+<script>(function(){var t=null,q=null;try{t=localStorage.getItem('fde-theme')}catch(e){}try{q=new URLSearchParams(location.search).get('theme')}catch(e){}if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}document.documentElement.dataset.theme=t})();</script>
 <style>
 /* Hallmark · genre: modern-minimal · macrostructure: workbench · design-system: design.md (Graphite) · designed-as-app */
 :root{
@@ -1173,6 +1189,8 @@ header{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px
 .hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .back{color:var(--muted);font-size:.85rem;transition:color .13s}
 .back:hover{color:var(--fg)}
+.lang{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:7px 11px;transition:color .13s,border-color .13s;white-space:nowrap}
+.lang:hover{color:var(--fg);border-color:var(--border-strong)}
 .tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;transition:color .13s,border-color .13s}
 .tbtn:hover{color:var(--fg);border-color:var(--border-strong)}
 .layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 57px)}
@@ -1270,6 +1288,7 @@ __ICON_SPRITE__
     <a class="back" href="/">&#8592; 功能总览</a>
     <a class="back" href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
     <a class="back" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
+    <a class="lang" href="/en/console" title="English version" aria-label="Switch to English">EN</a>
     <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
       <svg class="ic when-dark"><use href="#i-sun"/></svg>
       <svg class="ic when-light"><use href="#i-moon"/></svg>
@@ -1440,13 +1459,24 @@ function skillCard(r) {
     ? `<button onclick="publishSkill('${esc(r.id)}')">发布</button> <button class="ghost" onclick="editSkill('${esc(r.id)}')">编辑</button>`
     : r.status==='published'
       ? `<button class="ghost" onclick="archiveSkill('${esc(r.id)}')">归档</button>` : '';
+  const body = (r.body_md||'').trim();
+  const preview = body ? `<div style="margin:6px 0 0;font-size:.82rem;line-height:1.5;color:var(--fg);white-space:pre-wrap">${esc(body.length>200?body.slice(0,200)+'…':body)}</div>` : '';
+  const meta = [
+    r.phase_slug?'phase: '+esc(r.phase_slug):'',
+    r.gate_slug?'gate: '+esc(r.gate_slug):'',
+    (r.applies_to||[]).length?'适用: '+r.applies_to.map(a=>esc(a)).join(', '):'',
+    (r.export_formats||[]).length?'导出: '+r.export_formats.map(f=>esc(f)).join(', '):'',
+  ].filter(Boolean).join(' · ');
+  const origin = (r.source&&r.source!=='manual')?` · 来源 ${esc(r.source)}`:'';
   return `<div class="card">
     <div class="row"><b>${esc(r.title)}</b>
       <span class="pill">${esc(r.category)}</span>
       <span class="pill ${r.status==='draft'?'ind':''}">${esc(r.status)}</span>
-      <span class="meta" style="margin-left:auto">${esc(String(r.updated_at||'').slice(0,16).replace('T',' '))}</span></div>
+      <span class="meta" style="margin-left:auto">v${r.version||1} · ${esc(String(r.updated_at||'').slice(0,16).replace('T',' '))}</span></div>
     ${(r.tags||[]).length?`<div class="meta">${r.tags.map(t=>'#'+esc(t)).join(' ')}</div>`:''}
-    <div class="meta">${esc(r.id)}${r.source_engagement?' · 来自 '+esc(r.source_engagement):''}</div>
+    ${preview}
+    <div class="meta" style="margin-top:6px">${esc(r.id)} · 创建于 ${esc(String(r.created_at||'').slice(0,16).replace('T',' '))}${origin}${r.source_engagement?' · 来自 '+esc(r.source_engagement):''}</div>
+    ${meta?`<div class="meta">${meta}</div>`:''}
     <div class="row" style="margin:8px 0 0">${act}</div>
   </div>`;
 }
@@ -1499,13 +1529,22 @@ async function dlgEditSave() {
 function journalHtml(ctx) {
   const esc = escapeHtml;
   const entries = (ctx && ctx.journal) || [];
+  const kinds = entries.reduce((m,e)=>{m[e.kind]=(m[e.kind]||0)+1;return m;},{});
+  const linked = entries.filter(e=>e.skill_id).length;
+  const stats = entries.length ? `<div class="kpi-grid" style="margin-bottom:10px">
+    <div class="kpi"><div class="k">总条数</div><div class="v">${entries.length}</div></div>
+    <div class="kpi"><div class="k">调研</div><div class="v">${kinds.research||0}</div></div>
+    <div class="kpi"><div class="k">实施</div><div class="v">${kinds.implementation||0}</div></div>
+    <div class="kpi"><div class="k">调优</div><div class="v">${kinds.optimization||0}</div></div>
+    <div class="kpi"><div class="k">已沉淀技能</div><div class="v" style="color:var(--accent)">${linked}</div></div>
+  </div>` : '';
   const rows = entries.map(e => `<div class="card">
     <div class="row"><span class="pill">${esc(e.kind)}</span><span class="meta">${esc(e.ts)}</span>
       <span class="meta" style="margin-left:auto">${e.skill_id?icon('i-bulb')+' '+esc(e.skill_id):''}</span></div>
     <div>${esc(e.note)}</div>
     ${e.skill_id?'':`<button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="journalToSkill('${esc(e.id)}')">沉淀为技能</button>`}
   </div>`).join('') || '<div class="empty">暂无现场记录</div>';
-  return `<div class="card"><h2>现场记录</h2>${rows}</div>
+  return `<div class="card"><h2>现场记录</h2>${stats}${rows}</div>
     <div class="card"><h2>追加记录</h2>
       <div class="row"><label>类型</label><select id="jn-kind">
         <option value="research">research 调研</option>
@@ -1705,6 +1744,21 @@ function renderDetail(s, phases, gates) {
       <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${escapeHtml(slug)}')">重新校验</button></div>`;
   }).join('') || '<div class="empty">无适用 gate（当前 profile）</div>';
 
+  const recs = Object.entries(s.gate_records||{});
+  const ledgerHtml = recs.length?`<div class="card"><h2>Gate 台账（历次校验记录）</h2><div class="tablewrap"><table>
+    <thead><tr><th>Gate</th><th>结果</th><th>阻塞项</th><th>警告</th><th>备注</th><th>校验时间</th></tr></thead>
+    <tbody>${recs.map(([slug,r])=>{
+      const rblocks = (r.blockers||[]).map(b=>`<li class="bl">${icon('i-ban')} ${escapeHtml(b)}</li>`).join('');
+      const rwarns = (r.warnings||[]).map(w=>`<li class="wn">${icon('i-alert')} ${escapeHtml(w)}</li>`).join('');
+      return `<tr>
+      <td><b>${escapeHtml(slug)}</b></td>
+      <td>${r.passed?dot(true)+' PASS':dot(false)+' BLOCKED'}</td>
+      <td>${rblocks?`<ul style="margin:0;padding-left:1.1rem">${rblocks}</ul>`:'—'}</td>
+      <td>${rwarns?`<ul style="margin:0;padding-left:1.1rem">${rwarns}</ul>`:'—'}</td>
+      <td>${escapeHtml(r.notes||'—')}</td>
+      <td class="meta">${escapeHtml(r.checked_at||'')}</td>
+    </tr>`;}).join('')}</tbody></table></div></div>`:'';
+
   const html = `
     <div class="tabs">
       <div class="tab active" onclick="tab('overview',this)">概览</div>
@@ -1728,9 +1782,19 @@ function renderDetail(s, phases, gates) {
           <button class="ghost" onclick="advance(true)">force 推进</button>
         </div>
       </div>
+      <div class="card">
+        <h2>数据面板</h2>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="k">现场记录</div><div class="v">${((s.context||{}).journal||[]).length}</div></div>
+          <div class="kpi"><div class="k">干系人</div><div class="v">${((s.context||{}).stakeholders||[]).length}</div></div>
+          <div class="kpi"><div class="k">SLO</div><div class="v">${((s.context||{}).slos||[]).length}</div></div>
+          <div class="kpi"><div class="k">成功标准</div><div class="v">${((s.context||{}).success_criteria||[]).length}</div></div>
+          <div class="kpi"><div class="k">Gates 通过</div><div class="v">${Object.values(gates).filter(g=>g.passed).length}/${Object.values(gates).length}</div></div>
+        </div>
+      </div>
     </div>
     <div id="t-sop" class="hidden"><div class="card"><div class="phases">${phaseHtml}</div></div></div>
-    <div id="t-gates" class="hidden">${gateHtml}</div>
+    <div id="t-gates" class="hidden">${ledgerHtml}${gateHtml}</div>
     <div id="t-context" class="hidden">${contextHtml(s.context)}</div>
     <div id="t-forge" class="hidden"><div class="card">
       <h2>语料锻造（CSV → CorpusReport）</h2>
@@ -1773,10 +1837,15 @@ function contextHtml(ctx) {
   let siteHtml;
   if (site.location) {
     const net = (site.networks||[]).map(n=>`<li>${esc(n)}</li>`).join('');
+    const assetRows = (site.assets||[]).map(a=>`<tr>
+      <td>${esc(a.name)}</td><td>${esc(a.type||'—')}</td><td>${esc(a.vendor||'—')}</td>
+      <td><code>${esc(a.protocol||'—')}</code></td>
+      <td><span class="pill ${a.criticality==='high'?'ind':''}">${esc(a.criticality||'—')}</span></td></tr>`).join('');
     siteHtml = `<div class="row"><label>地点</label><b>${esc(site.location)}</b></div>
       <div class="row"><label>班次</label>${esc(site.shift_count)} · OT/IT 隔离 ${yn(site.ot_it_separated)} · 气隙 ${yn(site.air_gapped)}</div>
       ${net?`<div class="row"><label>网络</label><ul style="margin:2px 0 0;padding-left:18px">${net}</ul></div>`:''}
       <div class="row"><label>资产</label>${(site.assets||[]).length} 项 · 工会代表 ${site.works_council_represented?yn(true):'—'}</div>
+      ${assetRows?`<div class="tablewrap" style="margin:4px 0 0"><table><thead><tr><th>资产</th><th>类型</th><th>厂商</th><th>协议</th><th>关键度</th></tr></thead><tbody>${assetRows}</tbody></table></div>`:''}
       ${site.notes?`<div class="row"><label>备注</label>${esc(site.notes)}</div>`:''}`;
   } else {
     siteHtml = '<div class="empty">无现场数据（SaaS 项目）</div>';
@@ -1789,8 +1858,8 @@ function contextHtml(ctx) {
   // 成功标准
   const crit = (ctx.success_criteria||[]).map(c=>`<li>${esc(c)}</li>`).join('')||'<li class="meta">未定义</li>';
   // SLO
-  const sloRows = (ctx.slos||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.target)}</td><td>${esc(x.alert_route||'—')}</td><td>${esc(x.window)}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="meta">未定义 SLO</td></tr>';
+  const sloRows = (ctx.slos||[]).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.target)}</td><td>${esc(x.error_budget||'—')}</td><td>${esc(x.alert_route||'—')}</td><td>${esc(x.window)}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="meta">未定义 SLO</td></tr>';
   // 功能安全
   const safetyHtml = ctx.profile==='manufacturing'
     ? `<tr><td>ISO 13849</td><td>PLr ${esc(safety.required_plr||'—')} / PL ${esc(safety.achieved_pl||'—')}</td></tr>
@@ -1807,10 +1876,16 @@ function contextHtml(ctx) {
   if (assets.corpus_report) links.push(`<a class="btn" href="/${esc(assets.corpus_report)}" target="_blank">${icon('i-doc')} 语料报告</a>`);
   const mon = assets.monitoring||{};
   const known = (assets.known_limitations||[]).map(k=>`<li>${esc(k)}</li>`).join('');
+  const monOn = mon.data_drift||mon.quality_drift||mon.feedback_latency||(mon.dashboards||[]).length;
+  const monRows = monOn ? `
+      <div class="row"><label>数据漂移</label>${mon.data_drift&&mon.data_drift.enabled?dot(true)+' 启用 · 节奏 '+esc(mon.data_drift.cadence||'每日')+(mon.data_drift.threshold?' · 阈值 '+esc(mon.data_drift.threshold):''):dot(false)+' 未启用'}</div>
+      <div class="row"><label>质量漂移</label>${mon.quality_drift&&mon.quality_drift.enabled?dot(true)+' 启用 · 节奏 '+esc(mon.quality_drift.cadence||'每周')+(mon.quality_drift.threshold?' · 阈值 '+esc(mon.quality_drift.threshold):''):dot(false)+' 未启用'}</div>
+      ${mon.feedback_latency&&mon.feedback_latency.target_hours?`<div class="row"><label>反馈时延</label>目标 ${esc(mon.feedback_latency.target_hours)}h 内闭环</div>`:''}
+      ${(mon.dashboards||[]).length?`<div class="row"><label>看板</label>${mon.dashboards.map(d=>`<a href="${esc(d.url||'#')}" target="_blank">${esc(d.name||d.url||'看板')}</a>`).join(' · ')}</div>`:''}` : '';
   return `<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
     <div class="card"><h2>干系人</h2><div class="tablewrap"><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div></div>
     <div class="card"><h2>成功标准</h2><ul style="padding-left:18px">${crit}</ul></div>
-    <div class="card"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
+    <div class="card"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>错误预算</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
     <div class="card"><h2>功能安全</h2><div class="tablewrap"><table><tbody>${safetyHtml}</tbody></table></div></div>
     <div class="card"><h2>产物与交付</h2>
       <div class="row"><label>语料</label>${esc(assets.corpus_summary||'—')}</div>
@@ -1818,7 +1893,7 @@ function contextHtml(ctx) {
       ${evRows?`<div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>评估指标</th><th>值</th></tr></thead><tbody>${evRows}</tbody></table></div>`:''}
       <div class="row" style="margin-top:10px">${links.join(' ')||'—'}</div>
       ${known?`<div class="row"><label>已知局限</label><ul style="padding-left:18px">${known}</ul></div>`:''}
-      <div class="row"><label>监控</label>漂移 ${mon.data_drift&&mon.data_drift.enabled?dot(true)+' 每日':dot(false)+' 未启用'} · 质量 ${mon.quality_drift&&mon.quality_drift.enabled?dot(true)+' 每周':dot(false)+' 未启用'}</div>
+      ${monRows}
     </div>`;
 }
 
@@ -2056,6 +2131,16 @@ _ICON_SPRITE = """<svg width="0" height="0" style="position:absolute" aria-hidde
 <symbol id="i-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></symbol>
 </defs></svg>"""
 
+_OVERVIEW_HTML_EN = (
+    to_en(_OVERVIEW_HTML)
+    .replace("__GLOSSARY__", _glossary_snippet("en"))
+    .replace("__ICON_SPRITE__", _ICON_SPRITE)
+)
+_DASHBOARD_HTML_EN = (
+    to_en(_DASHBOARD_HTML)
+    .replace("__GLOSSARY__", _glossary_snippet("en"))
+    .replace("__ICON_SPRITE__", _ICON_SPRITE)
+)
 _OVERVIEW_HTML = _OVERVIEW_HTML.replace("__GLOSSARY__", _glossary_snippet()).replace(
     "__ICON_SPRITE__", _ICON_SPRITE
 )
