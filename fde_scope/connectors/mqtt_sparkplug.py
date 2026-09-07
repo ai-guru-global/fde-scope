@@ -20,6 +20,7 @@ is still alive — plain MQTT can't tell you that.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -78,6 +79,20 @@ class MqttSparkplugConnector(DataConnector):
             raise ImportError(
                 "MqttSparkplugConnector live mode needs paho-mqtt: pip install paho-mqtt"
             ) from exc
+
+    # -- auth -------------------------------------------------------------------
+    def _apply_auth(self, client: Any) -> None:
+        """Apply broker credentials from the environment, if configured.
+
+        Invariant (AGENTS.md #3): credentials live in env vars only — they
+        are read at connect time and never persisted. paho's
+        ``username_pw_set`` requires a username, so a password without a
+        username cannot be expressed and is ignored.
+        """
+        username = os.environ.get("FDE_SCOPE_MQTT_USERNAME")
+        password = os.environ.get("FDE_SCOPE_MQTT_PASSWORD")
+        if username is not None:
+            client.username_pw_set(username, password)
 
     # -- payload parsing --------------------------------------------------------
     def _parse_payload(self, raw: Any) -> list[tuple[str, Any]]:
@@ -222,6 +237,7 @@ class MqttSparkplugConnector(DataConnector):
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         if use_tls:
             client.tls_set()
+        self._apply_auth(client)
 
         def on_message(_c, _d, msg):  # noqa: ANN001
             out.extend(

@@ -8,7 +8,12 @@ real broker) and are exercised only in optional integration environments.
 from __future__ import annotations
 
 import json
+import sys
+import threading
+import types
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -45,6 +50,139 @@ def mqtt_capture(tmp_path: Path) -> Path:
     p = tmp_path / "capture.jsonl"
     p.write_text("\n".join(json.dumps(m, ensure_ascii=False) for m in msgs), encoding="utf-8")
     return p
+
+
+# ---------------------------------------------------------------------------
+# Fake paho.mqtt.client — the surface the connector actually uses
+# ---------------------------------------------------------------------------
+class _FakeMqttMessage:
+    """Mirror paho's MQTTMessage — only the attributes _normalize reads."""
+
+    def __init__(self, topic: str, payload: bytes, qos: int = 0, retain: bool = False):
+        self.topic = topic
+        self.payload = payload
+        self.qos = qos
+        self.retain = retain
+
+
+class _FakeMqttClient:
+    """Mirror paho.mqtt.client.Client — records calls for assertions.
+
+    ``loop_start`` replays the configured outbox through ``on_message`` on
+    a real thread, so both the collect (list.append) and stream (queue.put)
+    callbacks are exercised against real concurrency.
+    """
+
+    def __init__(
+        self,
+        callback_api_version: int,  # noqa: ARG002 — mirror paho signature
+        outbox: list[_FakeMqttMessage] | None = None,
+        *,
+        fail_connect: bool = False,
+        fail_subscribe: bool = False,
+    ) -> None:
+        self._outbox = outbox or []
+        self._fail_connect = fail_connect
+        self._fail_subscribe = fail_subscribe
+        self.on_message: Any = None
+        self.calls: list[str] = []
+        self.subscribed: list[str] = []
+        self.username_pw_args: tuple[str, str | None] | None = None
+        self.tls_enabled = False
+        self.connected = False
+        self.loop_stopped = False
+        self.disconnected = False
+        self._thread: threading.Thread | None = None
+
+    def username_pw_set(self, username: str, password: str | None = None) -> None:
+        self.calls.append("username_pw_set")
+        self.username_pw_args = (username, password)
+
+    def tls_set(self) -> None:
+        self.calls.append("tls_set")
+        self.tls_enabled = True
+
+    def connect(self, host: str, port: int, keepalive: int) -> None:  # noqa: ARG002
+        self.calls.append("connect")
+        if self._fail_connect:
+            raise ConnectionRefusedError(f"[Errno 61] connect to {host}:{port} refused")
+        self.connected = True
+
+    def subscribe(self, topic: str) -> None:
+        self.calls.append("subscribe")
+        if self._fail_subscribe:
+            raise RuntimeError(f"subscribe refused: {topic}")
+        self.subscribed.append(topic)
+
+    def loop_start(self) -> None:
+        self.calls.append("loop_start")
+
+        def _replay() -> None:
+            for msg in self._outbox:
+                if self.on_message is not None:
+                    self.on_message(self, None, msg)
+
+        self._thread = threading.Thread(target=_replay, daemon=True)
+        self._thread.start()
+
+    def loop_stop(self) -> None:
+        self.calls.append("loop_stop")
+        self.loop_stopped = True
+        if self._thread is not None:
+            self._thread.join(timeout=5)
+
+    def disconnect(self) -> None:
+        self.calls.append("disconnect")
+        self.disconnected = True
+
+
+class _FakeMqttModule(types.ModuleType):
+    """Module stand-in for ``paho.mqtt.client``."""
+
+    def __init__(self) -> None:
+        super().__init__("paho.mqtt.client")
+        self.outbox: list[_FakeMqttMessage] = []
+        self.fail_connect = False
+        self.fail_subscribe = False
+        self.created: list[_FakeMqttClient] = []
+        self.CallbackAPIVersion = types.SimpleNamespace(VERSION2=2)
+
+    def Client(self, callback_api_version: int) -> _FakeMqttClient:  # noqa: N802
+        c = _FakeMqttClient(
+            callback_api_version,
+            outbox=self.outbox,
+            fail_connect=self.fail_connect,
+            fail_subscribe=self.fail_subscribe,
+        )
+        self.created.append(c)
+        return c
+
+
+@pytest.fixture
+def fake_paho_module() -> Iterator[_FakeMqttModule]:
+    """Install a fake ``paho.mqtt.client`` (+ parent packages) in sys.modules.
+
+    Tests configure behavior by mutating the yielded module (outbox,
+    fail_connect, ...) before calling the connector.
+    """
+    paho = types.ModuleType("paho")
+    mqtt_pkg = types.ModuleType("paho.mqtt")
+    client_mod = _FakeMqttModule()
+    paho.mqtt = mqtt_pkg  # type: ignore[attr-defined]
+    mqtt_pkg.client = client_mod  # type: ignore[attr-defined]
+    sys.modules["paho"] = paho
+    sys.modules["paho.mqtt"] = mqtt_pkg
+    sys.modules["paho.mqtt.client"] = client_mod
+    try:
+        yield client_mod
+    finally:
+        for name in ("paho", "paho.mqtt", "paho.mqtt.client"):
+            sys.modules.pop(name, None)
+
+
+def _live_msg(topic: str, payload: dict[str, Any]) -> _FakeMqttMessage:
+    """Build one fake wire message (payload JSON-encoded like a real broker)."""
+    return _FakeMqttMessage(topic=topic, payload=json.dumps(payload).encode("utf-8"))
 
 
 def test_jsonl_discover_schema(mqtt_capture: Path) -> None:
@@ -194,3 +332,67 @@ def test_missing_file_extract_returns_empty(tmp_path: Path) -> None:
     c = MqttSparkplugConnector(str(tmp_path / "nope.jsonl"))
     assert c.extract_sample(10) == []
     assert c.discover_schema().row_count is None
+
+
+# ---------------------------------------------------------------------------
+# Live broker path — mocked paho (fake module via sys.modules)
+# ---------------------------------------------------------------------------
+def test_live_collect_applies_env_auth(
+    fake_paho_module: _FakeMqttModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both env vars set → username_pw_set('u','p') called BEFORE connect."""
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DBIRTH/edge01/cobot-01", {"metric": "joint_temp", "value": 72.5}),
+    ]
+    monkeypatch.setenv("FDE_SCOPE_MQTT_USERNAME", "svc-fde")
+    monkeypatch.setenv("FDE_SCOPE_MQTT_PASSWORD", "s3cret")
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    rows = conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.username_pw_args == ("svc-fde", "s3cret")
+    assert client.calls.index("username_pw_set") < client.calls.index("connect")
+    assert rows, "expected the replayed message to come back as a row"
+
+
+def test_live_collect_username_only(
+    fake_paho_module: _FakeMqttModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FDE_SCOPE_MQTT_USERNAME", "svc-fde")
+    monkeypatch.delenv("FDE_SCOPE_MQTT_PASSWORD", raising=False)
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.username_pw_args == ("svc-fde", None)
+
+
+def test_live_collect_password_only_ignored(
+    fake_paho_module: _FakeMqttModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """paho has no password-only API → a lone password must not be applied."""
+    monkeypatch.delenv("FDE_SCOPE_MQTT_USERNAME", raising=False)
+    monkeypatch.setenv("FDE_SCOPE_MQTT_PASSWORD", "s3cret")
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.username_pw_args is None
+    assert "username_pw_set" not in client.calls
+
+
+def test_live_collect_no_env_no_auth(
+    fake_paho_module: _FakeMqttModule, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("FDE_SCOPE_MQTT_USERNAME", raising=False)
+    monkeypatch.delenv("FDE_SCOPE_MQTT_PASSWORD", raising=False)
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.username_pw_args is None
+    assert "username_pw_set" not in client.calls
