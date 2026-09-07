@@ -228,7 +228,13 @@ class MqttSparkplugConnector(DataConnector):
         return host, port, use_tls
 
     def _collect_live(self, n: int) -> list[dict[str, Any]]:  # pragma: no cover — needs broker
-        """Connect, subscribe, collect up to ``n`` messages, disconnect."""
+        """Connect, subscribe, collect up to ``n`` rows, disconnect.
+
+        Cleanup is stage-aware: an unconnected client is not disconnected
+        and a never-started loop is not stopped (paho's behavior on those
+        calls against an unestablished session is not something we rely
+        on). Errors propagate honestly — no silent empty-data fallback.
+        """
         self._ensure_driver()
         import paho.mqtt.client as mqtt
 
@@ -254,19 +260,26 @@ class MqttSparkplugConnector(DataConnector):
             )
 
         client.on_message = on_message
-        client.connect(host, port, 60)
-        client.subscribe(self.topic_filter)
-        client.loop_start()
-        import time
-
-        deadline = time.time() + self.timeout_seconds
+        connected = False
+        loop_running = False
         try:
+            client.connect(host, port, 60)
+            connected = True
+            client.subscribe(self.topic_filter)
+            client.loop_start()
+            loop_running = True
+            import time
+
+            deadline = time.time() + self.timeout_seconds
             while len(out) < n and time.time() < deadline:
                 time.sleep(0.05)
         finally:
-            client.loop_stop()
-            client.disconnect()
-        return out
+            if loop_running:
+                client.loop_stop()
+            if connected:
+                client.disconnect()
+        # The callback thread can out-run the poll loop's final check.
+        return out[:n]
 
     def _stream_live(self, batch_size: int) -> Iterator[Batch]:  # pragma: no cover — needs broker
         """Long-lived subscription; yields batches as they fill."""

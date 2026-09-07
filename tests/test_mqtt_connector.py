@@ -396,3 +396,88 @@ def test_live_collect_no_env_no_auth(
     client = fake_paho_module.created[0]
     assert client.username_pw_args is None
     assert "username_pw_set" not in client.calls
+
+
+def test_live_collect_normalizes_and_cleans_up(fake_paho_module: _FakeMqttModule) -> None:
+    """Rows come out normalized; loop and socket are always torn down."""
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DBIRTH/edge01/cobot-01", {"metric": "joint_temp", "value": 72.5}),
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metrics": [{"name": "grip_force", "value": 35}]}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    rows = conn.extract_sample(10)
+
+    assert [r["metric_name"] for r in rows] == ["joint_temp", "grip_force"]
+    assert rows[0]["device_id"] == "cobot-01"
+    assert rows[0]["value"] == 72.5
+    assert rows[0]["timestamp"]  # live path stamps receive time
+    client = fake_paho_module.created[0]
+    assert client.subscribed == ["spBv1.0/#"]
+    assert client.tls_enabled is False  # plain mqtt:// → no TLS
+    assert client.loop_stopped is True
+    assert client.disconnected is True
+
+
+def test_live_collect_truncates_at_n(fake_paho_module: _FakeMqttModule) -> None:
+    """Callback thread may out-run the poll loop → truncate to n."""
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": f"m{i}", "value": i}) for i in range(5)
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    rows = conn.extract_sample(2)
+
+    assert len(rows) == 2
+
+
+def test_live_collect_timeout_returns_empty(fake_paho_module: _FakeMqttModule) -> None:
+    """Silent broker → [] after timeout_seconds, no hang."""
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    assert conn.extract_sample(5) == []
+    client = fake_paho_module.created[0]
+    assert client.disconnected is True
+
+
+def test_live_collect_connect_failure_propagates_without_cleanup(
+    fake_paho_module: _FakeMqttModule,
+) -> None:
+    """Refused connect → error propagates; nothing to clean up is touched."""
+    fake_paho_module.fail_connect = True
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    with pytest.raises(ConnectionRefusedError):
+        conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.connected is False
+    assert client.loop_stopped is False
+    assert client.disconnected is False
+
+
+def test_live_collect_subscribe_failure_still_disconnects(
+    fake_paho_module: _FakeMqttModule,
+) -> None:
+    """Connected but subscribe failed → socket must still be disconnected."""
+    fake_paho_module.fail_subscribe = True
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    with pytest.raises(RuntimeError, match="subscribe"):
+        conn.extract_sample(5)
+
+    client = fake_paho_module.created[0]
+    assert client.connected is True
+    assert client.loop_stopped is False  # loop never started
+    assert client.disconnected is True
+
+
+def test_live_collect_mqtts_enables_tls(fake_paho_module: _FakeMqttModule) -> None:
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DBIRTH/edge01/cobot-01", {"metric": "t", "value": 1}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtts://broker.local:8883", timeout_seconds=1)
+    conn.extract_sample(1)
+
+    client = fake_paho_module.created[0]
+    assert client.tls_enabled is True
