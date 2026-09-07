@@ -1,0 +1,219 @@
+{
+  "id": "supply-chain-demo-store",
+  "ontology_ref": "supply-chain-demo@1.0.0",
+  "individuals": [
+    {
+      "curie": "scm:cust-A",
+      "types": ["scm:Customer"],
+      "data_assertions": {"scm:name": ["客户A"]}
+    },
+    {
+      "curie": "scm:cust-B",
+      "types": ["scm:Customer"],
+      "data_assertions": {"scm:name": ["客户B"]}
+    },
+    {
+      "curie": "scm:sup-B",
+      "types": ["scm:Supplier"],
+      "data_assertions": {"scm:name": ["供应商B"]}
+    },
+    {
+      "curie": "scm:sup-C",
+      "types": ["scm:Supplier"],
+      "data_assertions": {"scm:name": ["供应商C"]}
+    },
+    {
+      "curie": "scm:wh-FG",
+      "types": ["scm:Warehouse"],
+      "data_assertions": {"scm:name": ["成品仓"]}
+    },
+    {
+      "curie": "scm:wh-RM",
+      "types": ["scm:Warehouse"],
+      "data_assertions": {"scm:name": ["原料仓"]}
+    },
+    {
+      "curie": "scm:MOTOR-X",
+      "types": ["scm:FinishedGoods"],
+      "object_assertions": {
+        "scm:bom_expands": ["scm:WINDING", "scm:COPPER-WIRE", "scm:BEARING"],
+        "scm:stored_in": ["scm:wh-FG"]
+      },
+      "data_assertions": {
+        "scm:name": ["X型号电机"],
+        "scm:qty_on_hand": [0],
+        "scm:safety_stock": [100],
+        "scm:forecast_demand_7d": [200],
+        "scm:lead_time_days": [3]
+      }
+    },
+    {
+      "curie": "scm:WINDING",
+      "types": ["scm:SemiFinished"],
+      "object_assertions": {
+        "scm:bom_expands": ["scm:COPPER-WIRE"],
+        "scm:stored_in": ["scm:wh-RM"]
+      },
+      "data_assertions": {
+        "scm:name": ["定子绕线组件"],
+        "scm:qty_on_hand": [450],
+        "scm:safety_stock": [100],
+        "scm:forecast_demand_7d": [0],
+        "scm:lead_time_days": [2]
+      }
+    },
+    {
+      "curie": "scm:COPPER-WIRE",
+      "types": ["scm:RawMaterial", "scm:StrategicMaterial"],
+      "object_assertions": {"scm:stored_in": ["scm:wh-RM"]},
+      "data_assertions": {
+        "scm:name": ["漆包铜线"],
+        "scm:qty_on_hand": [150],
+        "scm:safety_stock": [100],
+        "scm:forecast_demand_7d": [1400],
+        "scm:lead_time_days": [7]
+      }
+    },
+    {
+      "curie": "scm:BEARING",
+      "types": ["scm:RawMaterial"],
+      "object_assertions": {"scm:stored_in": ["scm:wh-RM"]},
+      "data_assertions": {
+        "scm:name": ["深沟球轴承"],
+        "scm:qty_on_hand": [1500],
+        "scm:safety_stock": [400],
+        "scm:forecast_demand_7d": [1200],
+        "scm:lead_time_days": [14]
+      }
+    },
+    {
+      "curie": "scm:SO-1001",
+      "types": ["scm:SalesOrder"],
+      "object_assertions": {
+        "scm:placed_by": ["scm:cust-A"],
+        "scm:contains": ["scm:MOTOR-X"],
+        "scm:fulfilled_by": ["scm:PO-5001"]
+      },
+      "data_assertions": {
+        "scm:name": ["客户A 千台电机订单"],
+        "scm:order_qty": [1000],
+        "scm:due_date": ["2026-09-15T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:SO-1002",
+      "types": ["scm:SalesOrder"],
+      "object_assertions": {
+        "scm:placed_by": ["scm:cust-B"],
+        "scm:contains": ["scm:MOTOR-X"],
+        "scm:fulfilled_by": ["scm:PO-5002"]
+      },
+      "data_assertions": {
+        "scm:name": ["客户B 两百台电机订单"],
+        "scm:order_qty": [200],
+        "scm:due_date": ["2026-09-06T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:PO-3001",
+      "types": ["scm:PurchaseOrder"],
+      "object_assertions": {
+        "scm:ordered_from": ["scm:sup-B"],
+        "scm:supplies": ["scm:COPPER-WIRE"]
+      },
+      "data_assertions": {
+        "scm:name": ["供应商B 铜线 200"],
+        "scm:order_qty": [200],
+        "scm:due_date": ["2026-09-04T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:PO-3002",
+      "types": ["scm:PurchaseOrder"],
+      "object_assertions": {
+        "scm:ordered_from": ["scm:sup-C"],
+        "scm:supplies": ["scm:COPPER-WIRE"]
+      },
+      "data_assertions": {
+        "scm:name": ["供应商C 铜线 250"],
+        "scm:order_qty": [250],
+        "scm:due_date": ["2026-09-10T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:PO-3003",
+      "types": ["scm:PurchaseOrder"],
+      "object_assertions": {
+        "scm:ordered_from": ["scm:sup-C"],
+        "scm:supplies": ["scm:COPPER-WIRE"]
+      },
+      "data_assertions": {
+        "scm:name": ["供应商C 铜线 650"],
+        "scm:order_qty": [650],
+        "scm:due_date": ["2026-09-12T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:PO-5001",
+      "types": ["scm:ProductionOrder"],
+      "object_assertions": {
+        "scm:fulfills": ["scm:SO-1001"],
+        "scm:consumes": ["scm:COPPER-WIRE", "scm:BEARING"]
+      },
+      "data_assertions": {
+        "scm:name": ["工单：电机 1000 台"],
+        "scm:order_qty": [1000],
+        "scm:due_date": ["2026-09-12T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:PO-5002",
+      "types": ["scm:ProductionOrder"],
+      "object_assertions": {
+        "scm:fulfills": ["scm:SO-1002"],
+        "scm:consumes": ["scm:COPPER-WIRE", "scm:BEARING"]
+      },
+      "data_assertions": {
+        "scm:name": ["工单：电机 200 台"],
+        "scm:order_qty": [200],
+        "scm:due_date": ["2026-09-05T00:00:00"]
+      }
+    },
+    {
+      "curie": "scm:BL-1",
+      "types": ["scm:BOMLine"],
+      "object_assertions": {
+        "scm:line_order": ["scm:PO-5001"],
+        "scm:line_material": ["scm:COPPER-WIRE"]
+      },
+      "data_assertions": {"scm:line_qty": [1000]}
+    },
+    {
+      "curie": "scm:BL-2",
+      "types": ["scm:BOMLine"],
+      "object_assertions": {
+        "scm:line_order": ["scm:PO-5001"],
+        "scm:line_material": ["scm:BEARING"]
+      },
+      "data_assertions": {"scm:line_qty": [1000]}
+    },
+    {
+      "curie": "scm:BL-3",
+      "types": ["scm:BOMLine"],
+      "object_assertions": {
+        "scm:line_order": ["scm:PO-5002"],
+        "scm:line_material": ["scm:COPPER-WIRE"]
+      },
+      "data_assertions": {"scm:line_qty": [200]}
+    },
+    {
+      "curie": "scm:BL-4",
+      "types": ["scm:BOMLine"],
+      "object_assertions": {
+        "scm:line_order": ["scm:PO-5002"],
+        "scm:line_material": ["scm:BEARING"]
+      },
+      "data_assertions": {"scm:line_qty": [200]}
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+# 供应链 TBox —— "步骤2 概念模型"的形式化编码（示例本体，非内置）。
+# 对应 docs/ontology.md 的作者指南；CURIE 前缀必须在此声明（ONTO-030）。
+# 覆盖边界 = 销售订单 -> 生产计划 -> 采购与库存（见 README 的步骤1）。
+id: supply-chain-demo
+version: 1.0.0
+base_iri: https://ai-guru-global.github.io/fde-scope/ontology/
+namespaces:
+  - prefix: scm
+    iri: https://ai-guru-global.github.io/fde-scope/ontology/supplychain#
+classes:
+  # ---- 根：领域实体 -------------------------------------------------------
+  - curie: scm:DomainEntity
+    label: Domain Entity
+    label_zh: 领域实体
+    comment: 供应链闭环内所有业务对象的根类。
+  # ---- 订单类（步骤2 的"订单类 Order"）------------------------------------
+  - curie: scm:Order
+    label: Order
+    label_zh: 订单
+    sub_class_of: [scm:DomainEntity]
+  - curie: scm:SalesOrder
+    label: Sales Order
+    label_zh: 销售订单
+    sub_class_of: [scm:Order]
+  - curie: scm:PurchaseOrder
+    label: Purchase Order
+    label_zh: 采购订单
+    sub_class_of: [scm:Order]
+  - curie: scm:ProductionOrder
+    label: Production Order
+    label_zh: 生产工单
+    sub_class_of: [scm:Order]
+  # ---- 物料类（步骤2 的"物料类 Material"）---------------------------------
+  - curie: scm:Material
+    label: Material
+    label_zh: 物料
+    sub_class_of: [scm:DomainEntity]
+  - curie: scm:FinishedGoods
+    label: Finished Goods
+    label_zh: 成品
+    sub_class_of: [scm:Material]
+  - curie: scm:SemiFinished
+    label: Semi-Finished Goods
+    label_zh: 半成品
+    sub_class_of: [scm:Material]
+  - curie: scm:RawMaterial
+    label: Raw Material
+    label_zh: 原材料
+    sub_class_of: [scm:Material]
+  # 战略级物料 = 分类驱动审批路由（CQ3 规则2 读取的机器可读分类）
+  - curie: scm:StrategicMaterial
+    label: Strategic Material
+    label_zh: 战略级物料
+    comment: 战略级原材料；触发紧急采购时必须经供应链总监审批。
+    sub_class_of: [scm:RawMaterial]
+  # ---- 交易主体 / 仓库（步骤2 的"实体类 Entity"）---------------------------
+  - curie: scm:Party
+    label: Party
+    label_zh: 交易主体
+    sub_class_of: [scm:DomainEntity]
+  - curie: scm:Customer
+    label: Customer
+    label_zh: 客户
+    sub_class_of: [scm:Party]
+  - curie: scm:Supplier
+    label: Supplier
+    label_zh: 供应商
+    sub_class_of: [scm:Party]
+  - curie: scm:Warehouse
+    label: Warehouse
+    label_zh: 仓库
+    sub_class_of: [scm:DomainEntity]
+  # ---- BOM 行：n 元关系的具体化（带数量的关系需要升格为个体）----------------
+  - curie: scm:BOMLine
+    label: BOM Line
+    label_zh: BOM 行
+    comment: 生产工单对物料的消耗数量无法放进二元关系，具体化为"行"个体。
+    sub_class_of: [scm:DomainEntity]
+object_properties:
+  # 步骤2 的四条核心关系
+  - curie: scm:contains
+    label: contains
+    domain: scm:SalesOrder
+    range: scm:FinishedGoods
+  - curie: scm:bom_expands
+    label: BOM expands to
+    domain: scm:Material
+    range: scm:Material
+  - curie: scm:supplies
+    label: supplies
+    domain: scm:PurchaseOrder
+    range: scm:RawMaterial
+  - curie: scm:consumes
+    label: consumes
+    domain: scm:ProductionOrder
+    range: scm:Material
+  # 支撑 CQ1/CQ2 追溯的关联
+  - curie: scm:placed_by
+    label: placed by
+    domain: scm:SalesOrder
+    range: scm:Customer
+  - curie: scm:ordered_from
+    label: ordered from
+    domain: scm:PurchaseOrder
+    range: scm:Supplier
+  - curie: scm:fulfills
+    label: fulfills
+    domain: scm:ProductionOrder
+    range: scm:SalesOrder
+    inverse: scm:fulfilled_by
+  - curie: scm:fulfilled_by
+    label: fulfilled by
+    domain: scm:SalesOrder
+    range: scm:ProductionOrder
+  - curie: scm:stored_in
+    label: stored in
+    domain: scm:Material
+    range: scm:Warehouse
+  # BOM 行的两条关联
+  - curie: scm:line_order
+    label: line of order
+    domain: scm:BOMLine
+    range: scm:ProductionOrder
+  - curie: scm:line_material
+    label: line material
+    domain: scm:BOMLine
+    range: scm:Material
+data_properties:
+  - curie: scm:name
+    label: name
+    domain: scm:DomainEntity
+    range: string
+  - curie: scm:order_qty
+    label: order quantity
+    domain: scm:Order
+    range: integer
+  - curie: scm:due_date
+    label: due date
+    domain: scm:Order
+    range: datetime
+  - curie: scm:qty_on_hand
+    label: quantity on hand
+    domain: scm:Material
+    range: integer
+  - curie: scm:safety_stock
+    label: safety stock level
+    domain: scm:Material
+    range: integer
+  - curie: scm:forecast_demand_7d
+    label: 7-day forecast demand
+    domain: scm:Material
+    range: integer
+  - curie: scm:lead_time_days
+    label: lead time in days
+    domain: scm:Material
+    range: integer
+  - curie: scm:line_qty
+    label: line quantity
+    domain: scm:BOMLine
+    range: number
