@@ -39,12 +39,15 @@ AGENTS.md 危险区零接触）。
 1. **`_ensure_driver` 错误信息** → `pip install 'fde-scope[mqtt]'`
    （与 opcua/mysql 的 extra 命名对齐）。
 2. **`_apply_auth(client)`**（新私有方法）：读
-   `FDE_SCOPE_MQTT_USERNAME` / `FDE_SCOPE_MQTT_PASSWORD`，
-   各自仅在设置时应用（`username_pw_set`）。`_collect_live` 与
-   `_stream_live` 在 connect 前调用。
+   `FDE_SCOPE_MQTT_USERNAME` / `FDE_SCOPE_MQTT_PASSWORD`，在 connect 前
+   调用。paho 的 `username_pw_set(username, password)` 必须有 username，
+   因此：username 设置时应用（password 可选）；仅设 password 时忽略
+   （paho 无 password-only API）；两者都没设时不调用。
 3. **`_collect_live` 加固**：connect/subscribe/loop_start 包在 try 中，
-   失败路径同样保证 `loop_stop` + `disconnect`，然后原样 re-raise
-   （诚实传播，不做静默空数据回退）。
+   finally 按已完成阶段清理（未连接不 disconnect、未启 loop 不
+   loop_stop——paho 对未建立连接调用这些方法的行为不可依赖），异常
+   原样 re-raise（诚实传播，不做静默空数据回退）。返回前对结果做
+   `out[:n]` 截断（回调线程与轮询循环存在竞态，不能依赖循环条件）。
 4. **`_stream_live` 修复（核心）**：新增 option `max_messages`
    （默认 `1000`，有界；`0` = 不设上限）。终止条件取先到者：
    累计收到 `max_messages` 条消息（按消息计，非 normalize 后的行），
@@ -85,11 +88,13 @@ AGENTS.md 危险区零接触）。
 - `stream` 有界终止：`max_messages=3` + batch_size 2 → 两个批次
   （2+1 尾批），生成器自然结束不挂起；
 - `stream` 消息不足：1 条 + batch_size 5 → 单条尾批；
-- 认证：设置 env → `username_pw_set("u","p")` 被调用；只设其一 → 只应用
-  那一个；都没设 → 不调用；
+- 认证：设置 env → `username_pw_set("u","p")` 被调用且先于 connect；
+  只设 username → `("u", None)`；只设 password → 不调用（paho 无
+  password-only API）；都没设 → 不调用；
 - TLS：`mqtts://` → `tls_set()` 被调用（`mqtt://` 不调）；
 - driver 缺失：ImportError 信息含 `fde-scope[mqtt]`；
-- connect 抛错 → 异常原样传播，finally 清理路径自身不崩；
+- connect 抛错 → 异常原样传播且不调用清理（未连接）；subscribe 抛错
+  → 异常原样传播且 `disconnect` 被调用（已连接、loop 未启）；
 - `timeout_seconds` 生效（collect）：fake 不投递消息、时间到 → 返回
   `[]` 正常退出；
 - `timeout_seconds` 生效（stream）：无消息、`timeout_seconds` 到 →
