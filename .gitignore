@@ -46,6 +46,12 @@ coverage.xml
 .dmypy.json
 dmypy.json
 
+# Local agent-tooling state (hook state, plugin roots, run history)
+.mimosa/
+.v2c/
+.video_agent/
+.qoder/
+
 # uv — uv.lock is committed on purpose (remediation-plan B2): CI installs
 # through `uv sync --locked`, so an upstream release can't silently change
 # what gets tested.
@@ -65,6 +71,7 @@ reports/
 corpus_store/
 .fde_scope/
 .probe/
+examples/supply_chain_ontology/out/
 
 # Locally vendored third-party deps (not project code; keeps `ruff .` aligned with CI)
 .pydeps/
