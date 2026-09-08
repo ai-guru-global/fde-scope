@@ -339,17 +339,27 @@ class MqttSparkplugConnector(DataConnector):
                 except queue.Empty:
                     if time.time() >= deadline:
                         break
-                    # Cap reached and the queue is fully drained — done.
-                    # (Checking before get() would race the callback thread:
-                    # a fast producer hits the cap before we drain its rows.)
-                    if self.max_messages and len(messages) >= self.max_messages:
-                        break
                     continue
                 batch.append(rec)
                 deadline = time.time() + self.timeout_seconds
                 if len(batch) >= batch_size:
                     yield Batch(batch, source=str(self.broker))
                     batch = []
+                if self.max_messages and len(messages) >= self.max_messages:
+                    # A sustained producer never lets get() time out, so the
+                    # cap must also be enforced here: the callback appends to
+                    # ``messages`` before putting rows, so everything counted
+                    # is already queued — drain it, then stop.
+                    while True:
+                        try:
+                            extra = q.get_nowait()
+                        except queue.Empty:
+                            break
+                        batch.append(extra)
+                        if len(batch) >= batch_size:
+                            yield Batch(batch, source=str(self.broker))
+                            batch = []
+                    break
             if batch:
                 yield Batch(batch, source=str(self.broker))
         finally:

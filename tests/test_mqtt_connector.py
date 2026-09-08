@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sys
 import threading
+import time
 import types
 from collections.abc import Iterator
 from pathlib import Path
@@ -547,3 +548,29 @@ def test_stream_live_default_max_messages_is_bounded(
     batches = list(conn.stream(batch_size=10))
 
     assert [len(b) for b in batches] == [1]
+
+
+def test_stream_live_unbounded_terminates_on_silence(
+    fake_paho_module: _FakeMqttModule,
+) -> None:
+    """max_messages=0 → unbounded: the cap guard must be skipped entirely.
+
+    Batch shape alone can't distinguish this from a dropped guard (the
+    cap-path drain collects the same rows), so we also assert the coarse
+    timing: guard present → the generator lives until the silence deadline
+    (~1s); guard dropped → `len(messages) >= 0` fires immediately (<10ms).
+    """
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": "m", "value": 1}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1, max_messages=0)
+    started = time.monotonic()
+    batches = list(conn.stream(batch_size=10))
+    elapsed = time.monotonic() - started
+
+    assert [len(b) for b in batches] == [1]
+    assert elapsed >= 0.5, "0-mode terminated instantly — cap guard not skipped"
+    client = fake_paho_module.created[0]
+    assert client.loop_stopped is True
+    assert client.disconnected is True
