@@ -583,6 +583,16 @@ In `fde_scope/connectors/mqtt_sparkplug.py`, extend the option block in `__init_
 
 - [ ] **Step 4: Rewrite `_stream_live`**
 
+> **ERRATUM (2026-09-08, post-implementation):** the loop below is racy as
+> written — the pre-`get()` cap check `while ... len(messages) < max_messages`
+> exits before the queue is drained when the producer out-runs the consumer
+> (empirically confirmed; 2 of 4 tests fail with `[]`). The shipped code
+> (commit c7500a7) instead loops `while True` and enforces the cap AFTER a
+> row is consumed: when the cap is reached it drains the queue
+> non-blockingly (`get_nowait` until `Empty`), then breaks — so a sustained
+> producer is also capped, not just a stalling one. Execute the shipped
+> code, not the snippet below.
+
 Replace the entire `_stream_live` method with:
 
 ```python
