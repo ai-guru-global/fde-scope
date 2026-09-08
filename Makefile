@@ -17,7 +17,7 @@ install: ## Install package (core data layer only)
 install-dev: ## Install with dev + test deps
 	$(PIP) install -e ".[dev]"
 
-install-full: ## Install everything (dev + agentscope + mysql + opcua + web)
+install-full: ## Install everything (dev + agentscope + mysql + opcua + mqtt + web)
 	$(PIP) install -e ".[full]"
 
 test: ## Run the test suite (core layer needs no agentscope)
