@@ -8,6 +8,7 @@ real broker) and are exercised only in optional integration environments.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import threading
 import time
@@ -608,3 +609,60 @@ def test_stream_live_mqtts_enables_tls(fake_paho_module: _FakeMqttModule) -> Non
     assert [len(b) for b in batches] == [1]
     client = fake_paho_module.created[0]
     assert client.tls_enabled is True
+
+
+# ---------------------------------------------------------------------------
+# Driver availability contract
+# ---------------------------------------------------------------------------
+def test_ensure_driver_message_names_the_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the user forgot the [mqtt] extra, the error names the fix."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "paho" or name.startswith("paho."):
+            raise ImportError("simulated missing driver")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    conn = MqttSparkplugConnector("mqtt://localhost:1883")
+    with pytest.raises(ImportError, match=r"fde-scope\[mqtt\]"):
+        conn._ensure_driver()
+
+
+def test_fake_surface_matches_real_paho_client() -> None:
+    """Guard against the fake drifting from the real paho Client API.
+
+    Skipped when paho-mqtt isn't installed (CI without the [mqtt] extra).
+    """
+    paho_client = pytest.importorskip("paho.mqtt.client")
+    for name in (
+        "username_pw_set",
+        "tls_set",
+        "connect",
+        "subscribe",
+        "loop_start",
+        "loop_stop",
+        "disconnect",
+    ):
+        assert hasattr(paho_client.Client, name), f"paho Client.{name} missing — fake drifted from driver"
+
+
+# ---------------------------------------------------------------------------
+# Real-broker integration test (opt-in via env var)
+# ---------------------------------------------------------------------------
+@pytest.mark.mqtt
+def test_mqtt_real_broker_smoke() -> None:
+    """End-to-end against a real broker. Skipped unless FDE_SCOPE_MQTT_URL
+    is set (e.g. local mosquitto or a customer's broker). Publish at least
+    one retained message before running, or run it while a publisher is live.
+    """
+    url = os.environ.get("FDE_SCOPE_MQTT_URL")
+    if not url:
+        pytest.skip("FDE_SCOPE_MQTT_URL not set; skipping real-broker integration test")
+    pytest.importorskip("paho.mqtt.client")
+    conn = MqttSparkplugConnector(url, timeout_seconds=10)
+    sample = conn.extract_sample(10)
+    assert sample, "no messages received; publish a test message first"
+    assert sample[0]["topic"]

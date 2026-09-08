@@ -86,6 +86,7 @@ markers = [
     "agentscope: tests that import the optional agentscope extra (skipped if not installed)",
     "mysql: tests that require a real MySQL server (skipped unless FDE_SCOPE_MYSQL_DSN is set)",
     "opcua: tests that require a real OPC UA server (skipped unless FDE_SCOPE_OPCUA_URL is set)",
+    "mqtt: tests that require a real MQTT broker (skipped unless FDE_SCOPE_MQTT_URL is set)",
 ]
 
 # ---------------------------------------------------------------------------

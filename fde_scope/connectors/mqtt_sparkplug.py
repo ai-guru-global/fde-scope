@@ -82,7 +82,8 @@ class MqttSparkplugConnector(DataConnector):
             import paho.mqtt.client  # noqa: F401
         except ImportError as exc:  # pragma: no cover
             raise ImportError(
-                "MqttSparkplugConnector live mode needs paho-mqtt: pip install paho-mqtt"
+                "MqttSparkplugConnector live mode needs the optional 'mqtt' extra "
+                "(paho-mqtt): pip install 'fde-scope[mqtt]'"
             ) from exc
 
     # -- auth -------------------------------------------------------------------
