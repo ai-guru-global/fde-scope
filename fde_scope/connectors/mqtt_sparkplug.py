@@ -22,7 +22,8 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -97,6 +98,36 @@ class MqttSparkplugConnector(DataConnector):
         password = os.environ.get("FDE_SCOPE_MQTT_PASSWORD")
         if username is not None:
             client.username_pw_set(username, password)
+
+    # -- shared live plumbing ----------------------------------------------------
+    def _make_on_message(
+        self,
+        sink: Callable[[dict[str, Any]], None],
+        message_log: list[Any] | None = None,
+    ) -> Callable[..., None]:
+        """Build a paho ``on_message`` callback over the shared normalize pipeline.
+
+        Both live paths converge here; only the sink differs (list.append for
+        collect, queue.put for stream). ``message_log`` records one entry per
+        wire message — the stream path counts *messages*, not normalized rows.
+        """
+
+        def on_message(_client: Any, _userdata: Any, msg: Any) -> None:
+            if message_log is not None:
+                message_log.append(msg)
+            for row in self._normalize(
+                {
+                    "topic": msg.topic,
+                    "payload": msg.payload.decode("utf-8", errors="replace"),
+                    # No wire timestamp in plain MQTT — stamp receive time.
+                    "timestamp": datetime.now(UTC).isoformat(),
+                    "qos": msg.qos,
+                    "retain": msg.retain,
+                }
+            ):
+                sink(row)
+
+        return on_message
 
     # -- payload parsing --------------------------------------------------------
     def _parse_payload(self, raw: Any) -> list[tuple[str, Any]]:
@@ -231,7 +262,7 @@ class MqttSparkplugConnector(DataConnector):
         port = parsed.port or (8883 if use_tls else 1883)
         return host, port, use_tls
 
-    def _collect_live(self, n: int) -> list[dict[str, Any]]:  # pragma: no cover — needs broker
+    def _collect_live(self, n: int) -> list[dict[str, Any]]:
         """Connect, subscribe, collect up to ``n`` rows, disconnect.
 
         Cleanup is stage-aware: an unconnected client is not disconnected
@@ -249,21 +280,7 @@ class MqttSparkplugConnector(DataConnector):
             client.tls_set()
         self._apply_auth(client)
 
-        def on_message(_c, _d, msg):  # noqa: ANN001
-            out.extend(
-                self._normalize(
-                    {
-                        "topic": msg.topic,
-                        "payload": msg.payload.decode("utf-8", errors="replace"),
-                        # No wire timestamp in plain MQTT — stamp receive time.
-                        "timestamp": datetime.now(UTC).isoformat(),
-                        "qos": msg.qos,
-                        "retain": msg.retain,
-                    }
-                )
-            )
-
-        client.on_message = on_message
+        client.on_message = self._make_on_message(out.append)
         connected = False
         loop_running = False
         try:
@@ -272,10 +289,9 @@ class MqttSparkplugConnector(DataConnector):
             client.subscribe(self.topic_filter)
             client.loop_start()
             loop_running = True
-            import time
 
-            deadline = time.time() + self.timeout_seconds
-            while len(out) < n and time.time() < deadline:
+            deadline = time.monotonic() + self.timeout_seconds
+            while len(out) < n and time.monotonic() < deadline:
                 time.sleep(0.05)
         finally:
             if loop_running:
@@ -285,7 +301,7 @@ class MqttSparkplugConnector(DataConnector):
         # The callback thread can out-run the poll loop's final check.
         return out[:n]
 
-    def _stream_live(self, batch_size: int) -> Iterator[Batch]:  # pragma: no cover — needs broker
+    def _stream_live(self, batch_size: int) -> Iterator[Batch]:
         """Bounded live subscription; yields batches as they fill.
 
         Terminates on whichever limit hits first: ``max_messages`` messages
@@ -306,21 +322,7 @@ class MqttSparkplugConnector(DataConnector):
             client.tls_set()
         self._apply_auth(client)
 
-        def on_message(_c: Any, _d: Any, msg: Any) -> None:  # noqa: ANN001
-            messages.append(msg)
-            for row in self._normalize(
-                {
-                    "topic": msg.topic,
-                    "payload": msg.payload.decode("utf-8", errors="replace"),
-                    # No wire timestamp in plain MQTT — stamp receive time.
-                    "timestamp": datetime.now(UTC).isoformat(),
-                    "qos": msg.qos,
-                    "retain": msg.retain,
-                }
-            ):
-                q.put(row)
-
-        client.on_message = on_message
+        client.on_message = self._make_on_message(q.put, messages)
         connected = False
         loop_running = False
         try:
@@ -329,19 +331,18 @@ class MqttSparkplugConnector(DataConnector):
             client.subscribe(self.topic_filter)
             client.loop_start()
             loop_running = True
-            import time
 
-            deadline = time.time() + self.timeout_seconds
+            deadline = time.monotonic() + self.timeout_seconds
             batch: list[dict[str, Any]] = []
             while True:
                 try:
                     rec = q.get(timeout=1.0)
                 except queue.Empty:
-                    if time.time() >= deadline:
+                    if time.monotonic() >= deadline:
                         break
                     continue
                 batch.append(rec)
-                deadline = time.time() + self.timeout_seconds
+                deadline = time.monotonic() + self.timeout_seconds
                 if len(batch) >= batch_size:
                     yield Batch(batch, source=str(self.broker))
                     batch = []
