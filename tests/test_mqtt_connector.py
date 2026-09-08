@@ -647,6 +647,21 @@ def test_fake_surface_matches_real_paho_client() -> None:
         "disconnect",
     ):
         assert hasattr(paho_client.Client, name), f"paho Client.{name} missing — fake drifted from driver"
+    # The connector constructs Client(CallbackAPIVersion.VERSION2), which only
+    # exists on paho >= 2 — all 7 methods above also exist on 1.x.
+    assert hasattr(paho_client, "CallbackAPIVersion"), "connector requires paho-mqtt >= 2"
+
+
+# ---------------------------------------------------------------------------
+# Registry wiring
+# ---------------------------------------------------------------------------
+def test_mqtt_is_registered_after_reload() -> None:
+    """mqtt_sparkplug slug is in the connector registry as MqttSparkplugConnector."""
+    from fde_scope.connectors import _registry
+
+    reg = _registry.get_registry()
+    if "mqtt_sparkplug" in reg:
+        assert issubclass(reg["mqtt_sparkplug"], MqttSparkplugConnector)
 
 
 # ---------------------------------------------------------------------------
