@@ -1,8 +1,9 @@
 """Tests for the MQTT/Sparkplug connector.
 
-Covers the JSONL-replay path (zero-dep, fully working) and the Sparkplug B
-topic/payload parsing. Live-broker paths are ``pragma: no cover`` (they need a
-real broker) and are exercised only in optional integration environments.
+Covers the JSONL-replay path (zero-dep, fully working), the Sparkplug B
+topic/payload parsing, and both live-broker paths against a fake
+``paho.mqtt.client`` module. The only real-broker test is env-gated
+(``-m mqtt``, ``FDE_SCOPE_MQTT_URL``).
 """
 
 from __future__ import annotations

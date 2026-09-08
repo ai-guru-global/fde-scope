@@ -357,7 +357,9 @@ class MqttSparkplugConnector(DataConnector):
                     # A sustained producer never lets get() time out, so the
                     # cap must also be enforced here: the callback appends to
                     # ``messages`` before putting rows, so everything counted
-                    # is already queued — drain it, then stop.
+                    # is enqueued or being enqueued — drain it, then stop.
+                    # (At most the cap-crossing message's tail rows can land
+                    # after the drain; bounded to that one message.)
                     while True:
                         try:
                             extra = q.get_nowait()
