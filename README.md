@@ -676,7 +676,7 @@ Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
 
 - [x] OPC UA 真实工业 IO（asyncua 驱动，mock 测试覆盖）
 - [x] Category-stratified train/eval/test split（`CorpusReport.splits`）
-- [ ] MQTT-Sparkplug 真实 broker IO（paho-mqtt）
+- [x] MQTT-Sparkplug 真实 broker IO（paho-mqtt 驱动，mock + 真 broker 测试）
 - [ ] rosbag2 真实回放（rosbags）
 - [x] Ontology 模块（横切语义层：TBox + ABox、SKOS 概念体系、SHACL-lite 校验 ONTO-* 错误码、JSON-LD 1.1 标准导出、零新依赖）— [设计文档](docs/superpowers/specs/2026-08-31-ontology-module-design.md) · [使用指南](docs/ontology.md)
 - [x] Real LLM corpus synthesis & quality scoring (drop-in behind existing signatures)
