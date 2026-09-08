@@ -48,6 +48,7 @@ dependencies = [
 agentscope = ["agentscope[ollama,service]>=2.0.4.post1,<3"]
 mysql = ["mysql-connector-python>=8.3"]
 opcua = ["asyncua>=1.0,<3"]
+mqtt = ["paho-mqtt>=2.0,<3"]
 web = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"]
 dev = [
     "pytest>=8.0",
@@ -64,6 +65,7 @@ full = [
     "fde-scope[agentscope]",
     "fde-scope[mysql]",
     "fde-scope[opcua]",
+    "fde-scope[mqtt]",
     "fde-scope[web]",
 ]
 

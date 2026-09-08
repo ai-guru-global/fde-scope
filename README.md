@@ -602,7 +602,8 @@ pip install -e ".[web]"            # + FastAPI/uvicorn console
 pip install -e ".[agentscope]"    # + real AgentScope 2.0 runtime layer
 pip install -e ".[mysql]"          # + MySQL connector driver
 pip install -e ".[opcua]"          # + OPC UA connector driver (asyncua)
-pip install -e ".[full]"           # everything (dev + agentscope + mysql + opcua + web)
+pip install -e ".[mqtt]"           # + MQTT-Sparkplug live broker driver (paho-mqtt)
+pip install -e ".[full]"           # everything (dev + agentscope + mysql + opcua + mqtt + web)
 ```
 
 Requires **Python ≥ 3.11**. Entry point: `fde-scope` (or `python -m fde_scope.cli`).

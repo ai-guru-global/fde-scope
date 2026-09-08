@@ -7,10 +7,16 @@ Two modes:
    is one captured message ``{"topic":..., "payload":{...}, "qos":..., "retain":...}``.
    This is what the contract tests and the corpus forge exercise.
 
-2. **Live broker subscription** (needs ``paho-mqtt``): connect to a real broker,
-   subscribe, and collect messages. Plain-MQTT JSON payloads are parsed; native
-   Sparkplug B protobuf decoding is roadmap (the payload schema is honored
+2. **Live broker subscription** (needs ``paho-mqtt``: ``pip install
+   'fde-scope[mqtt]'``): connect to a real broker, subscribe, and collect
+   messages. Plain-MQTT JSON payloads are parsed; native Sparkplug B
+   protobuf decoding is roadmap (the payload schema is honored
    regardless, so downstream code is stable).
+
+Live-mode options: ``timeout_seconds`` (collect window / stream silence
+deadline), ``max_messages`` (stream bound, default 1000, 0 = unbounded),
+``topic`` (subscription filter). Broker credentials come from the
+environment only: ``FDE_SCOPE_MQTT_USERNAME`` / ``FDE_SCOPE_MQTT_PASSWORD``.
 
 Industry note: Sparkplug B adds session/state management + named-metric
 payloads on top of MQTT, so consumers know whether a device went silent vs.
