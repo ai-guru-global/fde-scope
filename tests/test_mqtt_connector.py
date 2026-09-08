@@ -574,3 +574,37 @@ def test_stream_live_unbounded_terminates_on_silence(
     client = fake_paho_module.created[0]
     assert client.loop_stopped is True
     assert client.disconnected is True
+
+
+def test_stream_live_yields_full_batches_before_cap(
+    fake_paho_module: _FakeMqttModule,
+) -> None:
+    """Cap not hit + batch_size < rows → mid-stream yields at exactly batch_size.
+
+    Locks the normal batch-size yield path, distinct from the cap-drain path
+    the bounded-terminates test exercises (1 row/message lets the cap fire
+    before the batch-size check there). timeout_seconds=2 also walks the
+    pre-deadline Empty→continue branch: the first ~1s poll precedes the
+    deadline, the second terminates.
+    """
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": f"m{i}", "value": i}) for i in range(5)
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=2, max_messages=100)
+    batches = list(conn.stream(batch_size=2))
+
+    assert [len(b) for b in batches] == [2, 2, 1]
+
+
+def test_stream_live_mqtts_enables_tls(fake_paho_module: _FakeMqttModule) -> None:
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DBIRTH/edge01/cobot-01", {"metric": "t", "value": 1}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtts://broker.local:8883", timeout_seconds=1)
+    batches = list(conn.stream(batch_size=1))
+
+    assert [len(b) for b in batches] == [1]
+    client = fake_paho_module.created[0]
+    assert client.tls_enabled is True
