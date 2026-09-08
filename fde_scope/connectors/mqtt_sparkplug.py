@@ -62,6 +62,10 @@ class MqttSparkplugConnector(DataConnector):
         self.topic_filter = options.get("topic", "spBv1.0/#")
         self.sparkplug = options.get("sparkplug", True)
         self.timeout_seconds = options.get("timeout_seconds", 5)
+        # Live-stream bound: stop after this many *messages* (0 = unbounded,
+        # consumer closes the generator). Guards corpus forge against a
+        # never-terminating subscription.
+        self.max_messages = int(options.get("max_messages", 1000))
         self._jsonl_path: Path | None = (
             Path(source) if not self._is_broker_url(source) and Path(source).suffix == ".jsonl" else None
         )
@@ -282,19 +286,28 @@ class MqttSparkplugConnector(DataConnector):
         return out[:n]
 
     def _stream_live(self, batch_size: int) -> Iterator[Batch]:  # pragma: no cover — needs broker
-        """Long-lived subscription; yields batches as they fill."""
+        """Bounded live subscription; yields batches as they fill.
+
+        Terminates on whichever limit hits first: ``max_messages`` messages
+        received (0 = unbounded — the consumer closes the generator), or
+        ``timeout_seconds`` of silence. A partially-filled tail batch is
+        yielded before exit.
+        """
         self._ensure_driver()
         import queue
 
         import paho.mqtt.client as mqtt
 
         q: queue.Queue = queue.Queue()
+        messages: list[Any] = []  # one entry per wire message (not per row)
         host, port, use_tls = self._connection_params()
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         if use_tls:
             client.tls_set()
+        self._apply_auth(client)
 
-        def on_message(_c, _d, msg):  # noqa: ANN001
+        def on_message(_c: Any, _d: Any, msg: Any) -> None:  # noqa: ANN001
+            messages.append(msg)
             for row in self._normalize(
                 {
                     "topic": msg.topic,
@@ -308,20 +321,39 @@ class MqttSparkplugConnector(DataConnector):
                 q.put(row)
 
         client.on_message = on_message
-        client.connect(host, port, 60)
-        client.subscribe(self.topic_filter)
-        client.loop_start()
-        batch: list[dict[str, Any]] = []
+        connected = False
+        loop_running = False
         try:
+            client.connect(host, port, 60)
+            connected = True
+            client.subscribe(self.topic_filter)
+            client.loop_start()
+            loop_running = True
+            import time
+
+            deadline = time.time() + self.timeout_seconds
+            batch: list[dict[str, Any]] = []
             while True:
                 try:
                     rec = q.get(timeout=1.0)
-                    batch.append(rec)
-                    if len(batch) >= batch_size:
-                        yield Batch(batch, source=str(self.broker))
-                        batch = []
                 except queue.Empty:
+                    if time.time() >= deadline:
+                        break
+                    # Cap reached and the queue is fully drained — done.
+                    # (Checking before get() would race the callback thread:
+                    # a fast producer hits the cap before we drain its rows.)
+                    if self.max_messages and len(messages) >= self.max_messages:
+                        break
                     continue
+                batch.append(rec)
+                deadline = time.time() + self.timeout_seconds
+                if len(batch) >= batch_size:
+                    yield Batch(batch, source=str(self.broker))
+                    batch = []
+            if batch:
+                yield Batch(batch, source=str(self.broker))
         finally:
-            client.loop_stop()
-            client.disconnect()
+            if loop_running:
+                client.loop_stop()
+            if connected:
+                client.disconnect()

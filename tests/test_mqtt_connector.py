@@ -481,3 +481,69 @@ def test_live_collect_mqtts_enables_tls(fake_paho_module: _FakeMqttModule) -> No
 
     client = fake_paho_module.created[0]
     assert client.tls_enabled is True
+
+
+# ---------------------------------------------------------------------------
+# Live stream — bounded termination (the hang fix)
+# ---------------------------------------------------------------------------
+def test_stream_live_bounded_terminates(fake_paho_module: _FakeMqttModule) -> None:
+    """max_messages=3 + batch_size=2 → [2, 1] batches, generator ends."""
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DBIRTH/edge01/cobot-01", {"metric": "joint_temp", "value": 72.5}),
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": "grip_force", "value": 35}),
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": "cycle_count", "value": 1042}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=2, max_messages=3)
+    batches = list(conn.stream(batch_size=2))
+
+    assert [len(b) for b in batches] == [2, 1]
+    assert batches[0].source == "mqtt://localhost:1883"
+    client = fake_paho_module.created[0]
+    assert client.loop_stopped is True
+    assert client.disconnected is True
+
+
+def test_stream_live_silence_terminates(fake_paho_module: _FakeMqttModule) -> None:
+    """Silent broker → generator exits after timeout_seconds (no hang)."""
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    assert list(conn.stream(batch_size=5)) == []
+    client = fake_paho_module.created[0]
+    assert client.loop_stopped is True
+    assert client.disconnected is True
+
+
+def test_stream_live_counts_messages_not_rows(fake_paho_module: _FakeMqttModule) -> None:
+    """One multi-metric message is ONE message for max_messages purposes."""
+    fake_paho_module.outbox = [
+        _live_msg(
+            "spBv1.0/plant1/DDATA/edge01/cobot-01",
+            {
+                "metrics": [
+                    {"name": "grip_force", "value": 35},
+                    {"name": "joint_temp", "value": 72.5},
+                    {"name": "cycle_count", "value": 1042},
+                ]
+            },
+        ),
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=2, max_messages=1)
+    batches = list(conn.stream(batch_size=10))
+
+    # 1 message → 3 rows, all in the single tail batch.
+    assert [len(b) for b in batches] == [3]
+
+
+def test_stream_live_default_max_messages_is_bounded(
+    fake_paho_module: _FakeMqttModule,
+) -> None:
+    """Default max_messages=1000: a small outbox still terminates on silence."""
+    fake_paho_module.outbox = [
+        _live_msg("spBv1.0/plant1/DDATA/edge01/cobot-01", {"metric": "m", "value": 1}),
+    ]
+
+    conn = MqttSparkplugConnector("mqtt://localhost:1883", timeout_seconds=1)
+    batches = list(conn.stream(batch_size=10))
+
+    assert [len(b) for b in batches] == [1]
