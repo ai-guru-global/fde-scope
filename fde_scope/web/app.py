@@ -896,7 +896,7 @@ __ICON_SPRITE__
     <a href="#practices">最佳实践</a>
     <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
     <a href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
-    <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
+    <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
   </nav>
   <a class="lang" href="/en/" title="English version" aria-label="Switch to English">EN</a>
   <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
@@ -1287,7 +1287,7 @@ __ICON_SPRITE__
   <div class="hdr-right">
     <a class="back" href="/">&#8592; 功能总览</a>
     <a class="back" href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
-    <a class="back" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
+    <a class="back" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
     <a class="lang" href="/en/console" title="English version" aria-label="Switch to English">EN</a>
     <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
       <svg class="ic when-dark"><use href="#i-sun"/></svg>

@@ -25,14 +25,43 @@ actually decide whether the engagement produces value.
 **industrial overlay** (FAT/SAT, functional safety, CE/EU-AI-Act, works council,
 air-gap, shift handover) for manufacturing/robotics deployments.
 
+```mermaid
+flowchart LR
+    subgraph ZA["Zone A · Pre-engagement — 定边界"]
+        direction TB
+        P1["1 立项框定 qualification"] --> P2["2 现场勘察 site survey 🏭<br/>gate: site_survey"]
+        P2 --> P3["3 干系人地图 stakeholder map"]
+        P3 --> P4["4 成功标准契约化 success criteria<br/>gate: success_criteria"]
+    end
+    subgraph ZB["Zone B · Build — 造出来"]
+        direction TB
+        P5["5 数据接入 connect 🏭<br/>gate: air_gap"] --> P6["6 语料锻造 corpus"]
+        P6 --> P7["7 真实数据原型 prototype-real"]
+        P7 --> P8["8 干系人验证 validate"]
+        P8 --> P9["9 部署上线 deploy 🏭<br/>gates: fat_sat · functional_safety · conformity"]
+        P9 --> P10["10 评估交付 eval"]
+    end
+    subgraph ZC["Zone C · Operationalization — 稳得住"]
+        direction TB
+        P11["11 SLO/SLA + on-call<br/>gates: slo · shift_handover 🏭"] --> P12["12 Runbook 编写"]
+        P12 --> P13["13 监控与漂移 monitoring / drift"]
+        P13 --> P14["14 变更管理 + 培训 🏭<br/>gate: works_council"]
+        P14 --> P15["15 飞轮 → 产品化 flywheel"]
+    end
+    subgraph ZD["Zone D · Handoff — 交得出去"]
+        direction TB
+        P16["16 运维移交 ops handoff"] --> P17["17 知识转移 knowledge transfer"]
+        P17 --> P18["18 退场 disengage · 客户签收<br/>gate: handoff_signoff"]
+    end
+    ZA --> ZB --> ZC --> ZD
+
+    classDef ind fill:#fdecea,stroke:#c0392b;
+    class P2,P5,P9,P11,P14 ind
 ```
-Zone A · Pre-engagement  →  Zone B · Build  →  Zone C · Operationalization  →  Zone D · Handoff
- qualification               connect             slo / on-call                   ops handoff
- site survey (🏭)            corpus              runbook                         knowledge transfer
- stakeholder map             prototype-real      monitoring / drift              disengage (signed off)
- success criteria            deploy (🏭 FAT/SAT) change-mgmt (🏭 works council)
-                             eval                flywheel → productize
-```
+
+🏭 红色 = industrial-only,仅 `manufacturing` profile 执行(`ticket` 跑 15 个阶段);
+每个 `gate:` 挂在"离开该阶段"的动作上,`advance` 时实时重评,不达标不放行。
+逐阶段说明见 [`docs/features.md`](docs/features.md)。
 
 It is **not** an agent application — it's an FDE's workbench: a CLI, a Web UI,
 and a Python library that turns the SOP from a checklist into enforced engineering.
@@ -188,7 +217,8 @@ rendered runbook (`reports/<slug>-runbook.md`) and corpus report
 Everything below is executable code with tests — the
 [architecture guard suite](tests/test_architecture_guard.py) pins the counts,
 and [`docs/architecture-model/architecture-map.md`](docs/architecture-model/architecture-map.md)
-carries the full evidence index.
+carries the full evidence index. 完整的中文功能清单(逐项说明、连接器成熟度、
+"功能 → 优点"速查表)见 [`docs/features.md`](docs/features.md)。
 
 **SOP engine**
 
@@ -220,32 +250,37 @@ carries the full evidence index.
 ## 🏗 Architecture
 
 ```mermaid
-graph TD
-    subgraph surfaces["Surfaces"]
-        CLI["fde-scope CLI"]
-        WEB["web/ · FastAPI console · 32 routes"]
-        PAW["pawapp/ · QwenPaw plugin · 18 routes"]
-        MAC["macOS App · universal2 DMG"]
+flowchart TB
+    subgraph surfaces["Surfaces · 四个入口,同一引擎同一数据根"]
+        CLI["fde-scope CLI<br/>13 组命令"]
+        WEB["web/ FastAPI 控制台<br/>32 路由 · 单页"]
+        PAW["pawapp/ QwenPaw 插件<br/>/api/fde-scope · 18 路由"]
+        MAC["macOS App<br/>universal2 DMG"]
     end
 
-    subgraph engine["SOP engine · engagement/ + profiles/ · zero AgentScope"]
-        PH["18-phase state machine · 4 zones"]
-        GT["10 executable gates · live re-eval on every advance"]
+    subgraph engine["SOP engine · engagement/ + profiles/ · 零 AgentScope"]
+        PH["18-phase 状态机<br/>4 zones · ticket 15 / mfg 18"]
+        GT["10 executable gates<br/>每次 advance 实时重评"]
     end
 
-    subgraph layers["Data & intelligence layers"]
-        L1["1 · connectors/"]
-        L2["2 · corpus/"]
-        L3["3 · deploy/ · AgentScope 2.0 (lazy)"]
-        L4["4 · eval/"]
-        L5["5 · flywheel/"]
+    subgraph layers["Data & intelligence · 五层流水线"]
+        L1["1 connectors/<br/>10 连接器"]
+        L2["2 corpus/<br/>PII→去重→质量→补盲"]
+        L3["3 deploy/<br/>AgentScope 2.0 装配 lazy"]
+        L4["4 eval/<br/>工单指标 + 工业 KPI"]
+        L5["5 flywheel/<br/>回流 + 重训调度"]
+        L1 -->|"samples + schema"| L2
+        L2 -->|"语料 + splits"| L3
+        L3 -->|"被测 Agent"| L4
+        L4 -->|"bad cases"| L5
+        L5 -.->|"corpus 回流 · retrain"| L2
     end
 
-    subgraph cross["Cross-cutting"]
-        SK["6 · skills/"]
-        INT["7 · integrations/"]
-        ONT["8 · ontology/ · TBox + ABox + JSON-LD"]
-        LLM["llm.py · optional LLM egress"]
+    subgraph cross["Cross-cutting · 横切,全部可选"]
+        SK["6 skills/<br/>方法论沉淀"]
+        INT["7 integrations/<br/>QwenPaw + ACP"]
+        ONT["8 ontology/<br/>TBox + ABox + JSON-LD"]
+        LLM["llm.py<br/>可选 LLM 出口"]
     end
 
     CLI --> PH
@@ -253,17 +288,24 @@ graph TD
     PAW --> PH
     MAC --> PH
     PH --> GT
-    PH --> L1
-    L1 --> L2
-    L2 --> L3
-    L3 --> L4
-    L4 --> L5
-    SK -.-> L3
-    INT -.-> PAW
-    ONT -.-> L2
+    PH -->|"按阶段调用"| L1
+    ONT -.->|"概念对齐:覆盖率 / 技能检索"| L2
     ONT -.-> SK
-    LLM -.-> L3
+    SK -.->|"skills_dirs 注册进 Toolkit"| L3
+    LLM -.->|"失败回退规则"| L3
+    INT -.-> PAW
 ```
+
+**怎么读这张图**
+
+- **实线 = 主数据流**:连接器接原始数据 → corpus 锻成语料 → deploy 装配出真实
+  Agent → eval 用 KPI 证明价值 → flywheel 把现场学习**回流**到 corpus(虚线回边,
+  闭环重训)。五层各自可独立使用,组合起来是完整闭环。
+- **四个表面 → 同一 SOP 引擎**:CLI / Web / PawApp / macOS App 操作同一份
+  engagement 状态与数据根,任何入口的预检与门禁结果零分歧。
+- **虚线 = 可选/横切**:ontology、skills、LLM 都不挡主流程——没有它们流水线照样
+  跑通,这是"零门槛可验证"的架构来源。
+- **`PH --> GT` 门禁内嵌在状态机里**:`advance` 是唯一推进入口,门禁评估没有旁路。
 
 | Layer | Module | Role | agentscope? |
 |---|---|---|---|
@@ -338,6 +380,19 @@ rather than rhetorical:
   present, `advance` refuses and the state machine cannot move. `--force`
   overrides authority but still evaluates and records, so even exceptions leave
   an audit trail instead of becoming indistinguishable from a clean pass.
+
+```mermaid
+flowchart TD
+    A["fde-scope engage advance(可带 --force)"] --> B["evaluate_phase_gates(ctx)<br/>当前阶段所有门禁 · 无条件实时重评"]
+    B --> C{"blockers 为空?"}
+    C -->|"是"| D["✅ 记录 pass → 放行进入下一阶段"]
+    C -->|"否"| E{"带了 --force?"}
+    E -->|"否"| F["⛔ 拒绝推进 · 返回 blockers 清单<br/>自动生成 gate_hint 技能草稿(skill review 完善)"]
+    E -->|"是"| G["⚠️ 强制放行 · 仍评估并记录<br/>例外留下审计痕迹,不混同于干净通过"]
+```
+
+门禁执行流:`advance` 是唯一推进入口,评估内联其中——**每一条路径都会评估并记录**,
+包括被 `--force` 打开的那条。
 
 Concretely, `Engagement(ctx).evaluate_gate(slug)` returns
 `(passed, blockers, warnings)` and blocks `advance` until clean.
@@ -635,6 +690,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 
 ## 📄 Documentation
 
+- [`docs/features.md`](docs/features.md) — 完整功能清单：18 阶段逐条说明 / 10 门禁执行流 / 连接器成熟度 / "功能 → 优点"速查表（English: [`docs/features-en.md`](docs/features-en.md)）
 - [`docs/fde_sop_full.md`](docs/fde_sop_full.md) — the 18-phase SOP, 12 anti-patterns, sources
 - [`docs/manufacturing_scenario.md`](docs/manufacturing_scenario.md) — embodied-robotics factory end-to-end walkthrough
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
