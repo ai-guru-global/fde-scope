@@ -426,3 +426,100 @@ def test_binary_skip_increments_skipped(monkeypatch: pytest.MonkeyPatch) -> None
     assert len(sample) == 1  # only the String message
     assert sample[0]["payload"] == {"data": "hello"}
     assert c.skipped == 2  # Image + PointCloud2
+
+
+# ---------------------------------------------------------------------------
+# real-file tests — rosbags Writer dual format
+# ---------------------------------------------------------------------------
+rosbags = pytest.importorskip("rosbags", reason="rosbags not installed")
+
+from rosbags.rosbag2 import Writer
+from rosbags.rosbag2.writer import StoragePlugin
+from rosbags.typesys import Stores, get_typestore
+
+
+def _write_test_bag(bag_path: Path, use_mcap: bool = False) -> None:
+    """Write a test bag with 3 String messages using rosbags Writer."""
+    ts = get_typestore(Stores.ROS2_HUMBLE)
+    StringType = ts.types["std_msgs/msg/String"]
+    
+    storage = StoragePlugin.MCAP if use_mcap else StoragePlugin.SQLITE3
+    with Writer(bag_path, version=9, storage_plugin=storage) as writer:
+        conn = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
+        for i, text in enumerate(["hello", "world", "test"], start=1):
+            msg = StringType(data=text)
+            data = ts.serialize_cdr(msg, "std_msgs/msg/String")
+            writer.write(conn, i * 1000, data)
+
+
+def test_real_file_mcap_extract_sample(tmp_path: Path) -> None:
+    """Write a real mcap file, read it back with extract_sample."""
+    mcap_path = tmp_path / "test.mcap"
+    _write_test_bag(mcap_path, use_mcap=True)
+    
+    c = Ros2BagConnector(str(mcap_path))
+    # Note: rosbags Writer creates a directory structure even for mcap storage
+    assert c._path_form == "dir"
+    
+    sample = c.extract_sample(10)
+    assert len(sample) == 3
+    assert sample[0]["topic"] == "/chatter"
+    assert sample[0]["msg_type"] == "std_msgs/msg/String"
+    assert sample[0]["timestamp_ns"] == 1000
+    assert sample[0]["payload"] == {"data": "hello"}
+    assert sample[1]["payload"] == {"data": "world"}
+    assert sample[2]["payload"] == {"data": "test"}
+
+
+def test_real_file_db3_extract_sample(tmp_path: Path) -> None:
+    """Write a real db3 bag directory, read it back with extract_sample."""
+    bag_dir = tmp_path / "test_bag"
+    _write_test_bag(bag_dir, use_mcap=False)
+    
+    c = Ros2BagConnector(str(bag_dir))
+    assert c._path_form == "dir"
+    
+    sample = c.extract_sample(10)
+    assert len(sample) == 3
+    assert sample[0]["payload"] == {"data": "hello"}
+    assert sample[2]["payload"] == {"data": "test"}
+
+
+def test_real_file_stream(tmp_path: Path) -> None:
+    """Write a real bag, stream it in batches."""
+    mcap_path = tmp_path / "test.mcap"
+    _write_test_bag(mcap_path, use_mcap=True)
+    
+    c = Ros2BagConnector(str(mcap_path))
+    batches = list(c.stream(batch_size=2))
+    
+    assert len(batches) == 2  # 2+1
+    assert len(batches[0]) == 2
+    assert len(batches[1]) == 1
+    assert batches[0].source == str(mcap_path)
+    assert batches[0][0]["payload"] == {"data": "hello"}
+    assert batches[1][0]["payload"] == {"data": "test"}
+
+
+def test_real_file_topics_filter(tmp_path: Path) -> None:
+    """Write a bag with multiple topics, filter with topics parameter."""
+    ts = get_typestore(Stores.ROS2_HUMBLE)
+    StringType = ts.types["std_msgs/msg/String"]
+    
+    mcap_path = tmp_path / "test.mcap"
+    with Writer(mcap_path, version=9, storage_plugin=StoragePlugin.MCAP) as writer:
+        conn1 = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
+        conn2 = writer.add_connection("/other", "std_msgs/msg/String", typestore=ts)
+        
+        msg1 = StringType(data="from_chatter")
+        writer.write(conn1, 1000, ts.serialize_cdr(msg1, "std_msgs/msg/String"))
+        
+        msg2 = StringType(data="from_other")
+        writer.write(conn2, 2000, ts.serialize_cdr(msg2, "std_msgs/msg/String"))
+    
+    c = Ros2BagConnector(str(mcap_path), topics=["/chatter"])
+    sample = c.extract_sample(10)
+    
+    assert len(sample) == 1
+    assert sample[0]["topic"] == "/chatter"
+    assert sample[0]["payload"] == {"data": "from_chatter"}
