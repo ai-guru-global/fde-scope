@@ -8,8 +8,9 @@ self-produces bags (dual format). Integration: env-gated real bag.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 
@@ -394,24 +395,57 @@ def test_stream_with_expanded_messages(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------
 # error handling — skip counting
 # ---------------------------------------------------------------------------
-def test_deserialize_failure_skips_and_counts(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Half-corrupt bag: one good message, one that raises, one good again."""
+def test_pre_deserialized_messages_pass_through(monkeypatch: pytest.MonkeyPatch) -> None:
+    """All messages from _iter_bag are already deserialized — they pass through."""
     c = Ros2BagConnector("dummy.mcap")
 
-    call_count = 0
-
     def fake_iter_bag() -> Iterator[tuple[str, str, int, dict[str, Any]]]:
-        nonlocal call_count
-        call_count += 1
         yield "/chatter", "std_msgs/msg/String", 100, {"data": "good1"}
         yield "/broken", "custom_msgs/msg/Weird", 200, {"data": "good2"}
         yield "/chatter", "std_msgs/msg/String", 300, {"data": "good3"}
 
     monkeypatch.setattr(c, "_iter_bag", fake_iter_bag)
     sample = c.extract_sample(10)
-    # All 3 messages come through _iter_bag already deserialized
-    # (the skip counting for deserialize failures happens inside _iter_bag itself)
     assert len(sample) == 3
+
+
+def test_deserialize_failure_in_iter_bag_skips_and_counts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_iter_bag's try/except: deserialize raises on one message → skipped + counted."""
+    pytest.importorskip("rosbags")
+    from rosbags.rosbag2 import Writer as Rosbag2Writer
+    from rosbags.typesys import Stores, get_typestore
+
+    ts = get_typestore(Stores.ROS2_HUMBLE)
+    bag_dir = tmp_path / "corrupt_bag"
+    StrType = ts.types["std_msgs/msg/String"]
+
+    with Rosbag2Writer(bag_dir, version=Rosbag2Writer.VERSION_LATEST) as writer:
+        conn = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
+        for i, text in enumerate(("first", "second", "third")):
+            msg = StrType(data=text)
+            writer.write(conn, (i + 1) * 1_000_000_000, bytes(ts.serialize_cdr(msg, "std_msgs/msg/String")))
+
+    from rosbags.highlevel import AnyReader
+
+    real_deserialize = AnyReader.deserialize
+    call_count = 0
+
+    def flaky_deserialize(self: Any, raw: bytes, msgtype: str) -> Any:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 2:
+            raise RuntimeError("simulated corrupt message")
+        return real_deserialize(self, raw, msgtype)
+
+    monkeypatch.setattr(AnyReader, "deserialize", flaky_deserialize)
+
+    c = Ros2BagConnector(str(bag_dir))
+    sample = c.extract_sample(10)
+    assert len(sample) == 2  # first + third; second was skipped
+    assert c.skipped == 1
 
 
 def test_binary_skip_increments_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -434,16 +468,16 @@ def test_binary_skip_increments_skipped(monkeypatch: pytest.MonkeyPatch) -> None
 # ---------------------------------------------------------------------------
 rosbags = pytest.importorskip("rosbags", reason="rosbags not installed")
 
-from rosbags.rosbag2 import Writer
-from rosbags.rosbag2.writer import StoragePlugin
-from rosbags.typesys import Stores, get_typestore
+from rosbags.rosbag2 import Writer  # noqa: E402
+from rosbags.rosbag2.writer import StoragePlugin  # noqa: E402
+from rosbags.typesys import Stores, get_typestore  # noqa: E402
 
 
 def _write_test_bag(bag_path: Path, use_mcap: bool = False) -> None:
     """Write a test bag with 3 String messages using rosbags Writer."""
     ts = get_typestore(Stores.ROS2_HUMBLE)
     StringType = ts.types["std_msgs/msg/String"]
-    
+
     storage = StoragePlugin.MCAP if use_mcap else StoragePlugin.SQLITE3
     with Writer(bag_path, version=9, storage_plugin=storage) as writer:
         conn = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
@@ -457,11 +491,11 @@ def test_real_file_mcap_extract_sample(tmp_path: Path) -> None:
     """Write a real mcap file, read it back with extract_sample."""
     mcap_path = tmp_path / "test.mcap"
     _write_test_bag(mcap_path, use_mcap=True)
-    
+
     c = Ros2BagConnector(str(mcap_path))
     # Note: rosbags Writer creates a directory structure even for mcap storage
     assert c._path_form == "dir"
-    
+
     sample = c.extract_sample(10)
     assert len(sample) == 3
     assert sample[0]["topic"] == "/chatter"
@@ -476,10 +510,10 @@ def test_real_file_db3_extract_sample(tmp_path: Path) -> None:
     """Write a real db3 bag directory, read it back with extract_sample."""
     bag_dir = tmp_path / "test_bag"
     _write_test_bag(bag_dir, use_mcap=False)
-    
+
     c = Ros2BagConnector(str(bag_dir))
     assert c._path_form == "dir"
-    
+
     sample = c.extract_sample(10)
     assert len(sample) == 3
     assert sample[0]["payload"] == {"data": "hello"}
@@ -490,10 +524,10 @@ def test_real_file_stream(tmp_path: Path) -> None:
     """Write a real bag, stream it in batches."""
     mcap_path = tmp_path / "test.mcap"
     _write_test_bag(mcap_path, use_mcap=True)
-    
+
     c = Ros2BagConnector(str(mcap_path))
     batches = list(c.stream(batch_size=2))
-    
+
     assert len(batches) == 2  # 2+1
     assert len(batches[0]) == 2
     assert len(batches[1]) == 1
@@ -506,21 +540,21 @@ def test_real_file_topics_filter(tmp_path: Path) -> None:
     """Write a bag with multiple topics, filter with topics parameter."""
     ts = get_typestore(Stores.ROS2_HUMBLE)
     StringType = ts.types["std_msgs/msg/String"]
-    
+
     mcap_path = tmp_path / "test.mcap"
     with Writer(mcap_path, version=9, storage_plugin=StoragePlugin.MCAP) as writer:
         conn1 = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
         conn2 = writer.add_connection("/other", "std_msgs/msg/String", typestore=ts)
-        
+
         msg1 = StringType(data="from_chatter")
         writer.write(conn1, 1000, ts.serialize_cdr(msg1, "std_msgs/msg/String"))
-        
+
         msg2 = StringType(data="from_other")
         writer.write(conn2, 2000, ts.serialize_cdr(msg2, "std_msgs/msg/String"))
-    
+
     c = Ros2BagConnector(str(mcap_path), topics=["/chatter"])
     sample = c.extract_sample(10)
-    
+
     assert len(sample) == 1
     assert sample[0]["topic"] == "/chatter"
     assert sample[0]["payload"] == {"data": "from_chatter"}

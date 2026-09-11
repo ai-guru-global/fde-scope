@@ -1,12 +1,12 @@
 """ROS 2 rosbag connector.
 
-STATUS: skeleton. Real implementation will read a ``rosbag2`` SQLite/mcap
-file, iterate messages on selected topics (joint states, TF, images, grasp
-candidates, task transitions), and expose them as rows.
+Reads a ``rosbag2`` bag directory (``metadata.yaml`` + storage) or a
+standalone ``.mcap`` file via the ``rosbags`` library.  Semantic expanders
+flatten TFMessage (per-transform) and JointState (per-joint); large binary
+types (Image, CompressedImage, PointCloud2) are excluded by default with
+an opt-in metadata-only stub.
 
-Industry note: rosbag2 is the standard record/replay unit for offline eval
-and policy training. /tf carries the time-varying coordinate-frame tree
-that any spatial-reasoning agent must consume.
+Requires the optional ``ros2`` extra: ``pip install 'fde-scope[ros2]'``.
 """
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ class Ros2BagConnector(DataConnector):
                 yield conn.topic, conn.msgtype, timestamp, self._msg_to_dict(msg)
 
     @staticmethod
-    def _msg_to_dict(msg: Any) -> dict[str, Any]:
+    def _msg_to_dict(msg: Any) -> Any:
         """Convert a rosbags-deserialized message object to a plain dict.
 
         rosbags 0.11.x message objects are dataclass-like — they expose
@@ -245,7 +245,7 @@ class Ros2BagConnector(DataConnector):
                 if key != "__msgtype__"
             }
         if isinstance(msg, (list, tuple)):
-            return [Ros2BagConnector._msg_to_dict(item) for item in msg]  # type: ignore[return-value]
+            return [Ros2BagConnector._msg_to_dict(item) for item in msg]
         if isinstance(msg, bytes):
             return msg
         return msg  # primitives pass through
@@ -286,14 +286,28 @@ class Ros2BagConnector(DataConnector):
                     "header_stamp_ns",
                 ):
                     fields.append(
-                        SchemaField(name=name, inferred_type="string" if "frame" in name else "float")
+                        SchemaField(
+                            name=name,
+                            inferred_type="string"
+                            if "frame" in name
+                            else "int"
+                            if name == "header_stamp_ns"
+                            else "float",
+                        )
                     )
                 break
         for _topic, (msg_type, _count) in topic_info.items():
             if msg_type == "sensor_msgs/msg/JointState":
                 for name in ("joint_name", "position", "velocity", "effort", "header_stamp_ns"):
                     fields.append(
-                        SchemaField(name=name, inferred_type="string" if name == "joint_name" else "float")
+                        SchemaField(
+                            name=name,
+                            inferred_type="string"
+                            if name == "joint_name"
+                            else "int"
+                            if name == "header_stamp_ns"
+                            else "float",
+                        )
                     )
                 break
 
