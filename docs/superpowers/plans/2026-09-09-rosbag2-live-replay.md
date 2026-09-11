@@ -889,8 +889,8 @@ def _iter_bag(self) -> Iterator[tuple[str, str, int, dict[str, Any]]]:
     self._validate_path()
     from rosbags.highlevel import AnyReader
 
-    with AnyReader(self.bag_path) as reader:
-        reader.open()
+    # AnyReader takes a sequence of paths; context manager opens/closes.
+    with AnyReader([self.bag_path]) as reader:
         for conn, timestamp, raw in reader.messages():
             try:
                 msg = reader.deserialize(raw, conn.msgtype)
@@ -903,15 +903,17 @@ def _iter_bag(self) -> Iterator[tuple[str, str, int, dict[str, Any]]]:
 def _msg_to_dict(msg: Any) -> dict[str, Any]:
     """Convert a rosbags-deserialized message object to a plain dict.
 
-    rosbags messages expose __slots__; we recurse into nested messages,
-    lists, and primitives. bytes pass through as-is (the binary stub
-    reads len(data) for byte_size).
+    rosbags 0.11.x message objects are dataclass-like — they expose
+    ``__dataclass_fields__`` for field enumeration and ``__msgtype__``
+    for the message type string. We recurse into nested messages and
+    lists. bytes pass through as-is (the binary stub reads len(data)
+    for byte_size). ``__msgtype__`` is excluded from the output.
     """
-    if hasattr(msg, "__slots__"):
+    if hasattr(msg, "__dataclass_fields__"):
         return {
-            slot: Ros2BagConnector._msg_to_dict(getattr(msg, slot, None))
-            for slot in msg.__slots__
-            if not slot.startswith("_")
+            key: Ros2BagConnector._msg_to_dict(val)
+            for key, val in vars(msg).items()
+            if key != "__msgtype__"
         }
     if isinstance(msg, (list, tuple)):
         return [Ros2BagConnector._msg_to_dict(item) for item in msg]  # type: ignore[return-value]
@@ -967,8 +969,7 @@ def discover_schema(self) -> Schema:
     from rosbags.highlevel import AnyReader
 
     topic_info: dict[str, tuple[str, int]] = {}  # topic → (msg_type, msg_count)
-    with AnyReader(self.bag_path) as reader:
-        reader.open()
+    with AnyReader([self.bag_path]) as reader:
         for conn, _timestamp, _raw in reader.messages():
             if conn.topic not in topic_info:
                 topic_info[conn.topic] = (conn.msgtype, 0)
@@ -1148,129 +1149,113 @@ git commit -m "test(ros2): error handling — skip count for binary + deserializ
 
 ---
 
-### Task 8: 真实文件层测试 — rosbags Writer 自产 bag（双格式）
+### Task 8: 真实文件层测试 — rosbags Writer 自产 bag（sqlite3）
 
 **Files:**
 - Modify: `tests/test_ros2_bag.py`
 
 **Interfaces:**
 - Consumes: rosbags 在 dev extra（Task 2）
-- Produces: 自产 bag 双格式（mcap + sqlite3）读写回断言
+- Produces: 自产 sqlite3 bag 读写回断言（rosbags 0.11.5 无 mcap writer，mcap 读取由集成测试覆盖）
 
-- [ ] **Step 1: 写 pytest fixture — 自产 bag**
+**API 实测结论（Task 1）**：
+- Writer: `rosbags.rosbag2.Writer(path, version=Writer.VERSION_LATEST)` — path 必须不存在
+- `add_connection(topic, msgtype, typestore=ts)` — 必须传 typestore
+- `write(conn, timestamp_ns, raw_bytes)` — raw bytes，不是 message 对象
+- 消息构造: `ts.types[msgtype](field=value, ...)` — 直接调用类构造函数
+- 序列化: `bytes(ts.serialize_cdr(msg, msgtype))` — serialize_cdr 返回 memoryview
+- AnyReader: `AnyReader([paths])` — 接受路径列表，context manager 自动 open
+- 消息对象: dataclass-like，用 `__dataclass_fields__` / `vars()` 枚举字段，含 `__msgtype__`
+
+- [ ] **Step 1: 写 pytest fixture — 自产 sqlite3 bag**
 
 ```python
-# --- real-file layer (rosbags Writer self-produces bags) ---
+# --- real-file layer (rosbags Writer self-produces sqlite3 bags) ---
 rosbags = pytest.importorskip("rosbags")
 
-from rosbags.highlevel import AnyWriter
+from rosbags.rosbag2 import Writer as Rosbag2Writer
 from rosbags.typesys import get_typestore, Stores
+
 
 @pytest.fixture(scope="module")
 def typestore():
     return get_typestore(Stores.ROS2_HUMBLE)
 
-def _write_bag(path: Path, ts: Any) -> None:
-    """Self-produce a bag with TFMessage (2 transforms/msg), JointState (3 joints),
-    std_msgs/String, and a small sensor_msgs/Image."""
-    with AnyWriter(path) as writer:
-        # /tf — TFMessage
-        tf_conn = writer.add_connection("/tf", "tf2_msgs/msg/TFMessage")
-        tf_msg = ts.deserialize_ros2(
-            ts.serialize_ros2(
-                ts.create_instance("tf2_msgs/msg/TFMessage", transforms=[
-                    ts.create_instance("geometry_msgs/msg/TransformStamped",
-                        header=ts.create_instance("std_msgs/msg/Header",
-                            stamp=ts.create_instance("builtin_interfaces/msg/Time", sec=1, nanosec=0),
-                            frame_id="odom"),
-                        child_frame_id="base_link",
-                        transform=ts.create_instance("geometry_msgs/msg/Transform",
-                            translation=ts.create_instance("geometry_msgs/msg/Vector3", x=1.0, y=2.0, z=3.0),
-                            rotation=ts.create_instance("geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.0, w=1.0)),
-                    ),
-                    ts.create_instance("geometry_msgs/msg/TransformStamped",
-                        header=ts.create_instance("std_msgs/msg/Header",
-                            stamp=ts.create_instance("builtin_interfaces/msg/Time", sec=1, nanosec=500),
-                            frame_id="base_link"),
-                        child_frame_id="camera_link",
-                        transform=ts.create_instance("geometry_msgs/msg/Transform",
-                            translation=ts.create_instance("geometry_msgs/msg/Vector3", x=0.1, y=0.0, z=0.5),
-                            rotation=ts.create_instance("geometry_msgs/msg/Quaternion", x=0.0, y=0.0, z=0.707, w=0.707)),
-                    ),
-                ]),
-                "tf2_msgs/msg/TFMessage",
+
+def _write_bag(bag_dir: Path, ts: Any) -> None:
+    """Self-produce a sqlite3 bag with TFMessage (2 transforms/msg),
+    JointState (3 joints), std_msgs/String, and a small sensor_msgs/Image.
+
+    ``bag_dir`` must NOT exist yet — Writer refuses to overwrite.
+    """
+    with Rosbag2Writer(bag_dir, version=Rosbag2Writer.VERSION_LATEST) as writer:
+        # /tf — TFMessage with 2 transforms
+        tf_conn = writer.add_connection("/tf", "tf2_msgs/msg/TFMessage", typestore=ts)
+        TFType = ts.types["tf2_msgs/msg/TFMessage"]
+        TSType = ts.types["geometry_msgs/msg/TransformStamped"]
+        HType = ts.types["std_msgs/msg/Header"]
+        TimeType = ts.types["builtin_interfaces/msg/Time"]
+        TrType = ts.types["geometry_msgs/msg/Transform"]
+        V3Type = ts.types["geometry_msgs/msg/Vector3"]
+        QType = ts.types["geometry_msgs/msg/Quaternion"]
+
+        tf_msg = TFType(transforms=[
+            TSType(
+                header=HType(stamp=TimeType(sec=1, nanosec=0), frame_id="odom"),
+                child_frame_id="base_link",
+                transform=TrType(
+                    translation=V3Type(x=1.0, y=2.0, z=3.0),
+                    rotation=QType(x=0.0, y=0.0, z=0.0, w=1.0),
+                ),
             ),
-            "tf2_msgs/msg/TFMessage",
-        )
-        writer.write(tf_conn, 1_000_000_000, tf_msg)
+            TSType(
+                header=HType(stamp=TimeType(sec=1, nanosec=500), frame_id="base_link"),
+                child_frame_id="camera_link",
+                transform=TrType(
+                    translation=V3Type(x=0.1, y=0.0, z=0.5),
+                    rotation=QType(x=0.0, y=0.0, z=0.707, w=0.707),
+                ),
+            ),
+        ])
+        writer.write(tf_conn, 1_000_000_000, bytes(ts.serialize_cdr(tf_msg, "tf2_msgs/msg/TFMessage")))
 
         # /joint_states — JointState (3 joints)
-        js_conn = writer.add_connection("/joint_states", "sensor_msgs/msg/JointState")
-        js_msg = ts.deserialize_ros2(
-            ts.serialize_ros2(
-                ts.create_instance("sensor_msgs/msg/JointState",
-                    header=ts.create_instance("std_msgs/msg/Header",
-                        stamp=ts.create_instance("builtin_interfaces/msg/Time", sec=2, nanosec=0),
-                        frame_id=""),
-                    name=["joint_1", "joint_2", "joint_3"],
-                    position=[1.0, 2.0, 3.0],
-                    velocity=[0.1, 0.2, 0.3],
-                    effort=[10.0, 20.0, 30.0],
-                ),
-                "sensor_msgs/msg/JointState",
-            ),
-            "sensor_msgs/msg/JointState",
+        JSType = ts.types["sensor_msgs/msg/JointState"]
+        js_msg = JSType(
+            header=HType(stamp=TimeType(sec=2, nanosec=0), frame_id=""),
+            name=["joint_1", "joint_2", "joint_3"],
+            position=[1.0, 2.0, 3.0],
+            velocity=[0.1, 0.2, 0.3],
+            effort=[10.0, 20.0, 30.0],
         )
-        writer.write(js_conn, 2_000_000_000, js_msg)
+        js_conn = writer.add_connection("/joint_states", "sensor_msgs/msg/JointState", typestore=ts)
+        writer.write(js_conn, 2_000_000_000, bytes(ts.serialize_cdr(js_msg, "sensor_msgs/msg/JointState")))
 
         # /chatter — std_msgs/String
-        str_conn = writer.add_connection("/chatter", "std_msgs/msg/String")
-        str_msg = ts.deserialize_ros2(
-            ts.serialize_ros2(
-                ts.create_instance("std_msgs/msg/String", data="hello from bag"),
-                "std_msgs/msg/String",
-            ),
-            "std_msgs/msg/String",
-        )
-        writer.write(str_conn, 3_000_000_000, str_msg)
+        StrType = ts.types["std_msgs/msg/String"]
+        str_msg = StrType(data="hello from bag")
+        str_conn = writer.add_connection("/chatter", "std_msgs/msg/String", typestore=ts)
+        writer.write(str_conn, 3_000_000_000, bytes(ts.serialize_cdr(str_msg, "std_msgs/msg/String")))
 
-        # /camera/image — small sensor_msgs/Image (will be excluded by default)
-        img_conn = writer.add_connection("/camera/image", "sensor_msgs/msg/Image")
-        img_msg = ts.deserialize_ros2(
-            ts.serialize_ros2(
-                ts.create_instance("sensor_msgs/msg/Image",
-                    header=ts.create_instance("std_msgs/msg/Header",
-                        stamp=ts.create_instance("builtin_interfaces/msg/Time", sec=3, nanosec=0),
-                        frame_id="camera"),
-                    height=2, width=2, encoding="bgr8", is_bigendian=0, step=6,
-                    data=b"\x00" * 12,
-                ),
-                "sensor_msgs/msg/Image",
-            ),
-            "sensor_msgs/msg/Image",
+        # /camera/image — small sensor_msgs/Image (excluded by default)
+        ImgType = ts.types["sensor_msgs/msg/Image"]
+        img_msg = ImgType(
+            header=HType(stamp=TimeType(sec=3, nanosec=0), frame_id="camera"),
+            height=2, width=2, encoding="bgr8", is_bigendian=0, step=6,
+            data=b"\x00" * 12,
         )
-        writer.write(img_conn, 4_000_000_000, img_msg)
+        img_conn = writer.add_connection("/camera/image", "sensor_msgs/msg/Image", typestore=ts)
+        writer.write(img_conn, 4_000_000_000, bytes(ts.serialize_cdr(img_msg, "sensor_msgs/msg/Image")))
 
 
 @pytest.fixture(scope="module")
 def sqlite_bag(tmp_path_factory: pytest.TempPathFactory, typestore: Any) -> Path:
-    """Self-produced sqlite3 bag (default rosbag2 storage)."""
-    bag_dir = tmp_path_factory.mktemp("bag_sqlite")
+    """Self-produced sqlite3 bag directory."""
+    base = tmp_path_factory.mktemp("bag_sqlite")
+    bag_dir = base / "test_bag"  # must NOT exist yet
     _write_bag(bag_dir, typestore)
     return bag_dir
-
-
-@pytest.fixture(scope="module")
-def mcap_bag(tmp_path_factory: pytest.TempPathFactory, typestore: Any) -> Path:
-    """Self-produced mcap bag."""
-    bag_path = tmp_path_factory.mktemp("bag_mcap") / "recording.mcap"
-    _write_bag(bag_path, typestore)
-    return bag_path
 ```
-
-**Note:** The exact rosbags Writer API (especially `add_connection`, `write`, `create_instance`, `serialize_ros2`/`deserialize_ros2`) must be verified against Task 1's measurement. The code above is a best-guess based on rosbags 0.11.x documentation. The implementer should adjust to match the actual API discovered in Task 1.
-
-If `create_instance` / `serialize_ros2` / `deserialize_ros2` are not the right API, the alternative is to construct messages via the typestore's message classes directly and serialize manually. The key invariant: the fixture must produce a readable bag with known content.
 
 - [ ] **Step 2: 写真实文件测试**
 
@@ -1280,7 +1265,7 @@ def test_sqlite_bag_extract_sample(sqlite_bag: Path) -> None:
     String passes through, Image excluded."""
     c = Ros2BagConnector(str(sqlite_bag))
     sample = c.extract_sample(100)
-    # 1 TF message → 2 rows, 1 JointState → 3 rows, 1 String → 1 row, 1 Image → 0 (excluded)
+    # 1 TF msg → 2 rows, 1 JointState → 3 rows, 1 String → 1 row, 1 Image → 0 (excluded)
     assert len(sample) == 6
     tf_rows = [r for r in sample if r["msg_type"] == "tf2_msgs/msg/TFMessage"]
     assert len(tf_rows) == 2
@@ -1292,13 +1277,6 @@ def test_sqlite_bag_extract_sample(sqlite_bag: Path) -> None:
     assert len(str_rows) == 1
     assert str_rows[0]["payload"] == {"data": "hello from bag"}
     assert c.skipped == 1  # Image
-
-def test_mcap_bag_extract_sample(mcap_bag: Path) -> None:
-    """Same assertions for mcap format."""
-    c = Ros2BagConnector(str(mcap_bag))
-    sample = c.extract_sample(100)
-    assert len(sample) == 6
-    assert c.skipped == 1
 
 def test_sqlite_bag_stream_batches(sqlite_bag: Path) -> None:
     c = Ros2BagConnector(str(sqlite_bag))
@@ -1323,22 +1301,21 @@ def test_include_binary_produces_stub(sqlite_bag: Path) -> None:
     assert img_rows[0]["height"] == 2
     assert img_rows[0]["encoding"] == "bgr8"
     assert img_rows[0]["byte_size"] == 12
-    assert "data" not in img_rows[0] or img_rows[0].get("byte_size") == 12  # no raw data
 ```
 
 - [ ] **Step 3: 运行真实文件测试**
 
 ```bash
-pytest tests/test_ros2_bag.py -v -k "sqlite_bag or mcap_bag or include_binary_produces"
+pytest tests/test_ros2_bag.py -v -k "sqlite_bag or include_binary_produces"
 ```
 
-预期：全绿。若 rosbags Writer API 与 Task 1 实测不符，调整 fixture 代码。
+预期：全绿。
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add tests/test_ros2_bag.py
-git commit -m "test(ros2): real-file layer — self-produced bag dual format (mcap + sqlite3)"
+git commit -m "test(ros2): real-file layer — self-produced sqlite3 bag roundtrip"
 ```
 
 ---
