@@ -27,7 +27,7 @@ def test_registry_resolves_industrial_connector(slug: str) -> None:
 
 
 @pytest.mark.parametrize("slug", INDUSTRIAL_SLUGS)
-def test_discover_schema_returns_valid_schema(slug: str) -> None:
+def test_discover_schema_returns_valid_schema(slug: str, tmp_path, monkeypatch) -> None:
     """discover_schema must work without optional deps and return a Schema."""
     from fde_scope.connectors.schema import Schema
 
@@ -36,11 +36,23 @@ def test_discover_schema_returns_valid_schema(slug: str) -> None:
     src = {
         "opcua": "opc.tcp://localhost:4840",
         "mqtt_sparkplug": "tcp://localhost:1883",
-        "ros2_bag": "/tmp/does_not_exist",
+        "ros2_bag": str(tmp_path / "recording.mcap"),  # valid .mcap path form
         "mes": "https://mes.example.com",
         "historian": "https://pi.example.com",
     }[slug]
     connector = cls(src)
+    if slug == "ros2_bag":
+        # ros2_bag is no longer a stub: monkeypatch the driver + bag iterator
+        monkeypatch.setattr(connector, "_ensure_driver", lambda: None)
+        monkeypatch.setattr(connector, "_iter_bag", lambda: iter([]))
+        # discover_schema opens AnyReader directly — mock it to yield no messages
+        import contextlib
+        import unittest.mock
+
+        monkeypatch.setattr(
+            "rosbags.highlevel.AnyReader",
+            lambda paths: contextlib.nullcontext(unittest.mock.MagicMock(messages=lambda: iter([]))),
+        )
     schema = connector.discover_schema()
     assert isinstance(schema, Schema)
     # Schema must carry its source and at least declare its fields list.
@@ -49,19 +61,26 @@ def test_discover_schema_returns_valid_schema(slug: str) -> None:
 
 
 @pytest.mark.parametrize("slug", INDUSTRIAL_SLUGS)
-def test_extract_sample_returns_list(slug: str) -> None:
+def test_extract_sample_returns_list(slug: str, tmp_path, monkeypatch) -> None:
     cls = get(slug)
-    connector = cls("placeholder://source")
+    src = str(tmp_path / "recording.mcap") if slug == "ros2_bag" else "placeholder://source"
+    connector = cls(src)
+    if slug == "ros2_bag":
+        monkeypatch.setattr(connector, "_ensure_driver", lambda: None)
+        monkeypatch.setattr(connector, "_iter_bag", lambda: iter([]))
     sample = connector.extract_sample(10)
     assert isinstance(sample, list)
-    # Stubs return []; that's the documented contract (not a crash).
 
 
 @pytest.mark.parametrize("slug", INDUSTRIAL_SLUGS)
-def test_stream_is_iterable(slug: str) -> None:
+def test_stream_is_iterable(slug: str, tmp_path, monkeypatch) -> None:
     """stream() must return an iterable of Batch (even if empty for stubs)."""
     cls = get(slug)
-    connector = cls("placeholder://source")
+    src = str(tmp_path / "recording.mcap") if slug == "ros2_bag" else "placeholder://source"
+    connector = cls(src)
+    if slug == "ros2_bag":
+        monkeypatch.setattr(connector, "_ensure_driver", lambda: None)
+        monkeypatch.setattr(connector, "_iter_bag", lambda: iter([]))
     batches = list(connector.stream())
     assert isinstance(batches, list)
 

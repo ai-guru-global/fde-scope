@@ -275,3 +275,116 @@ def test_expand_false_falls_back_to_payload() -> None:
     # No per-transform fields — just the raw payload
     assert "child_frame_id" not in rows[0]
     assert rows[0]["payload"] == msg
+
+
+# ---------------------------------------------------------------------------
+# three-step contract (contract layer, no rosbags)
+# ---------------------------------------------------------------------------
+def test_topics_filter_excludes_non_matching(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When topics is set, only matching messages pass through."""
+    c = Ros2BagConnector("dummy.mcap", topics=["/joint_states"])
+    fake_msgs = [
+        ("/tf", "tf2_msgs/msg/TFMessage", 100, {"transforms": []}),
+        (
+            "/joint_states",
+            "sensor_msgs/msg/JointState",
+            200,
+            {
+                "name": ["j1"],
+                "position": [1.0],
+                "velocity": [0.1],
+                "effort": [10.0],
+                "header": {"stamp": {"sec": 1, "nanosec": 0}},
+            },
+        ),
+    ]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    rows = c.extract_sample(10)
+    assert len(rows) == 1
+    assert rows[0]["topic"] == "/joint_states"
+    assert rows[0]["joint_name"] == "j1"
+
+
+def test_topics_empty_means_all(monkeypatch: pytest.MonkeyPatch) -> None:
+    """topics=[] (default) -> no filtering, all messages pass."""
+    c = Ros2BagConnector("dummy.mcap")
+    fake_msgs = [
+        ("/tf", "tf2_msgs/msg/TFMessage", 100, {"transforms": []}),
+        ("/chatter", "std_msgs/msg/String", 200, {"data": "hello"}),
+    ]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    rows = c.extract_sample(10)
+    # TFMessage with empty transforms -> 0 rows; String -> 1 row
+    assert len(rows) == 1
+    assert rows[0]["topic"] == "/chatter"
+
+
+def test_stream_rejects_invalid_batch_size() -> None:
+    c = Ros2BagConnector("dummy.mcap")
+    for bad in (0, -1):
+        with pytest.raises(ValueError, match="batch_size"):
+            list(c.stream(batch_size=bad))
+
+
+def test_extract_sample_with_fake_iter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Contract test: extract_sample reads from _iter_bag, normalizes, returns n rows."""
+    c = Ros2BagConnector("dummy.mcap")
+    fake_msgs = [
+        ("/chatter", "std_msgs/msg/String", 100, {"data": "hello"}),
+        ("/chatter", "std_msgs/msg/String", 200, {"data": "world"}),
+        ("/chatter", "std_msgs/msg/String", 300, {"data": "foo"}),
+    ]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    sample = c.extract_sample(2)
+    assert len(sample) == 2
+    assert sample[0]["payload"] == {"data": "hello"}
+    assert sample[1]["payload"] == {"data": "world"}
+
+
+def test_stream_with_fake_iter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Contract test: stream yields Batch objects with correct source."""
+    c = Ros2BagConnector("dummy.mcap")
+    fake_msgs = [("/chatter", "std_msgs/msg/String", i * 100, {"data": f"msg{i}"}) for i in range(5)]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    batches = list(c.stream(batch_size=2))
+    assert len(batches) == 3  # 2+2+1
+    assert sum(len(b) for b in batches) == 5
+    assert batches[0].source == "dummy.mcap"
+
+
+def test_stream_with_expanded_messages(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stream with TF expansion: 1 message -> 2 rows."""
+    c = Ros2BagConnector("dummy.mcap")
+    fake_msgs = [
+        (
+            "/tf",
+            "tf2_msgs/msg/TFMessage",
+            100,
+            {
+                "transforms": [
+                    {
+                        "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": "odom"},
+                        "child_frame_id": "base_link",
+                        "transform": {
+                            "translation": {"x": 1.0, "y": 0.0, "z": 0.0},
+                            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        },
+                    },
+                    {
+                        "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": "base_link"},
+                        "child_frame_id": "camera_link",
+                        "transform": {
+                            "translation": {"x": 0.1, "y": 0.0, "z": 0.5},
+                            "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        },
+                    },
+                ]
+            },
+        ),
+    ]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    batches = list(c.stream(batch_size=10))
+    assert len(batches) == 1
+    assert len(batches[0]) == 2
+    assert batches[0][0]["child_frame_id"] == "base_link"
+    assert batches[0][1]["child_frame_id"] == "camera_link"
