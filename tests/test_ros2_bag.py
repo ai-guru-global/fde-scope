@@ -7,6 +7,7 @@ self-produces bags (dual format). Integration: env-gated real bag.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -523,3 +524,23 @@ def test_real_file_topics_filter(tmp_path: Path) -> None:
     assert len(sample) == 1
     assert sample[0]["topic"] == "/chatter"
     assert sample[0]["payload"] == {"data": "from_chatter"}
+
+
+# ---------------------------------------------------------------------------
+# Real-bag integration test (opt-in via env var)
+# ---------------------------------------------------------------------------
+@pytest.mark.ros2
+def test_ros2_real_bag_smoke() -> None:
+    """End-to-end against a real recorded bag. Skipped unless FDE_SCOPE_ROS2_BAG
+    is set. The bag should contain at least /tf or /joint_states."""
+    bag_path = os.environ.get("FDE_SCOPE_ROS2_BAG")
+    if not bag_path:
+        pytest.skip("FDE_SCOPE_ROS2_BAG not set; skipping real-bag integration test")
+    pytest.importorskip("rosbags")
+    c = Ros2BagConnector(bag_path)
+    schema = c.discover_schema()
+    assert schema.row_count is not None and schema.row_count > 0
+    sample = c.extract_sample(50)
+    assert sample, "no messages extracted from real bag"
+    assert sample[0]["topic"]
+    assert sample[0]["msg_type"]
