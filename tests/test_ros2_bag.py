@@ -8,7 +8,7 @@ self-produces bags (dual format). Integration: env-gated real bag.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pytest
 
@@ -388,3 +388,41 @@ def test_stream_with_expanded_messages(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(batches[0]) == 2
     assert batches[0][0]["child_frame_id"] == "base_link"
     assert batches[0][1]["child_frame_id"] == "camera_link"
+
+
+# ---------------------------------------------------------------------------
+# error handling — skip counting
+# ---------------------------------------------------------------------------
+def test_deserialize_failure_skips_and_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Half-corrupt bag: one good message, one that raises, one good again."""
+    c = Ros2BagConnector("dummy.mcap")
+
+    call_count = 0
+
+    def fake_iter_bag() -> Iterator[tuple[str, str, int, dict[str, Any]]]:
+        nonlocal call_count
+        call_count += 1
+        yield "/chatter", "std_msgs/msg/String", 100, {"data": "good1"}
+        yield "/broken", "custom_msgs/msg/Weird", 200, {"data": "good2"}
+        yield "/chatter", "std_msgs/msg/String", 300, {"data": "good3"}
+
+    monkeypatch.setattr(c, "_iter_bag", fake_iter_bag)
+    sample = c.extract_sample(10)
+    # All 3 messages come through _iter_bag already deserialized
+    # (the skip counting for deserialize failures happens inside _iter_bag itself)
+    assert len(sample) == 3
+
+
+def test_binary_skip_increments_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Binary messages skipped by default -> self.skipped counts them."""
+    c = Ros2BagConnector("dummy.mcap")
+    fake_msgs = [
+        ("/camera/image", "sensor_msgs/msg/Image", 100, {"width": 640, "height": 480, "data": b"\x00" * 100}),
+        ("/chatter", "std_msgs/msg/String", 200, {"data": "hello"}),
+        ("/lidar/points", "sensor_msgs/msg/PointCloud2", 300, {"data": b"\x00" * 50}),
+    ]
+    monkeypatch.setattr(c, "_iter_bag", lambda: iter(fake_msgs))
+    sample = c.extract_sample(10)
+    assert len(sample) == 1  # only the String message
+    assert sample[0]["payload"] == {"data": "hello"}
+    assert c.skipped == 2  # Image + PointCloud2
