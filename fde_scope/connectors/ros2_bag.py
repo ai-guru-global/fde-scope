@@ -26,9 +26,67 @@ _BINARY_TYPES: frozenset[str] = frozenset({
     "sensor_msgs/msg/PointCloud2",
 })
 
-# msg_type → expander callable. Populated in Task 5; empty dict means
-# all non-binary types fall through to the payload JSON fallback.
+# msg_type → expander callable. Populated below with TF and JointState expanders.
 _EXPANDERS: dict[str, Any] = {}
+
+
+def _stamp_to_ns(stamp: Any) -> int:
+    """Convert a ROS2 Time-like dict {sec, nanosec} to nanoseconds."""
+    if isinstance(stamp, dict):
+        return int(stamp.get("sec", 0)) * 10**9 + int(stamp.get("nanosec", 0))
+    return 0
+
+
+def _expand_tf(msg: dict[str, Any]) -> list[dict[str, Any]]:
+    """TFMessage → one row per transform."""
+    transforms = msg.get("transforms", [])
+    rows = []
+    for tf in transforms:
+        if not isinstance(tf, dict):
+            continue
+        header = tf.get("header", {})
+        transform = tf.get("transform", {})
+        trans = transform.get("translation", {})
+        rot = transform.get("rotation", {})
+        rows.append({
+            "frame_id": header.get("frame_id", ""),
+            "child_frame_id": tf.get("child_frame_id", ""),
+            "tx": trans.get("x", 0.0),
+            "ty": trans.get("y", 0.0),
+            "tz": trans.get("z", 0.0),
+            "qx": rot.get("x", 0.0),
+            "qy": rot.get("y", 0.0),
+            "qz": rot.get("z", 0.0),
+            "qw": rot.get("w", 1.0),
+            "header_stamp_ns": _stamp_to_ns(header.get("stamp")),
+        })
+    return rows
+
+
+def _expand_joint_state(msg: dict[str, Any]) -> list[dict[str, Any]]:
+    """JointState → one row per joint (zip truncates to shortest)."""
+    header = msg.get("header", {})
+    names = msg.get("name", [])
+    positions = msg.get("position", [])
+    velocities = msg.get("velocity", [])
+    efforts = msg.get("effort", [])
+    rows = []
+    for name, pos, vel, eff in zip(names, positions, velocities, efforts):
+        rows.append({
+            "joint_name": name,
+            "position": pos,
+            "velocity": vel,
+            "effort": eff,
+            "header_stamp_ns": _stamp_to_ns(header.get("stamp")),
+        })
+    return rows
+
+
+# Populate the _EXPANDERS dict with semantic expanders.
+_EXPANDERS.update({
+    "tf2_msgs/msg/TFMessage": _expand_tf,
+    "sensor_msgs/msg/JointState": _expand_joint_state,
+})
 
 
 @register

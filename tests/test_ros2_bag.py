@@ -143,3 +143,135 @@ def test_compressed_image_skipped_by_default() -> None:
         msg={"format": "jpeg", "data": b"\xff\xd8\xff"},
     )
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# expanders
+# ---------------------------------------------------------------------------
+def test_tf_message_expands_per_transform() -> None:
+    """One TFMessage with 2 transforms → 2 rows, each with frame fields."""
+    c = Ros2BagConnector("dummy.mcap")
+    msg = {
+        "transforms": [
+            {
+                "header": {"stamp": {"sec": 1, "nanosec": 0}},
+                "child_frame_id": "base_link",
+                "transform": {
+                    "translation": {"x": 1.0, "y": 2.0, "z": 3.0},
+                    "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                },
+            },
+            {
+                "header": {"stamp": {"sec": 1, "nanosec": 500}},
+                "child_frame_id": "camera_link",
+                "transform": {
+                    "translation": {"x": 0.1, "y": 0.0, "z": 0.5},
+                    "rotation": {"x": 0.0, "y": 0.0, "z": 0.707, "w": 0.707},
+                },
+            },
+        ]
+    }
+    rows = c._normalize(
+        topic="/tf",
+        msg_type="tf2_msgs/msg/TFMessage",
+        timestamp_ns=1_000_000_000,
+        msg=msg,
+    )
+    assert len(rows) == 2
+    assert rows[0]["child_frame_id"] == "base_link"
+    assert rows[0]["tx"] == 1.0
+    assert rows[0]["ty"] == 2.0
+    assert rows[0]["tz"] == 3.0
+    assert rows[0]["qx"] == 0.0
+    assert rows[0]["qy"] == 0.0
+    assert rows[0]["qz"] == 0.0
+    assert rows[0]["qw"] == 1.0
+    assert rows[0]["header_stamp_ns"] == 1_000_000_000  # sec=1, nanosec=0
+    assert rows[1]["child_frame_id"] == "camera_link"
+    assert rows[1]["tx"] == 0.1
+
+
+def test_tf_message_empty_transforms() -> None:
+    c = Ros2BagConnector("dummy.mcap")
+    rows = c._normalize(
+        topic="/tf",
+        msg_type="tf2_msgs/msg/TFMessage",
+        timestamp_ns=100,
+        msg={"transforms": []},
+    )
+    assert rows == []
+
+
+def test_joint_state_expands_per_joint() -> None:
+    """One JointState with 3 joints → 3 rows."""
+    c = Ros2BagConnector("dummy.mcap")
+    msg = {
+        "header": {"stamp": {"sec": 2, "nanosec": 500_000_000}},
+        "name": ["joint_1", "joint_2", "joint_3"],
+        "position": [1.0, 2.0, 3.0],
+        "velocity": [0.1, 0.2, 0.3],
+        "effort": [10.0, 20.0, 30.0],
+    }
+    rows = c._normalize(
+        topic="/joint_states",
+        msg_type="sensor_msgs/msg/JointState",
+        timestamp_ns=2_500_000_000,
+        msg=msg,
+    )
+    assert len(rows) == 3
+    assert rows[0]["joint_name"] == "joint_1"
+    assert rows[0]["position"] == 1.0
+    assert rows[0]["velocity"] == 0.1
+    assert rows[0]["effort"] == 10.0
+    assert rows[0]["header_stamp_ns"] == 2_500_000_000
+    assert rows[2]["joint_name"] == "joint_3"
+    assert rows[2]["position"] == 3.0
+
+
+def test_joint_state_mismatched_lengths_truncated() -> None:
+    """If name/position/velocity/effort have different lengths, zip truncates."""
+    c = Ros2BagConnector("dummy.mcap")
+    msg = {
+        "header": {"stamp": {"sec": 0, "nanosec": 0}},
+        "name": ["j1", "j2"],
+        "position": [1.0],  # shorter than name
+        "velocity": [0.1],
+        "effort": [10.0],
+    }
+    rows = c._normalize(
+        topic="/joint_states",
+        msg_type="sensor_msgs/msg/JointState",
+        timestamp_ns=100,
+        msg=msg,
+    )
+    # zip truncates to shortest → 1 row
+    assert len(rows) == 1
+    assert rows[0]["joint_name"] == "j1"
+    assert rows[0]["position"] == 1.0
+
+
+def test_expand_false_falls_back_to_payload() -> None:
+    """expand=True is default; expand=False must skip all expanders."""
+    c = Ros2BagConnector("dummy.mcap", expand=False)
+    msg = {
+        "transforms": [
+            {
+                "header": {"stamp": {"sec": 1, "nanosec": 0}},
+                "child_frame_id": "base_link",
+                "transform": {
+                    "translation": {"x": 1.0, "y": 2.0, "z": 3.0},
+                    "rotation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                },
+            },
+        ]
+    }
+    rows = c._normalize(
+        topic="/tf",
+        msg_type="tf2_msgs/msg/TFMessage",
+        timestamp_ns=100,
+        msg=msg,
+    )
+    assert len(rows) == 1
+    # No per-transform fields — just the raw payload
+    assert "child_frame_id" not in rows[0]
+    assert rows[0]["payload"] == msg
