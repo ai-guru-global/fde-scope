@@ -41,6 +41,7 @@ dependencies = [
 #                  channel. The mode fallback itself (non-read-only unmatched
 #                  → ASK/DENY) is line-identical across the window (verified
 #                  against 2.0.7 sources, 2026-08-28).
+#   2.0.8          green — full suite incl. `pytest -m agentscope` (2026-09-22).
 # Sub-extras are required, not cosmetic: on 2.0.7 `OllamaChatModel.__init__`
 # (the placeholder tenant_manager builds) imports `ollama`, and the app scheduler
 # tools create_app registers import `apscheduler`. `ollama` is the extra name on

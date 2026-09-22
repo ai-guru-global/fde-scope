@@ -6,7 +6,7 @@
 > 两类场景。构建在 AgentScope 2.0 之上。
 >
 > 本文档是完整功能清单。所有条目均为有测试覆盖的可执行代码;数量类承诺
-> (18 阶段 / 10 门禁 / 32 路由…)由
+> (18 阶段 / 10 门禁 / 33 路由…)由
 > [架构守卫测试](../tests/test_architecture_guard.py) 钉死。
 >
 > English version: [`docs/features-en.md`](features-en.md)
@@ -130,7 +130,7 @@ flowchart TD
 | 表面 | 形态 | 功能 |
 |---|---|---|
 | CLI | `fde-scope` | 13 组命令:connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web 控制台 | FastAPI 单页,32 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图 |
+| Web 控制台 | FastAPI 单页,33 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图 |
 | QwenPaw PawApp | 桌面插件 | `/api/fde-scope` 下 18 路由 + 2 个 agent 工具 + skill provider,与 Web 同一引擎 |
 | macOS App | universal2 DMG | 双击即用;同一 FastAPI 对象(127.0.0.1:8737),单实例守护 + 健康检查 + 崩溃兜底 |
 
@@ -164,7 +164,7 @@ flowchart LR
 | Salesforce | `salesforce` | 同上 |
 | MES(ISA-95) | `mes` | 同上 |
 | Historian | `historian` | 同上 |
-| ROS2 bag | `ros2` | 接口(rosbags 真实回放在 roadmap) |
+| ROS2 bag | `ros2` | rosbags 真实回放(rosbags>=0.11 驱动;mock + 真 bag env-gated 测试) |
 | 文档解析 | — | PDF / Word / Excel / PPT(lazy import) |
 
 所有连接器统一 schema 预览 + 样本接口;sample 工具每调用上限 `MAX_TOOL_ROWS = 50` 行
@@ -261,7 +261,7 @@ runbook + eval 报告 + SLO + 培训材料组装为签收包;`fde-scope handoff 
 `tests/test_architecture_guard.py` 契约测试钉死。验证锚点:
 
 ```bash
-make test                                   # 全量套件(~89% 覆盖)
+make test                                   # 全量套件(~91% 覆盖)
 pytest -m agentscope                        # 真库运行时测试
 pytest tests/test_architecture_guard.py     # 契约守卫
 ruff check fde_scope tests && ruff format --check fde_scope tests
@@ -288,7 +288,6 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 
 ## 17. 尚未完成(Roadmap)
 
-- rosbag2 真实回放(rosbags)
 - `deploy --serve` 端到端实测(Redis 后端 + 可达模型)
 - Zammad / Salesforce / MES / Historian 完整 HTTP/SQL 实现
 - AgentScope Studio(`@agentscope/studio`)集成

@@ -7,7 +7,7 @@
 > `manufacturing` profile). Built on AgentScope 2.0.
 >
 > This is the full feature list. Every item is executable code with test
-> coverage; the count-level promises (18 phases / 10 gates / 32 routes…) are
+> coverage; the count-level promises (18 phases / 10 gates / 33 routes…) are
 > pinned by the [architecture guard suite](../tests/test_architecture_guard.py).
 >
 > 中文版:[`docs/features.md`](features.md)
@@ -139,7 +139,7 @@ from a clean pass.
 | Surface | Form | What it does |
 |---|---|---|
 | CLI | `fde-scope` | 13 command groups: connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web console | FastAPI single page, 32 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser |
+| Web console | FastAPI single page, 33 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser |
 | QwenPaw PawApp | Desktop plugin | 18 routes under `/api/fde-scope` + 2 agent tools + skill provider, same engine |
 | macOS App | universal2 DMG | Double-click; same FastAPI object (127.0.0.1:8737), single-instance guard + health check + crash fallback |
 
@@ -176,7 +176,7 @@ the next retrain.
 | Salesforce | `salesforce` | Same |
 | MES (ISA-95) | `mes` | Same |
 | Historian | `historian` | Same |
-| ROS2 bag | `ros2` | Interface (real rosbags replay on roadmap) |
+| ROS2 bag | `ros2` | Real rosbags replay (rosbags>=0.11 driver; mock + real-bag env-gated tests) |
 | Document parsers | — | PDF / Word / Excel / PPT (lazy import) |
 
 All connectors share one schema-preview + samples interface; sample tools cap
@@ -290,7 +290,7 @@ channel / measured AgentScope window quoted consistently), pinned by
 `tests/test_architecture_guard.py`. Verification anchors:
 
 ```bash
-make test                                   # full suite (~89% coverage)
+make test                                   # full suite (~91% coverage)
 pytest -m agentscope                        # real-library runtime tests
 pytest tests/test_architecture_guard.py     # contract guards
 ruff check fde_scope tests && ruff format --check fde_scope tests
@@ -317,7 +317,6 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 
 ## 17. Not done yet (roadmap)
 
-- rosbag2 real replay (rosbags)
 - `deploy --serve` end-to-end validation (Redis backend + reachable model)
 - Full Zammad / Salesforce / MES / Historian HTTP/SQL implementations
 - AgentScope Studio (npm `@agentscope/studio`) integration

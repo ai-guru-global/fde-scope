@@ -41,6 +41,14 @@ def test_discover_schema_returns_valid_schema(slug: str, tmp_path, monkeypatch) 
         "historian": "https://pi.example.com",
     }[slug]
     connector = cls(src)
+    if slug == "opcua":
+        # discover_schema takes the real-browse path whenever asyncua is
+        # importable ([full] profile), so pin the no-driver fallback this
+        # test is about instead of depending on the installed extras.
+        def _no_driver() -> None:
+            raise ImportError("simulated: asyncua not installed")
+
+        monkeypatch.setattr(connector, "_ensure_driver", _no_driver)
     if slug == "ros2_bag":
         # ros2_bag is no longer a stub: monkeypatch the driver + bag iterator
         monkeypatch.setattr(connector, "_ensure_driver", lambda: None)

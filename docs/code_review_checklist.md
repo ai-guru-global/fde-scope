@@ -84,5 +84,5 @@
 .venv/bin/ruff check fde_scope tests
 .venv/bin/ruff format --check fde_scope tests
 .venv/bin/mypy fde_scope
-.venv/bin/python -m pytest          # 263 passed, 3 skipped（基线）
+.venv/bin/python -m pytest          # 579 passed, 4 skipped（基线，.[full] 环境；4 跳过 = mysql/opcua/mqtt/ros2 真实服务集成测试）
 ```
