@@ -75,7 +75,7 @@ def station_kpi_jsonl(tmp_path: Path) -> Path:
 # ---------------------------------------------------------------------------
 def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample_csv: Path) -> None:
     """Walk a manufacturing engagement end-to-end through all 4 zones."""
-    ctx = EngagementContext(id="bmw-e2e", customer="BMW Spartanburg", profile="manufacturing")
+    ctx = EngagementContext(id="aurora-e2e", customer="Aurora Motors", profile="manufacturing")
     eng = Engagement(ctx)
 
     # ---- Zone A: Pre-engagement ------------------------------------------
@@ -175,7 +175,7 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
 
     # runbook renders
     runbook = render_runbook(eng.ctx)
-    assert "BMW Spartanburg" in runbook
+    assert "Aurora Motors" in runbook
     assert "SLO" in runbook
     eng.advance()  # → monitoring_drift
     eng.advance()  # → change_mgmt_training
@@ -193,8 +193,8 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     eng.advance()  # → knowledge_transfer
     pkg = build_handoff_package(
         eng.ctx,
-        runbook_path="reports/runbook_bmw.md",
-        eval_report_path="reports/eval_bmw.html",
+        runbook_path="reports/runbook_aurora.md",
+        eval_report_path="reports/eval_aurora.html",
         training_material="docs/operator_training.md",
         customer_accepted=True,
     )
@@ -204,7 +204,7 @@ def test_full_manufacturing_engagement_lifecycle(station_kpi_jsonl: Path, sample
     # handoff_signoff gate — now satisfied
     assert eng.evaluate_gate("handoff_signoff").passed
     summary = render_handoff_summary(eng.ctx)
-    assert "BMW Spartanburg" in summary
+    assert "Aurora Motors" in summary
     assert "✅" in summary  # customer accepted
 
     # The engagement is terminal + complete

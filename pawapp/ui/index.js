@@ -1178,7 +1178,7 @@
           h("div", null,
             h("div", { style: { fontSize: 12, color: C.muted, marginBottom: 4 } }, "客户名"),
             h(Input, {
-              placeholder: "如 BMW Spartanburg",
+              placeholder: "如 Aurora Motors",
               value: form.customer,
               onChange: function (e) { setForm({ customer: e.target.value, profile: form.profile }); },
             })

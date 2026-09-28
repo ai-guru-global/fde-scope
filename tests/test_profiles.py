@@ -151,9 +151,9 @@ def test_manufacturing_dpmo_pools_only_opportunity_samples() -> None:
 
 # -- handoff -----------------------------------------------------------------
 def test_handoff_package_builds_and_renders() -> None:
-    ctx = EngagementContext(id="m1", customer="BMW", profile="manufacturing")
+    ctx = EngagementContext(id="m1", customer="Aurora Motors", profile="manufacturing")
     pkg = build_handoff_package(ctx, runbook_path="r.md", eval_report_path="e.html", customer_accepted=True)
     assert pkg["customer_accepted"] is True
     assert pkg["runbook"] == "r.md"
     summary = render_handoff_summary(ctx)
-    assert "BMW" in summary
+    assert "Aurora Motors" in summary

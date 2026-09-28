@@ -285,7 +285,7 @@ def test_build_subagent_templates_uses_2_0_blueprints(
 def test_build_deploy_plan_binds_configured_sources() -> None:
     plan = build_deploy_plan(
         {
-            "tenant": "caocao",
+            "tenant": "swift",
             "sources": {"csv": "data/t.csv", "documents": "docs/"},
             "agents": [{"name": "analyst", "role": "数据分析"}, {"name": "archivist", "role": "文件分析"}],
         }
@@ -299,7 +299,7 @@ def test_build_deploy_plan_binds_configured_sources() -> None:
     ]
     # mysql belongs to the data role but nobody told it where the database is.
     assert plan["summary"]["unbound_tools"] == ["mes_sample", "mes_schema", "mysql_sample", "mysql_schema"]
-    assert plan["manifest"]["tenant_id"] == "caocao"
+    assert plan["manifest"]["tenant_id"] == "swift"
 
 
 def test_build_deploy_plan_is_always_a_plan_never_a_runtime() -> None:

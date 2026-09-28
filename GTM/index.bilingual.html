@@ -413,6 +413,14 @@ section{padding:96px 0 0}
 .lists-col li .zh{display:block;color:var(--paper-dim);font-size:.78rem;line-height:1.6}
 .lists-note{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;color:var(--text-dim);margin-top:22px;border-top:1px solid var(--line);padding-top:14px}
 
+/* ── pricing tiers ─────────────────────────────── */
+.lists-col.tier-featured{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange),inset 0 1px 0 rgba(230,237,246,.06)}
+.tier-price{font-family:var(--mono);font-weight:600;font-size:1.45rem;color:var(--text);margin:12px 0 0;line-height:1.2}
+.tier-price small{font-size:.7rem;font-weight:400;letter-spacing:.06em;color:var(--text-dim)}
+.tier-note{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;color:var(--amber);margin-top:6px}
+.tier-cta{margin-top:18px}
+.tier-cta .steelbtn{width:100%;justify-content:center}
+
 /* ── close ─────────────────────────────────────── */
 .close{padding:120px 0 90px;text-align:left}
 .close h2{
@@ -490,6 +498,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP DOCS</a>
       <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS · 技能库</a>
       <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">RESOLVEAGENT ↗</a>
+      <a href="#pricing">PRICING · 定价</a>
+      <a href="#contact">CONTACT · 联系</a>
       <a href="#crib">QUICK START</a>
     </nav>
   </div>
@@ -726,12 +736,12 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <div class="ledger">
       <div class="ledger-head"><span>Customer · 客户</span><span>Profile</span><span>Phase</span><span>Story · 状态故事</span><span>State</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">古茗 · tea chain</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">15/15</span><span class="ledger-story">Full handoff package, customer accepted.<span class="zh" lang="zh">完整交接包，客户签收。</span></span><span class="ledger-state st-passed"><i></i>SIGNED</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">一汽-大众 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">11/18</span><span class="ledger-story">9/9 industrial gates passed: 3 shifts, works council, PL d / SIL 2, HAZOP.<span class="zh" lang="zh">9/9 工业门禁通过：三班制、共决、PL d/SIL 2、HAZOP。</span></span><span class="ledger-state st-running"><i></i>RUNBOOK</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">广汽 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">9/18</span><span class="ledger-story">FAT/SAT + functional safety + conformity genuinely blocked → advance refused.<span class="zh" lang="zh">FAT/SAT、功能安全与合规真实阻断 → 拒绝推进。</span></span><span class="ledger-state st-blocked"><i></i>BLOCKED</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">一汽 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">13/15</span><span class="ledger-story">Productization flywheel running.<span class="zh" lang="zh">产品化飞轮运转中。</span></span><span class="ledger-state st-running"><i></i>FLYWHEEL</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">曹操出行 · ride-hailing</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">8/15</span><span class="ledger-story">Real-data prototyping, SLO defined.<span class="zh" lang="zh">真实数据原型，SLO 已定义。</span></span><span class="ledger-state st-running"><i></i>PROTOTYPE</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">易点天下 · outbound SaaS</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">3/15</span><span class="ledger-story">Single-sponsor blocker: the Sponsor Collapse anti-pattern, caught.<span class="zh" lang="zh">单一发起人阻断，即 Sponsor Collapse 反模式，被门禁拦下。</span></span><span class="ledger-state st-blocked"><i></i>BLOCKED</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">茶语万象 · tea chain</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">15/15</span><span class="ledger-story">Full handoff package, customer accepted.<span class="zh" lang="zh">完整交接包，客户签收。</span></span><span class="ledger-state st-passed"><i></i>SIGNED</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">亚特联汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">11/18</span><span class="ledger-story">9/9 industrial gates passed: 3 shifts, works council, PL d / SIL 2, HAZOP.<span class="zh" lang="zh">9/9 工业门禁通过：三班制、共决、PL d/SIL 2、HAZOP。</span></span><span class="ledger-state st-running"><i></i>RUNBOOK</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">南湾汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">9/18</span><span class="ledger-story">FAT/SAT + functional safety + conformity genuinely blocked → advance refused.<span class="zh" lang="zh">FAT/SAT、功能安全与合规真实阻断 → 拒绝推进。</span></span><span class="ledger-state st-blocked"><i></i>BLOCKED</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">北疆汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">13/15</span><span class="ledger-story">Productization flywheel running.<span class="zh" lang="zh">产品化飞轮运转中。</span></span><span class="ledger-state st-running"><i></i>FLYWHEEL</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">迅捷出行 · ride-hailing</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">8/15</span><span class="ledger-story">Real-data prototyping, SLO defined.<span class="zh" lang="zh">真实数据原型，SLO 已定义。</span></span><span class="ledger-state st-running"><i></i>PROTOTYPE</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">星澜科技 · outbound SaaS</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">3/15</span><span class="ledger-story">Single-sponsor blocker: the Sponsor Collapse anti-pattern, caught.<span class="zh" lang="zh">单一发起人阻断，即 Sponsor Collapse 反模式，被门禁拦下。</span></span><span class="ledger-state st-blocked"><i></i>BLOCKED</span></div>
       <div class="ledger-note">DEMO DATA · 演示数据 · seeded by examples/seed_mock_engagements.py; every record engine-generated.</div>
     </div>
   </div>
@@ -841,6 +851,79 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   </div>
 </section>
 
+<!-- ══ PRICING ══ -->
+<section id="pricing" aria-labelledby="pricing-h">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="pricing-h">Pricing</h2>
+      <p class="zh-line" lang="zh">定价 · 三档</p>
+      <p class="lede">The engine is open source; the seats around it are commercial. Start free on Community, subscribe per FDE seat on Pro, or bring us in for an Enterprise deployment.
+        <span class="zh" lang="zh">引擎开源，席位商用：Community 免费起步，Pro 按 FDE 席位订阅，Enterprise 由我们陪跑进现场。</span>
+      </p>
+    </div>
+    <div class="lists-grid">
+      <div class="lists-col slot">
+        <h3><i>CE</i>Community</h3>
+        <p class="lists-zh" lang="zh">社区版 · 开源 MIT</p>
+        <p class="tier-price">¥0<small> / free forever<span class="zh" lang="zh"> / 永久免费</span></small></p>
+        <ul>
+          <li><span><b>18-phase SOP</b> · 4 zones · 10 executable gates<span class="zh" lang="zh">完整状态机引擎，与商业版同一台</span></span></li>
+          <li><span><b>10 data connectors</b><span class="zh" lang="zh">全部连接器与两种场景配置</span></span></li>
+          <li><span><b>MIT license</b><span class="zh" lang="zh">可自由商用、修改与再分发</span></span></li>
+          <li><span><b>Community support</b><span class="zh" lang="zh">经 GitHub Issues 的社区支持</span></span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.8 6.3.8-4.6 4.3 1.2 6.1L12 17l-5.6 3 1.2-6.1L3 9.6l6.3-.8Z"/></svg>Star on GitHub</a></p>
+      </div>
+      <div class="lists-col tier-featured slot">
+        <h3><i>PRO</i>Pro</h3>
+        <p class="lists-zh" lang="zh">专业版 · 按席位订阅</p>
+        <p class="tier-price">¥4,800<small> / FDE seat / month<span class="zh" lang="zh"> / 席位 / 月</span></small></p>
+        <p class="tier-note">Placeholder price · final pricing subject to commercial discussion<span class="zh" lang="zh">占位价格 · 价格以商务洽谈为准</span></p>
+        <ul>
+          <li><span><b>Everything in Community</b><span class="zh" lang="zh">包含社区版全部功能</span></span></li>
+          <li><span><b>Per-seat subscription</b><span class="zh" lang="zh">按 FDE 席位计费，随团队规模伸缩</span></span></li>
+          <li><span><b>Priority support</b><span class="zh" lang="zh">工单优先响应，远程排障</span></span></li>
+          <li><span><b>Team onboarding</b><span class="zh" lang="zh">团队导入培训与 SOP 配置辅导</span></span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope%20Pro">Email sales<span class="zh" lang="zh">邮件咨询</span></a></p>
+      </div>
+      <div class="lists-col slot">
+        <h3><i>ENT</i>Enterprise</h3>
+        <p class="lists-zh" lang="zh">企业版 · 面议</p>
+        <p class="tier-price">Custom<small> scoped to your deployment<span class="zh" lang="zh">面议 · 按部署规模报价</span></small></p>
+        <ul>
+          <li><span><b>Everything in Pro</b><span class="zh" lang="zh">包含 Pro 全部功能</span></span></li>
+          <li><span><b>Audit + evidence chain</b><span class="zh" lang="zh">审计日志与证据链留存，面向合规检查</span></span></li>
+          <li><span><b>Custom connector adaptation</b><span class="zh" lang="zh">专属连接器适配你的现场系统</span></span></li>
+          <li><span><b>SLA</b><span class="zh" lang="zh">SLA 服务保障与专属响应通道</span></span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope%20Enterprise">Talk to us<span class="zh" lang="zh">预约洽谈</span></a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CONTACT ══ -->
+<section id="contact" aria-labelledby="contact-h">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="contact-h">Talk to an engineer</h2>
+      <p class="zh-line" lang="zh">联系我们</p>
+      <p class="lede">No forms, no tracking, no backend on this page. Email us directly and an engineer replies — or open a public issue and the whole community sees the answer.
+        <span class="zh" lang="zh">本页无表单、无追踪、无后端。直接发邮件，由工程师回复；或开公开 Issue，让社区一起看到答案。</span>
+      </p>
+    </div>
+    <div class="crib">
+      <div class="crib-row"><span class="crib-label">Email · 邮件<span class="zh" lang="zh">销售 / 试用 / 企业部署</span></span><code class="crib-cmd">contact@fde-scope.dev</code><button class="copybtn" data-copy="contact@fde-scope.dev">COPY</button></div>
+      <div class="cta-strip" style="border-top:none;padding:18px 6px 6px">
+        <a class="pushbtn" style="text-decoration:none;display:inline-block" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope">Write to us · 写邮件 →</a>
+        <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/issues" target="_blank" rel="noopener">GitHub Issues<span class="zh" lang="zh">或访问 GitHub Issues</span></a>
+        <span class="cta-note">REPLIES FROM ENGINEERS · NOT A TICKET BOT</span>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ══ CLOSE ══ -->
 <section class="close" aria-labelledby="close-h">
   <div class="wrap">
@@ -864,9 +947,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">Skills 手册库</a>
       <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/agentscope_api_mapping.md" target="_blank" rel="noopener">AgentScope mapping</a>
       <a href="https://github.com/ai-guru-global/fde-scope/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>
+      <a href="mailto:contact@fde-scope.dev">contact@fde-scope.dev</a>
       <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">ResolveAgent ↗</a>
     </nav>
-    <p class="colophon">FDE SCOPE · GTM BOARD<br>DIRECTION: SHIFT BOARD · SEED 773793EF<br><span lang="zh">门禁即工程 · 全程覆盖 · 现场优先</span></p>
+    <p class="colophon">FDE SCOPE · GTM BOARD<br>DIRECTION: SHIFT BOARD · SEED 773793EF<br><span lang="zh">门禁即工程 · 全程覆盖 · 现场优先</span><br>ALL DEMO DATA ON THIS PAGE IS FICTIONAL · <span lang="zh">本页演示数据均为虚构</span><br>CONTACT@FDE-SCOPE.DEV · DOMAIN PENDING REGISTRATION, SUBJECT TO CHANGE · <span lang="zh">域名待注册，以最终公布为准</span></p>
   </div>
 </footer>
 

@@ -1,9 +1,13 @@
 """Seed the Web UI with realistic mock engagements.
 
-Each mock is grounded in a real, publicly announced Alibaba Cloud customer
-(2025-2026: GAC full-stack AI, FAW "Hongqi Yunmei" agent, FAW-VW plant
-digitalization, Eclicktech overseas-marketing AI, CaoCao Mobility, Guming
-new-tea retail). The vertical / phase / gate data is illustrative.
+**DISCLAIMER / 免责声明**: every engagement, customer, person, metric and
+incident seeded by this script is **entirely fictional**. All company names
+(Aurora Motors, Atlas Auto Alliance, Southbay Motors, Northern Auto,
+Swift Ride, Adnova, Teaverse, Horizon Auto, Riverbend Spirits, Whitelake
+Dairy) are invented for product demonstration only and are **not** affiliated
+with, endorsed by, or based on any real company; any resemblance to actual
+companies is coincidental. 全部为虚构数据，与任何真实公司无关，仅用于产品演示。
+The vertical / phase / gate data is illustrative; all numbers are made up.
 
 Beyond the engagement contexts the script also fills the two libraries the
 console UI renders from, so no page opens empty:
@@ -168,12 +172,12 @@ def _write_reports(
 
 
 # ---------------------------------------------------------------------------
-# 1) Guming — new-tea retail chain, full lifecycle DONE (Zone D)
+# 1) Teaverse — new-tea retail chain, full lifecycle DONE (Zone D)
 # ---------------------------------------------------------------------------
-def guming() -> EngagementContext:
+def teaverse() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-guming-ticket-seed01",
-        customer="古茗茶饮（Guming）",
+        id="eng-teaverse-ticket-seed01",
+        customer="茶语万象（Teaverse）",
         profile="ticket",
         current_phase="disengage",
         stakeholders=[
@@ -195,12 +199,12 @@ def guming() -> EngagementContext:
         ],
         assets={
             "corpus_summary": "32.4k 门店样本 · 86 个 SKU 维度 · 3 个数据源",
-            "model_name": "guming-order-forecast-v2",
+            "model_name": "teaverse-order-forecast-v2",
             "known_limitations": ["新开店首周预测偏差大", "促销叠加日样本稀疏"],
         },
     )
     runbook_path, corpus_path = _write_reports(
-        "guming",
+        "teaverse",
         ctx,
         categories={"订货建议": 9800, "缺货预警": 4200, "促销预测": 2600, "新品预测": 1900},
         target_per_category=5000,
@@ -231,16 +235,16 @@ def guming() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 2) FAW-VW — automotive manufacturing digitalization, Zone C mid
+# 2) Atlas Auto Alliance — automotive manufacturing digitalization, Zone C mid
 # ---------------------------------------------------------------------------
-def faw_vw() -> EngagementContext:
+def northern_vw() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-fawvw-manufacturing-seed02",
-        customer="一汽-大众（FAW-VW）",
+        id="eng-atlas-manufacturing-seed02",
+        customer="亚特联汽车（Atlas Auto Alliance）",
         profile="manufacturing",
         current_phase="runbook",
         site=SiteInfo(
-            location="长春市汽车经济技术开发区 · 一厂总装车间",
+            location="北原市汽车经济技术开发区 · 一厂总装车间",
             ot_it_separated=True,
             air_gapped=False,
             networks=["PROFINET 产线环网", "OPC UA 汇聚层", "IT 办公网（隔离）"],
@@ -312,16 +316,16 @@ def faw_vw() -> EngagementContext:
                 "notes": "总装线诊断 agent 出厂测试通过",
             },
             "sat": {"passed": True, "signed_off_by": "周强（车间经理）", "notes": "现场 48h 试运行通过"},
-            "technical_construction_file": "reports/fawvw-technical-file.pdf",
-            "works_council_approval": {"status": "approved", "signed_off_by": "工会代表 · 长春基地"},
+            "technical_construction_file": "reports/atlas-technical-file.pdf",
+            "works_council_approval": {"status": "approved", "signed_off_by": "工会代表 · 北原基地"},
             "shift_handover": {"digital_log_integrated": True, "per_shift_runbook": True},
             "corpus_summary": "产线样本 1.2M 行 · 测点 208 · 故障标签 34 类",
-            "model_name": "fawvw-line-diagnose-v1.1",
+            "model_name": "atlas-line-diagnose-v1.1",
             "known_limitations": ["冬季冷启动工况样本不足", "新车型切换首周误报率偏高"],
         },
     )
     _write_reports(
-        "fawvw",
+        "atlas",
         ctx,
         categories={
             "焊接缺陷": 2600,
@@ -362,16 +366,16 @@ def faw_vw() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 3) GAC — full-stack AI, currently BLOCKED at deploy gates (Zone B tail)
+# 3) Southbay — full-stack AI, currently BLOCKED at deploy gates (Zone B tail)
 # ---------------------------------------------------------------------------
-def gac() -> EngagementContext:
+def southbay() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-gac-manufacturing-seed03",
-        customer="广汽集团（GAC）",
+        id="eng-southbay-manufacturing-seed03",
+        customer="南湾汽车集团（Southbay Motors）",
         profile="manufacturing",
         current_phase="deploy",
         site=SiteInfo(
-            location="广州市番禺区化龙镇 · 广汽乘用车工厂",
+            location="广州市南沙区 · 南湾乘用车工厂",
             ot_it_separated=True,
             air_gapped=False,
             networks=["PROFINET 总装环网", "OPC UA 汇聚", "5G 园区专网"],
@@ -393,7 +397,7 @@ def gac() -> EngagementContext:
                 {
                     "name": "AGV 车队 #3",
                     "type": "物流机器人",
-                    "vendor": "GAC 自研",
+                    "vendor": "客户自研",
                     "protocol": "5G",
                     "criticality": "medium",
                 },
@@ -427,12 +431,12 @@ def gac() -> EngagementContext:
         assets={
             "fat": {"passed": True, "signed_off_by": "何伟（客户）", "notes": "座舱语音 agent FAT 通过"},
             "corpus_summary": "座舱语料 8.6k 条 · 产线图像 45k 张",
-            "model_name": "gac-cabin-assistant-v1",
+            "model_name": "southbay-cabin-assistant-v1",
             "known_limitations": ["粤语方言识别待优化"],
         },
     )
     _write_reports(
-        "gac",
+        "southbay",
         ctx,
         categories={"座舱指令": 3400, "质检缺陷": 2600, "粤语方言": 900, "多轮对话": 1200},
         target_per_category=2400,
@@ -466,23 +470,23 @@ def gac() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 4) FAW — "Hongqi Yunmei" enterprise agent, Zone C tail
+# 4) Northern Auto — "Beijiang Yunshu" enterprise agent, Zone C tail
 # ---------------------------------------------------------------------------
-def faw() -> EngagementContext:
+def northern() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-faw-ticket-seed04",
-        customer="中国一汽（FAW）",
+        id="eng-northern-ticket-seed04",
+        customer="北疆汽车集团（Northern Auto）",
         profile="ticket",
         current_phase="flywheel_productization",
         stakeholders=[
             _st("张立群", "集团 CIO", True, "全集团 8 万人周活跃率 ≥40%"),
             _st("陈晓东", "数字化部总经理", True, "单次问答成本下降 60%"),
-            _st("马静", "红旗营销部数字化负责人"),
+            _st("马静", "品牌营销部数字化负责人"),
             _st("于涛", "HR 系统负责人"),
         ],
         success_criteria=[
             "≤14d 接入集团制度/流程/产品资料知识库",
-            "≤90d 红旗云妹覆盖全集团办公问答 + 多领域智能 BI",
+            "≤90d 北疆云枢覆盖全集团办公问答 + 多领域智能 BI",
             "≤120d 移交；bad_case_rate <10%",
         ],
         slos=[
@@ -492,13 +496,13 @@ def faw() -> EngagementContext:
         ],
         assets={
             "corpus_summary": "制度库 12.8k 篇 · BI 指标 460 个 · 6 个业务域",
-            "model_name": "yunmei-v1.4 (qwen 底座)",
+            "model_name": "yunshu-v1.4 (qwen 底座)",
             "known_limitations": ["跨部门数据权限边界偶发误答", "长文档引用溯源待增强"],
             "productized_features": ["智能 BI 问数", "制度问答（已产品化评审通过）"],
         },
     )
     _write_reports(
-        "faw",
+        "northern",
         ctx,
         categories={"制度问答": 5600, "BI 问数": 3200, "流程办理": 1800, "产品知识": 2200},
         target_per_category=3000,
@@ -526,17 +530,17 @@ def faw() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 5) CaoCao Mobility — ride-hailing platform, Zone B mid
+# 5) Swift Ride Mobility — ride-hailing platform, Zone B mid
 # ---------------------------------------------------------------------------
-def caocao() -> EngagementContext:
+def swift() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-caocao-ticket-seed05",
-        customer="曹操出行（CaoCao）",
+        id="eng-swift-ticket-seed05",
+        customer="迅捷出行（Swift Ride）",
         profile="ticket",
         current_phase="prototype_real_data",
         stakeholders=[
-            _st("罗永浩", "技术 VP", True, "AI 客服拦截率 ≥60%"),
-            _st("邓丽君", "数据总监", True, "146 城订单数据 ≤14d 接入"),
+            _st("罗成", "技术 VP", True, "AI 客服拦截率 ≥60%"),
+            _st("邓琳", "数据总监", True, "146 城订单数据 ≤14d 接入"),
             _st("钱锋", "客服中心负责人"),
             _st("孙丽", "司机端产品经理"),
         ],
@@ -548,13 +552,13 @@ def caocao() -> EngagementContext:
         slos=[],
         assets={
             "corpus_summary": "订单样本 5.2M 行 · 投诉 41k 条 · 司机侧会话 12k 条",
-            "model_name": "caocao-driver-support-v1",
+            "model_name": "swift-driver-support-v1",
             "known_limitations": ["方言/口语化投诉理解待提升"],
             "prototype_notes": "真实未策展数据原型已跑通：客服工单自动分类 + 处置建议。",
         },
     )
     _write_reports(
-        "caocao",
+        "swift",
         ctx,
         categories={"投诉处理": 21000, "调度咨询": 9800, "发票报销": 7400, "司机准入": 5200},
         target_per_category=8000,
@@ -582,12 +586,12 @@ def caocao() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 6) Eclicktech — overseas-marketing AI, Zone A (just signed, gate blocked)
+# 6) Adnova — overseas-marketing AI, Zone A (just signed, gate blocked)
 # ---------------------------------------------------------------------------
-def eclicktech() -> EngagementContext:
+def adnova() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-eclicktech-ticket-seed06",
-        customer="易点天下（Eclicktech）",
+        id="eng-adnova-ticket-seed06",
+        customer="星澜科技（Adnova）",
         profile="ticket",
         current_phase="success_criteria",
         stakeholders=[
@@ -605,7 +609,7 @@ def eclicktech() -> EngagementContext:
         },
     )
     _write_reports(
-        "eclicktech",
+        "adnova",
         ctx,
         categories={"素材文案": 1400, "投放策略": 900, "KOL 匹配": 700, "多语种翻译": 400},
         target_per_category=1200,
@@ -628,16 +632,16 @@ def eclicktech() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 7) BMW Brilliance — air-gapped automotive plant, Zone D entry (all gates pass)
+# 7) Aurora Motors — air-gapped automotive plant, Zone D entry (all gates pass)
 # ---------------------------------------------------------------------------
-def bmw_brilliance() -> EngagementContext:
+def aurora_motors() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-bmw-manufacturing-seed07",
-        customer="华晨宝马（BMW Brilliance）",
+        id="eng-aurora-manufacturing-seed07",
+        customer="奥罗拉汽车（Aurora Motors）",
         profile="manufacturing",
         current_phase="change_mgmt_training",
         site=SiteInfo(
-            location="沈阳市铁西区 · 大东工厂总装车间",
+            location="沈阳市铁西区 · 第一工厂总装车间",
             ot_it_separated=True,
             air_gapped=True,
             networks=["PROFINET 产线环网（园区内）", "OPC UA 汇聚层", "5G 园区专网（无外联）"],
@@ -711,12 +715,12 @@ def bmw_brilliance() -> EngagementContext:
             "works_council_approval": {"status": "approved", "signed_off_by": "Andrea Wolf（工会代表）"},
             "shift_handover": {"digital_log_integrated": True, "per_shift_runbook": True},
             "corpus_summary": "工艺参数 12 万条 · 质检图像 60k 张（本地存储）",
-            "model_name": "bmw-assembly-diagnose-v1.2 (edge)",
+            "model_name": "aurora-assembly-diagnose-v1.2 (edge)",
             "known_limitations": ["涂装送风机组 Modbus 采样粒度粗（1min）", "AGV 调度数据暂未接入"],
         },
     )
     _write_reports(
-        "bmw",
+        "aurora",
         ctx,
         categories={
             "装配异常": 3200,
@@ -756,12 +760,12 @@ def bmw_brilliance() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 8) Chery — Wuhu plant, early Zone B (connect), fresh timeline, no deliverables yet
+# 8) Horizon Auto — Wuhu plant, early Zone B (connect), fresh timeline, no deliverables yet
 # ---------------------------------------------------------------------------
-def chery() -> EngagementContext:
+def horizon() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-chery-manufacturing-seed08",
-        customer="奇瑞汽车（Chery）",
+        id="eng-horizon-manufacturing-seed08",
+        customer="宏途汽车（Horizon Auto）",
         profile="manufacturing",
         current_phase="connect",
         site=SiteInfo(
@@ -838,12 +842,12 @@ def chery() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 9) Luzhou Laojiao — baijiu producer, Zone B mid (corpus), dual-scenario
+# 9) Riverbend Spirits — baijiu producer, Zone B mid (corpus), dual-scenario
 # ---------------------------------------------------------------------------
-def lzlj() -> EngagementContext:
+def riverbend() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-lzlj-ticket-seed09",
-        customer="泸州老窖（Luzhou Laojiao）",
+        id="eng-riverbend-ticket-seed09",
+        customer="河湾酒业（Riverbend Spirits）",
         profile="ticket",
         current_phase="corpus",
         stakeholders=[
@@ -864,7 +868,7 @@ def lzlj() -> EngagementContext:
         },
     )
     _write_reports(
-        "lzlj",
+        "riverbend",
         ctx,
         categories={"防伪查询": 8000, "订单物流": 6200, "政策咨询": 4900, "投诉建议": 3100, "防伪异常": 900},
         target_per_category=5000,
@@ -887,12 +891,12 @@ def lzlj() -> EngagementContext:
 
 
 # ---------------------------------------------------------------------------
-# 10) Mengniu — dairy / cold-chain, Zone C (slo_sla), dual-scenario
+# 10) Whitelake Dairy — dairy / cold-chain, Zone C (slo_sla), dual-scenario
 # ---------------------------------------------------------------------------
-def mengniu() -> EngagementContext:
+def whitelake() -> EngagementContext:
     ctx = EngagementContext(
-        id="eng-mengniu-ticket-seed10",
-        customer="蒙牛集团（Mengniu）",
+        id="eng-whitelake-ticket-seed10",
+        customer="白湖乳业（Whitelake Dairy）",
         profile="ticket",
         current_phase="slo_sla",
         stakeholders=[
@@ -912,12 +916,12 @@ def mengniu() -> EngagementContext:
         ],
         assets={
             "corpus_summary": "订奶工单 88k 条 · 冷链温控时序 3 个月 · PII 9.4k 实体脱敏",
-            "model_name": "mengniu-coldchain-agent-v0.9",
+            "model_name": "whitelake-coldchain-agent-v0.9",
             "known_limitations": ["传感器漂移误报仍 38%（目标 <30%）", "乡镇配送地址标准化率低"],
         },
     )
     _write_reports(
-        "mengniu",
+        "whitelake",
         ctx,
         categories={"订奶变更": 21000, "配送咨询": 14000, "冷链告警": 9600, "发票售后": 6800},
         target_per_category=12000,
@@ -960,7 +964,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing", "ticket"],
         "source": "manual",
-        "engagement": "eng-fawvw-manufacturing-seed02",
+        "engagement": "eng-atlas-manufacturing-seed02",
         "published": True,
         "body": (
             "## Checklist\n"
@@ -982,14 +986,14 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-fawvw-manufacturing-seed02",
+        "engagement": "eng-atlas-manufacturing-seed02",
         "published": True,
         "body": (
             "## 步骤\n"
             "1. 检查 OPC UA 端点 URL（opc.tcp://host:port）\n"
             "2. 确认安全策略匹配（None/Basic256Sha256）\n"
             "3. 证书信任链：两端互信或端点自签 + 白名单\n\n"
-            "## 案例（长春一厂）\n"
+            "## 案例（北原一厂）\n"
             "Basic256Sha256 证书链未互信导致订阅**静默失败**——无报错但无数据。"
             "用 Wireshark 看到 BadCertificateInvalid 后改端点自签 + IP 白名单恢复。\n\n"
             "## 验收标准\n"
@@ -1005,7 +1009,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "slo",
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-faw-ticket-seed04",
+        "engagement": "eng-northern-ticket-seed04",
         "published": True,
         "body": (
             "## 方法\n"
@@ -1013,7 +1017,7 @@ _SKILL_LIBRARY: list[dict] = [
             "2. 检索召回量裁剪：top-k 50→20，重排后再取 5\n"
             "3. KV-cache 复用（system prompt + 指标口径字典前缀）\n"
             "4. 流式首 token 上报，P95 按 tok/s 单独监控\n\n"
-            "## 案例（红旗云妹）\n"
+            "## 案例（北疆云枢）\n"
             "qa_latency_p95 4.2s→2.8s，SLO <3s 达标；单次问答成本同步下降 63%。"
         ),
     },
@@ -1026,7 +1030,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing", "ticket"],
         "source": "manual",
-        "engagement": "eng-caocao-ticket-seed05",
+        "engagement": "eng-swift-ticket-seed05",
         "published": True,
         "body": (
             "## 结构\n"
@@ -1047,7 +1051,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "success_criteria",
         "applies_to": ["manufacturing", "ticket"],
         "source": "manual",
-        "engagement": "eng-eclicktech-ticket-seed06",
+        "engagement": "eng-adnova-ticket-seed06",
         "published": True,
         "body": (
             "## 信号\n"
@@ -1057,7 +1061,7 @@ _SKILL_LIBRARY: list[dict] = [
             "1. 从受益最大部门找第二发起人候选，逐一面访\n"
             "2. 把候选人的 KPI 翻译成成功标准里的可度量项\n"
             "3. 评审会前与两位 sponsor 预对齐，会上只做签认不做讨论\n\n"
-            "## 案例（易点天下）\n"
+            "## 案例（星澜科技）\n"
             "海外 COO 单 sponsor 卡 gate 两周；市场 VP 面访后以「多语种素材过审率」"
             "入标准 v2，成为第二发起人。"
         ),
@@ -1071,7 +1075,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-caocao-ticket-seed05",
+        "engagement": "eng-swift-ticket-seed05",
         "published": True,
         "body": (
             "## 为什么不做干净数据集\n"
@@ -1094,7 +1098,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "fat_sat",
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-fawvw-manufacturing-seed02",
+        "engagement": "eng-atlas-manufacturing-seed02",
         "published": True,
         "body": (
             "## FAT（出厂验收）\n"
@@ -1115,7 +1119,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-gac-manufacturing-seed03",
+        "engagement": "eng-southbay-manufacturing-seed03",
         "published": True,
         "body": (
             "## 现象\n"
@@ -1137,7 +1141,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing", "ticket"],
         "source": "manual",
-        "engagement": "eng-guming-ticket-seed01",
+        "engagement": "eng-teaverse-ticket-seed01",
         "published": True,
         "body": (
             "## 节奏\n"
@@ -1146,7 +1150,7 @@ _SKILL_LIBRARY: list[dict] = [
             "1. 抽样 20 条 bad case，按根因分桶（数据/特征/阈值/交互）\n"
             "2. 每桶指派 owner + 下双修复目标\n"
             "3. 回看上双目标完成率，未完成说明原因\n\n"
-            "## 效果（古茗）\n"
+            "## 效果（茶语万象）\n"
             "bad_case_rate 11%→6%（4 个双周），复盘记录全部回流语料库。"
         ),
     },
@@ -1159,7 +1163,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "conformity",
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-gac-manufacturing-seed03",
+        "engagement": "eng-southbay-manufacturing-seed03",
         "published": True,
         "body": (
             "## 材料清单\n"
@@ -1181,7 +1185,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket", "manufacturing"],
         "source": "manual",
-        "engagement": "eng-chery-manufacturing-seed08",
+        "engagement": "eng-horizon-manufacturing-seed08",
         "published": True,
         "body": (
             "## 原则\n"
@@ -1204,7 +1208,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-caocao-ticket-seed05",
+        "engagement": "eng-swift-ticket-seed05",
         "published": True,
         "body": (
             "## 为什么不用 agent 自造分类\n"
@@ -1227,7 +1231,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-faw-ticket-seed04",
+        "engagement": "eng-northern-ticket-seed04",
         "published": True,
         "body": (
             "## 现象\n"
@@ -1250,7 +1254,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-caocao-ticket-seed05",
+        "engagement": "eng-swift-ticket-seed05",
         "published": True,
         "body": (
             "## 规则集（正则 + NER 双通道）\n"
@@ -1271,7 +1275,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "slo",
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-mengniu-ticket-seed10",
+        "engagement": "eng-whitelake-ticket-seed10",
         "published": True,
         "body": (
             "## 谈判要点\n"
@@ -1292,7 +1296,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket", "manufacturing"],
         "source": "manual",
-        "engagement": "eng-mengniu-ticket-seed10",
+        "engagement": "eng-whitelake-ticket-seed10",
         "published": True,
         "body": (
             "## 三级路由\n"
@@ -1312,7 +1316,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "air_gap",
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-bmw-manufacturing-seed07",
+        "engagement": "eng-aurora-manufacturing-seed07",
         "published": True,
         "body": (
             "## 部署前\n"
@@ -1333,7 +1337,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "works_council",
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-fawvw-manufacturing-seed02",
+        "engagement": "eng-atlas-manufacturing-seed02",
         "published": True,
         "body": (
             "## 时序\n"
@@ -1342,7 +1346,7 @@ _SKILL_LIBRARY: list[dict] = [
             "1. 数据边界：agent 只读工单元数据，不做个人绩效评估（书面承诺）\n"
             "2. 岗位影响：辅助而非替代，附岗位影响评估表\n"
             "3. 试点代表：邀请工会代表参与 FAT/SAT 现场见证\n\n"
-            "## 案例（长春一厂）\n"
+            "## 案例（北原一厂）\n"
             "两轮沟通 + 数字日志字段清单逐项过会后，共决签字一次通过，未阻塞部署。"
         ),
     },
@@ -1355,7 +1359,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket", "manufacturing"],
         "source": "manual",
-        "engagement": "eng-lzlj-ticket-seed09",
+        "engagement": "eng-riverbend-ticket-seed09",
         "published": True,
         "body": (
             "## 为什么必须质检\n"
@@ -1378,7 +1382,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-guming-ticket-seed01",
+        "engagement": "eng-teaverse-ticket-seed01",
         "published": True,
         "body": (
             "## 管道节拍\n"
@@ -1399,7 +1403,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "handoff_signoff",
         "applies_to": ["ticket", "manufacturing"],
         "source": "manual",
-        "engagement": "eng-guming-ticket-seed01",
+        "engagement": "eng-teaverse-ticket-seed01",
         "published": True,
         "body": (
             "## 包内六件套（缺一不签）\n"
@@ -1422,7 +1426,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-bmw-manufacturing-seed07",
+        "engagement": "eng-aurora-manufacturing-seed07",
         "published": True,
         "body": (
             "## 闭环结构\n"
@@ -1444,7 +1448,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "shift_handover",
         "applies_to": ["manufacturing"],
         "source": "manual",
-        "engagement": "eng-bmw-manufacturing-seed07",
+        "engagement": "eng-aurora-manufacturing-seed07",
         "published": True,
         "body": (
             "## 落地三步\n"
@@ -1464,7 +1468,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket", "manufacturing"],
         "source": "manual",
-        "engagement": "eng-faw-ticket-seed04",
+        "engagement": "eng-northern-ticket-seed04",
         "published": True,
         "body": (
             "## 构成\n"
@@ -1486,10 +1490,10 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": "conformity",
         "applies_to": [],
         "source": "gate_hint",
-        "engagement": "eng-gac-manufacturing-seed03",
+        "engagement": "eng-southbay-manufacturing-seed03",
         "published": False,
         "body": (
-            "## 背景\n\n`conformity` 门禁在 engagement `eng-gac-manufacturing-seed03` 被阻塞。\n\n"
+            "## 背景\n\n`conformity` 门禁在 engagement `eng-southbay-manufacturing-seed03` 被阻塞。\n\n"
             "## 阻塞项\n\nCE 标志未完成；EU AI Act 技术文档附录 III 缺失；第三方风险评估未出报告\n\n"
             "## 解法（待补充）\n\n- 按《EU AI Act conformity 材料清单》技能逐项补齐\n"
             "- 与公告机构约定 9/15 复评窗口\n\n"
@@ -1505,7 +1509,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": ["ticket"],
         "source": "manual",
-        "engagement": "eng-guming-ticket-seed01",
+        "engagement": "eng-teaverse-ticket-seed01",
         "published": False,
         "body": (
             "## 现象\n"
@@ -1527,10 +1531,10 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": [],
         "source": "auto_capture",
-        "engagement": "eng-chery-manufacturing-seed08",
+        "engagement": "eng-horizon-manufacturing-seed08",
         "published": False,
         "body": (
-            "## 操作摘要\n\n`kpi` @ engagement `eng-chery-manufacturing-seed08`（阶段 `connect`）\n\n"
+            "## 操作摘要\n\n`kpi` @ engagement `eng-horizon-manufacturing-seed08`（阶段 `connect`）\n\n"
             "2026-08-28 晚间批量抽取把 MES 数据平台 MySQL 连接池打满（max 200 用满 8 分钟），"
             "业务慢查询告警 3 条。\n\n"
             "## 可复用点（待补充）\n\n- 独立配额 + 游标分页 + 批间限流（参见「MySQL 生产库批量抽取限流方案」）\n"
@@ -1546,7 +1550,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": [],
         "source": "manual",
-        "engagement": "eng-eclicktech-ticket-seed06",
+        "engagement": "eng-adnova-ticket-seed06",
         "published": False,
         "body": (
             "## 背景\n"
@@ -1569,7 +1573,7 @@ _SKILL_LIBRARY: list[dict] = [
         "gate": None,
         "applies_to": [],
         "source": "manual",
-        "engagement": "eng-chery-manufacturing-seed08",
+        "engagement": "eng-horizon-manufacturing-seed08",
         "published": False,
         "body": (
             "## 现象\n"
@@ -1631,7 +1635,7 @@ def _seed_skills() -> dict[str, str]:
 # 现场记录种子：与各 engagement 的 gate 时间线一致，部分条目沉淀为技能
 # ---------------------------------------------------------------------------
 _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
-    "eng-guming-ticket-seed01": [
+    "eng-teaverse-ticket-seed01": [
         (
             "research",
             "首日 Gemba：走访杭州 3 家门店 + 供应链中心。订货靠店长经验 + Excel，周订货准确率约 85%，"
@@ -1721,10 +1725,10 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             "handoff_acceptance_checklist",
         ),
     ],
-    "eng-fawvw-manufacturing-seed02": [
+    "eng-atlas-manufacturing-seed02": [
         (
             "research",
-            "Gemba walk 长春一厂总装车间：3 班倒、候选测点 208 个、OT/IT 分区隔离确认；"
+            "Gemba walk 北原一厂总装车间：3 班倒、候选测点 208 个、OT/IT 分区隔离确认；"
             "拧紧枪工位 12 数据最早缺失，列入首批补测，工会代表对接人已确认。",
             "2026-05-26T09:40:00+08:00",
             None,
@@ -1802,10 +1806,10 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             None,
         ),
     ],
-    "eng-gac-manufacturing-seed03": [
+    "eng-southbay-manufacturing-seed03": [
         (
             "research",
-            "番禺工厂首日勘察：焊装主线 PLC（S7）+ 智能座舱 HIL 台架（dSPACE）+ AGV 车队；"
+            "南沙工厂首日勘察：焊装主线 PLC（S7）+ 智能座舱 HIL 台架（dSPACE）+ AGV 车队；"
             "5G 园区专网实测上行 230Mbps，满足质检图像回传。",
             "2026-07-03T09:30:00+08:00",
             None,
@@ -1869,7 +1873,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             None,
         ),
     ],
-    "eng-faw-ticket-seed04": [
+    "eng-northern-ticket-seed04": [
         (
             "research",
             "集团制度库盘点：12.8k 篇制度/流程文档跨 6 个业务域；HR/财务两域权限模型最复杂，"
@@ -1879,7 +1883,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
         ),
         (
             "implementation",
-            "红旗云妹 v1.4 全集团发布：办公问答 + 智能 BI 问数双入口，8 万员工开放；首周周活 31%，"
+            "北疆云枢 v1.4 全集团发布：办公问答 + 智能 BI 问数双入口，8 万员工开放；首周周活 31%，"
             "离 40% 目标差 9pp。",
             "2026-07-10T09:30:00+08:00",
             None,
@@ -1921,7 +1925,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
         ),
         (
             "research",
-            "云妹 v1.4 发布前 HITL 评审：跨部门权限误答 5 例复现——上线期挂「数据边界」提示 + 误答举报入口，"
+            "云枢 v1.4 发布前 HITL 评审：跨部门权限误答 5 例复现——上线期挂「数据边界」提示 + 误答举报入口，"
             "月度 ACL 对账机制立项。",
             "2026-07-18T10:00:00+08:00",
             None,
@@ -1940,7 +1944,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             "agent_eval_harness",
         ),
     ],
-    "eng-caocao-ticket-seed05": [
+    "eng-swift-ticket-seed05": [
         (
             "research",
             "146 城订单/行程/投诉数据摸底：投诉明细 41k 条，TOP3 类目为发票报销(18%)、调度咨询(14%)、"
@@ -2008,7 +2012,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             "inference_latency",
         ),
     ],
-    "eng-eclicktech-ticket-seed06": [
+    "eng-adnova-ticket-seed06": [
         (
             "research",
             "出海素材生产线调研：单条素材成本 $38，人工剪辑占 62%；「AI 生产效率 +50%」目标对应成本下降 40%，"
@@ -2065,7 +2069,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             None,
         ),
     ],
-    "eng-bmw-manufacturing-seed07": [
+    "eng-aurora-manufacturing-seed07": [
         (
             "research",
             "铁西工厂首日 Gemba：总装/涂装双车间勘察，生产网与互联网物理隔离确认（air-gap），"
@@ -2122,7 +2126,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             None,
         ),
     ],
-    "eng-chery-manufacturing-seed08": [
+    "eng-horizon-manufacturing-seed08": [
         (
             "research",
             "芜湖一期总装车间勘察：2 班倒确认；老产线 Modbus 段占比 40%（62 测点），网关转换不可避免；"
@@ -2158,10 +2162,10 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             "mysql_pool_exhausted",
         ),
     ],
-    "eng-lzlj-ticket-seed09": [
+    "eng-riverbend-ticket-seed09": [
         (
             "research",
-            "泸州云峰酒厂调研：包装质检车间 + 客服中心双场景；质检图像瓶颈在瓶身气泡/标签歪斜两类的判定分歧"
+            "河湾酒厂调研：包装质检车间 + 客服中心双场景；质检图像瓶颈在瓶身气泡/标签歪斜两类的判定分歧"
             "（质检员间一致率 0.78）。",
             "2026-08-05T10:00:00+08:00",
             None,
@@ -2195,7 +2199,7 @@ _JOURNAL: dict[str, list[tuple[str, str, str, str | None]]] = {
             "llm_synthetic_quality",
         ),
     ],
-    "eng-mengniu-ticket-seed10": [
+    "eng-whitelake-ticket-seed10": [
         (
             "research",
             "呼和浩特总部调研：订奶热线 + 冷链 IoT 双场景确认；冷链温控告警日均 1.2k 条中误报约 80%"
@@ -2259,16 +2263,16 @@ def _apply_journal(ctx: EngagementContext, skill_ids: dict[str, str]) -> None:
 def main() -> None:
     skill_ids = _seed_skills()
     builders = [
-        guming,
-        faw_vw,
-        gac,
-        faw,
-        caocao,
-        eclicktech,
-        bmw_brilliance,
-        chery,
-        lzlj,
-        mengniu,
+        teaverse,
+        northern_vw,
+        southbay,
+        northern,
+        swift,
+        adnova,
+        aurora_motors,
+        horizon,
+        riverbend,
+        whitelake,
     ]
     paths: list[Path] = []
     for b in builders:

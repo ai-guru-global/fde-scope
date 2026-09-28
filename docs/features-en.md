@@ -174,8 +174,8 @@ the next retrain.
 | MySQL | `mysql` | SQL implementation (`[mysql]` extra) |
 | Zammad | `zammad` | Real HTTP API (`/api/v1/tickets` pagination + Token auth; env-configured, JSONL replay fallback) |
 | Salesforce | `salesforce` | Real REST API (`/services/data/vXX.X/query` SOQL + Bearer auth; env-configured, JSONL replay fallback; read-only) |
-| MES (ISA-95) | `mes` | Same |
-| Historian | `historian` | Same (stub, JSONL replay fallback) |
+| MES (ISA-95) | `mes` | Real REST API (work-orders pagination + Bearer auth; env-configured, endpoint overridable, JSONL replay fallback) |
+| Historian | `historian` | Real REST API (time-series samples by tag + Bearer auth; env-configured, generic/PI-style endpoints, JSONL replay fallback) |
 | ROS2 bag | `ros2` | Real rosbags replay (rosbags>=0.11 driver; mock + real-bag env-gated tests) |
 | Document parsers | — | PDF / Word / Excel / PPT (lazy import) |
 
@@ -318,6 +318,4 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 
 ## 17. Not done yet (roadmap)
 
-- `deploy --serve` end-to-end validation (Redis backend + reachable model)
-- Full Salesforce / MES / Historian HTTP/SQL implementations (Zammad, Salesforce done)
 - AgentScope Studio (npm `@agentscope/studio`) integration

@@ -50,6 +50,26 @@ def _isolated_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
 
 
+@pytest.fixture(autouse=True)
+def _pro_license_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give the suite a valid pro-tier license by default.
+
+    The web tier gate (fde_scope.license) returns 402 for pro+ features
+    (audit export, evidence retention) without a key; pre-existing tests
+    exercise those endpoints as part of the core workflow, so the suite
+    runs licensed. License-specific tests override both env vars
+    explicitly — a leaked developer key would otherwise make tier tests
+    non-deterministic.
+    """
+    from fde_scope import license as lic
+
+    monkeypatch.setenv(lic.ENV_LICENSE_SECRET, "test-suite-license-secret")
+    monkeypatch.setenv(
+        lic.ENV_LICENSE_KEY,
+        lic.issue_license(customer="Test Suite", tier="pro", seats=50, secret="test-suite-license-secret"),
+    )
+
+
 SAMPLE_ROWS = [
     {
         "id": "t-001",

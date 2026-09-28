@@ -63,7 +63,8 @@ _STR_LIST = TypeAdapter(list[str])
 
 from .deps import (  # noqa: E402
     _all_engagements,
-    _eng_path,
+    _archive,
+    _delete,
     _load,
     _save,
     _slugify,
@@ -232,6 +233,29 @@ def evaluate_gate(eid: str, slug: str, operator: str | None = Form(None)) -> dic
 
 
 # ---------------------------------------------------------------------------
+# license gating (pro+ features — see fde_scope/license.py; honesty, not DRM)
+# ---------------------------------------------------------------------------
+def _require_feature(feature: str) -> None:
+    """402 when the effective license doesn't grant ``feature``.
+
+    Without a key the install is community tier, so this is where the tier
+    boundary becomes visible to the customer with an actionable message.
+    """
+    from .. import license as lic
+
+    if not lic.has_feature(feature):
+        tier = lic.current_tier()
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"feature '{feature}' requires a pro or enterprise license "
+                f"(current tier: {tier}). Set {lic.ENV_LICENSE_KEY} or place a key at "
+                f".fde_scope/license.key — contact your vendor to upgrade."
+            ),
+        ) from None
+
+
+# ---------------------------------------------------------------------------
 # audit export（审计导出：按 engagement 过滤 + Markdown 报告）
 # ---------------------------------------------------------------------------
 def _export_audit_md(eid: str, events: list[dict]) -> Path:
@@ -243,6 +267,7 @@ def _export_audit_md(eid: str, events: list[dict]) -> Path:
 @app.get("/api/engagements/{eid}/audit/export")
 def export_audit(eid: str) -> dict:
     """Write a Markdown audit report for *eid* into the reports dir."""
+    _require_feature("audit_export")
     events = list(audit.read_events(eid))
     out = _export_audit_md(eid, events)
     return {"engagement_id": eid, "count": len(events), "path": str(out)}
@@ -354,6 +379,7 @@ async def attach_evidence(
     """Attach an external evidence file (signed FAT/SAT scan …) to an engagement."""
     from datetime import UTC, datetime
 
+    _require_feature("evidence")
     if file is None and not (path and path.strip()):
         raise HTTPException(status_code=422, detail="either 'file' or 'path' is required") from None
     if file is not None:
@@ -407,16 +433,13 @@ def list_evidence(eid: str) -> dict:
 # ---------------------------------------------------------------------------
 @app.post("/api/engagements/{eid}/archive")
 def archive_engagement(eid: str) -> dict:
-    """Move the engagement JSON to .fde_scope/archive/ (out of every listing)."""
+    """Archive the engagement (out of every listing) via the storage backend."""
     with engagement_lock(eid):
         eng = _load(eid)
-        src = _eng_path(eid)
-        dest = paths.archive_dir(create=True) / f"{eid}.json"
-        fsutil.atomic_write_text(dest, src.read_text(encoding="utf-8"))
-        src.unlink()
+        dest = _archive(eid)
     audit.log_event(
         "engagement.archived",
-        detail={"engagement_id": eid, "customer": eng.ctx.customer, "archive_path": str(dest)},
+        detail={"engagement_id": eid, "customer": eng.ctx.customer, "archive_path": dest},
     )
     return {"archived": True, "engagement_id": eid}
 
@@ -436,7 +459,7 @@ def delete_engagement(eid: str, confirm: str = Form(...)) -> dict:
                 status_code=400,
                 detail=f"confirm must exactly match the customer name {customer!r}",
             ) from None
-        _eng_path(eid).unlink()
+        _delete(eid)
         ev_dir = paths.evidence_dir(eid)
         if ev_dir.exists():
             shutil.rmtree(ev_dir)
@@ -973,7 +996,7 @@ _GLOSSARY_JS = r"""(() => {
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ASCII_TERM = /^[A-Za-z0-9][A-Za-z0-9 /+.-]*$/;
-// don't annotate substrings inside ids/slugs (e.g. ticket in eng-caocao-ticket-seed05, prototype in prototype_real_data)
+// don't annotate substrings inside ids/slugs (e.g. ticket in eng-swift-ticket-seed05, prototype in prototype_real_data)
 const ADJACENT = /[-_A-Za-z0-9]/;
 const GLOSSARY = __GLOSSARY_DATA__.slice().sort((a, b) => b[0].length - a[0].length)
   .map(([term, tip]) => ({ term, tip, ascii: ASCII_TERM.test(term),
@@ -1290,10 +1313,10 @@ __ICON_SPRITE__
   <div class="tile"><svg class="ic"><use href="#i-doc"/></svg><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-db"/></svg><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-broadcast"/></svg><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-factory"/></svg><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">JSONL 可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-factory"/></svg><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-cpu"/></svg><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-bot"/></svg><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-ticket"/></svg><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-cloud"/></svg><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-docs"/></svg><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
@@ -1351,7 +1374,7 @@ __ICON_SPRITE__
 </section>
 
 <section>
-<div class="sec-head"><svg class="ic"><use href="#i-trend"/></svg><h2>制造业 KPI（实测 BMW 数据）</h2><span class="n">08</span></div>
+<div class="sec-head"><svg class="ic"><use href="#i-trend"/></svg><h2>制造业 KPI（虚构演示数据）</h2><span class="n">08</span></div>
 <div class="grid cols-4">
   <div class="tile"><div class="name">OEE</div><div class="kpi-row"><span>设备综合效率</span><span class="v">0.724</span></div><div class="desc">世界级 ≥0.85</div></div>
   <div class="tile"><div class="name">抓取成功率</div><div class="kpi-row"><span>pick success</span><span class="v">0.793</span></div><div class="desc">DexNet 基准 ~0.80</div></div>
@@ -1369,7 +1392,7 @@ __ICON_SPRITE__
 <span class="c"># 安装（核心层零依赖）</span><br>
 <span class="cmd">pip install -e ".[dev]"</span><br><br>
 <span class="c"># 启动制造业 engagement</span><br>
-<span class="cmd">fde-scope</span> engage init --customer BMW --profile manufacturing<br><br>
+<span class="cmd">fde-scope</span> engage init --customer aurora-motors --profile manufacturing<br><br>
 <span class="c"># 推进 SOP（gate 拦截）</span><br>
 <span class="cmd">fde-scope</span> engage advance &lt;id&gt;<br>
 <span class="cmd">fde-scope</span> gate check &lt;id&gt; --gate fat_sat<br><br>
@@ -1635,7 +1658,7 @@ __ICON_SPRITE__
     <div id="eng-list"></div>
     <div class="card side-card">
       <h2>新建 Engagement</h2>
-      <div class="row"><label>客户</label><input id="new-customer" placeholder="BMW Spartanburg"></div>
+      <div class="row"><label>客户</label><input id="new-customer" placeholder="Aurora Motors"></div>
       <div class="row"><label>Profile</label>
         <select id="new-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select>
       </div>

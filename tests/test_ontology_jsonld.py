@@ -44,13 +44,17 @@ def _schema() -> OntologySchema:
 
 def test_schema_export_structure() -> None:
     doc = schema_to_jsonld(_schema())
-    assert doc["@type"] == "owl:Ontology"
-    assert doc["owl:versionInfo"] == "1.0.0"
-    assert doc["@id"] == "https://example.com/o/t/1.0.0"
+    # 形状契约：顶层只有 @context + @graph（graph-object 形式会把内容送进
+    # named graph，单图工具读不到——见 jsonld.py 模块 docstring）。
+    assert set(doc) == {"@context", "@graph"}
     ctx = doc["@context"]
     assert ctx["t"] == "https://example.com/o/t#"
     assert ctx["rdfs"]["@container"] == "@language"  # 双语 label 走 language map
-    nodes = {n["@id"]: n for n in doc["@graph"]}
+    ontology, *rest = doc["@graph"]
+    assert ontology["@id"] == "https://example.com/o/t/1.0.0"
+    assert ontology["@type"] == "owl:Ontology"
+    assert ontology["owl:versionInfo"] == "1.0.0"
+    nodes = {n["@id"]: n for n in rest}
     thing = nodes["https://example.com/o/t#Thing"]
     assert thing["@type"] == "rdfs:Class"
     assert thing["rdfs:label"] == {"en": "Thing", "zh": "东西"}
@@ -64,6 +68,20 @@ def test_schema_export_structure() -> None:
     cat = nodes["https://example.com/o/t#cat-a"]
     assert cat["@type"] == "skos:Concept"
     assert cat["skos:inScheme"] == {"@id": "https://example.com/o/t#CatScheme"}
+
+
+def test_schema_export_parses_as_plain_graph() -> None:
+    """互操作锚点：rdflib 的单图 Graph.parse 必须拿到全部三元组。"""
+    rdflib = pytest.importorskip("rdflib")
+    doc = schema_to_jsonld(_schema())
+    g = rdflib.Graph().parse(data=json.dumps(doc), format="json-ld")
+    # 2 类 + 2 属性 + scheme + concept + ontology 节点 ≳ 7 条
+    assert len(g) >= 7
+    assert (
+        rdflib.URIRef("https://example.com/o/t/1.0.0"),
+        rdflib.RDF.type,
+        rdflib.OWL.Ontology,
+    ) in g
 
 
 def test_schema_export_deterministic() -> None:
@@ -87,8 +105,9 @@ def test_store_export_expands_curies_and_literals() -> None:
         ],
     )
     doc = store_to_jsonld(store, schema)
-    assert doc["@id"] == "https://example.com/o/stores/s"
-    (node,) = doc["@graph"]
+    store_node, *rest = doc["@graph"]
+    assert store_node == {"@id": "https://example.com/o/stores/s", "rdfs:label": "s"}
+    (node,) = rest
     assert node["@id"] == "https://example.com/o/t#one"
     assert node["@type"] == ["https://example.com/o/t#Sub"]
     assert node["https://example.com/o/t#rel"] == [{"@id": "https://example.com/o/t#one"}]

@@ -9,6 +9,13 @@ mapping to real AgentScope 2.0 streaming event types lives in
 :mod:`event_mapping`. All agentscope imports are lazy.
 """
 
+from .backends import (
+    HTTPTrainingBackend,
+    NoopBackend,
+    TrainingBackend,
+    TrainingBackendError,
+    get_training_backend,
+)
 from .collectors import Collector, CorpusStore
 from .engine import DataFlywheel, FlywheelStats
 from .event_mapping import (
@@ -33,4 +40,9 @@ __all__ = [
     "RetrainScheduler",
     "RetrainJob",
     "DEFAULT_JOBS",
+    "TrainingBackend",
+    "TrainingBackendError",
+    "HTTPTrainingBackend",
+    "NoopBackend",
+    "get_training_backend",
 ]

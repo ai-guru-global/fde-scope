@@ -1,0 +1,59 @@
+NOTICE
+======
+
+fde-scope is licensed under the MIT License (see LICENSE).
+
+This product includes third-party software components. All components are
+used as unmodified Python package dependencies (dynamic references at
+install/runtime); no third-party source code is vendored into this
+repository.
+
+Direct dependencies
+-------------------
+
+Core (always installed):
+
+- typer — MIT — CLI framework (command surface of `fde-scope`).
+- rich — MIT — terminal formatting for CLI output.
+- pydantic — MIT v2 — data models / validation for contexts, manifests, gates.
+- pyyaml — MIT — YAML config parsing.
+- jinja2 — BSD-3-Clause — HTML report templating.
+
+Optional extras:
+
+- agentscope (`agentscope` extra) — Apache-2.0 — agent runtime layer
+  (deploy / flywheel assembly).
+- redis (`serve` extra) — MIT — Redis Python client required by
+  `agentscope[service]`'s RedisStorage on the `deploy --serve` path.
+- mysql-connector-python (`mysql` extra) — GPL-2.0 with the FOSS License
+  Exception — MySQL connector. **Copyleft**: the FOSS exception permits
+  combining with MIT-licensed code, but binary/embedded redistribution
+  scenarios should be reviewed by counsel; keep this dependency optional.
+- asyncua (`opcua` extra) — LGPL-3.0-or-later — OPC UA client. Weak copyleft:
+  used unmodified as an installed package; keep it optional and do not
+  vendor or patch its sources.
+- paho-mqtt (`mqtt` extra) — EPL-2.0 OR BSD-3-Clause (dual-licensed) — MQTT
+  client. EPL-2.0 is a weak copyleft license scoped to the EPL'd files
+  themselves; referencing the unmodified package does not create a
+  derivative work, but modifications to paho-mqtt source would trigger EPL
+  obligations. Binary distribution of an unmodified wheel is generally
+  considered safe; have counsel confirm for embedded shipping.
+- rosbags (`ros2` extra) — Apache-2.0 — ROS 2 bag parsing.
+- fastapi (`web`/`dev` extra) — MIT — Web console HTTP layer.
+- uvicorn (`web`/`dev` extra) — BSD-3-Clause — ASGI server.
+- python-multipart (`web`/`dev` extra) — Apache-2.0 — form parsing for FastAPI.
+
+Development-only (never shipped in the runtime install):
+
+- pytest — MIT — test runner.
+- pytest-cov — MIT — coverage plugin.
+- httpx — BSD-3-Clause — test client for the web app.
+
+Notes
+-----
+
+- License identifiers above are taken from each package's published
+  metadata; see `docs/license-audit.md` for the full audit table, risk
+  ratings, and compatibility analysis.
+- This NOTICE must be updated whenever `pyproject.toml` gains or drops a
+  direct dependency; `tests/test_third_party_licenses.py` enforces coverage.

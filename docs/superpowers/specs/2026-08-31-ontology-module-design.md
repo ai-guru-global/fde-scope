@@ -118,7 +118,7 @@ class OntologySchema(BaseModel):
 
 ```python
 class Individual(BaseModel):
-    curie: str                                   # "ex:guming-engagement"
+    curie: str                                   # "ex:teaverse-engagement"
     types: list[str]                             # 类 CURIE（多类型合法）
     object_assertions: dict[str, list[str]] = {} # 属性 CURIE → 个体 CURIE 列表
     data_assertions: dict[str, list[Any]] = {}   # 属性 CURIE → 字面量列表

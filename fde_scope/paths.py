@@ -93,6 +93,11 @@ def evidence_dir(eid: str, create: bool = False) -> Path:
     return _under_root("evidence", eid, create=create)
 
 
+def engagements_db() -> Path:
+    """``<root>/.fde_scope/engagements.db`` — SQLite storage backend database."""
+    return _under_root("engagements.db")
+
+
 def archive_dir(create: bool = False) -> Path:
     """``<root>/.fde_scope/archive`` — archived engagement JSON."""
     return _under_root("archive", create=create)

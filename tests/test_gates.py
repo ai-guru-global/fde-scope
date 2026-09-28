@@ -7,7 +7,7 @@ from fde_scope.engagement.engagement import _default_gate_registry
 
 
 def _eng(profile="manufacturing", **kw) -> Engagement:
-    ctx = EngagementContext(id="m1", customer="BMW", profile=profile, **kw)
+    ctx = EngagementContext(id="m1", customer="Aurora Motors", profile=profile, **kw)
     return Engagement(ctx)
 
 

@@ -708,6 +708,27 @@ def kpi(
     console.print(table)
 
 
+@app.command(name="storage-migrate")
+def storage_migrate(
+    to: str = typer.Option(..., "--to", help="Target backend: sqlite"),
+    db: str | None = typer.Option(
+        None, "--db", help="SQLite file path (default: <data root>/.fde_scope/engagements.db)"
+    ),
+) -> None:
+    """[Storage] One-way migrate engagements from the file backend to SQLite."""
+    _banner(f"storage-migrate → {to}")
+    if to != "sqlite":
+        console.print(f"[red]Unsupported target:[/red] {to} (only 'sqlite')")
+        raise typer.Exit(2)
+    from .storage import migrate_file_to_sqlite
+
+    summary = migrate_file_to_sqlite(db)
+    console.print(
+        f"✅ Migrated [bold]{summary['migrated']}[/bold] engagement(s) → [green]{summary['db_path']}[/green]"
+    )
+    console.print("[dim]Source JSON files left in place; activate with FDE_SCOPE_STORAGE=sqlite.[/dim]")
+
+
 @app.command()
 def profiles() -> None:
     """List available deployment scenario profiles."""
@@ -1223,21 +1244,29 @@ def ontology_check(
 @ontology_app.command("export")
 def ontology_export(
     target: str = typer.Argument(..., help="Schema 或 store id"),
-    fmt: str = typer.Option("jsonld", "--format", help="输出格式（当前仅 jsonld）"),
+    fmt: str = typer.Option("jsonld", "--format", help="输出格式：jsonld | mermaid（mermaid 仅 schema）"),
     out: Path | None = typer.Option(None, "--out", "-o", help="写入文件（缺省打印到 stdout）"),
 ) -> None:
-    """[Ontology] 导出 JSON-LD（schema 直接导出；store 联同其 TBox 上下文）."""
+    """[Ontology] 导出 JSON-LD（schema/store）或 Mermaid 概念模型图（仅 schema）."""
     _banner(f"ontology export · {target}")
-    if fmt != "jsonld":
-        console.print(f"[red]Unsupported format:[/red] {fmt} (only jsonld)")
+    if fmt not in ("jsonld", "mermaid"):
+        console.print(f"[red]Unsupported format:[/red] {fmt} (jsonld | mermaid)")
         raise typer.Exit(2)
     store = _ontology_store()
     schema = store.load_schema(target)
     if schema is not None:
-        from .ontology.jsonld import schema_to_jsonld
+        if fmt == "mermaid":
+            from .ontology.diagram import schema_to_mermaid
 
-        doc = schema_to_jsonld(schema)
+            text = schema_to_mermaid(schema)
+        else:
+            from .ontology.jsonld import schema_to_jsonld
+
+            text = json.dumps(schema_to_jsonld(schema), ensure_ascii=False, indent=2, sort_keys=True)
     else:
+        if fmt == "mermaid":
+            console.print("[red]Mermaid export is schema-only[/red]（概念模型图来自 TBox）")
+            raise typer.Exit(2)
         inst = store.load_store(target)
         if inst is None:
             console.print(f"[red]Unknown target:[/red] {target}")
@@ -1249,15 +1278,122 @@ def ontology_export(
             raise typer.Exit(2)
         from .ontology.jsonld import store_to_jsonld
 
-        doc = store_to_jsonld(inst, ref_schema)
-    text = json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True)
+        text = json.dumps(store_to_jsonld(inst, ref_schema), ensure_ascii=False, indent=2, sort_keys=True)
     if out is None:
         console.print(text)
     else:
         from .fsutil import atomic_write_text
 
         atomic_write_text(out, text + "\n")
-        console.print(f"✅ Exported JSON-LD → [green]{out}[/green]")
+        console.print(f"✅ Exported {fmt} → [green]{out}[/green]")
+
+
+@ontology_app.command("diff")
+def ontology_diff(
+    old_id: str = typer.Argument(..., help="旧 schema id"),
+    new_id: str = typer.Argument(..., help="新 schema id"),
+    store_id: str | None = typer.Option(None, "--store", help="附带 ABox 影响面（个体证据清单）"),
+) -> None:
+    """[Ontology] TBox 版本 diff：D1-D4 破坏性变更 + 可选 ABox 影响面. exit 1 = 有破坏性变更."""
+    _banner(f"ontology diff · {old_id} → {new_id}")
+    store = _ontology_store()
+    old = store.load_schema(old_id)
+    new = store.load_schema(new_id)
+    if old is None or new is None:
+        console.print(f"[red]Unknown schema:[/red] {old_id if old is None else new_id}")
+        raise typer.Exit(2)
+    from .ontology.diff import diff_schemas, store_impact
+
+    diff = diff_schemas(old, new)
+    console.print(f"{old_id}@{diff.from_version} → {new_id}@{diff.to_version}")
+    if diff.ok:
+        console.print("✅ [green]NO BREAKING CHANGES[/green]")
+    for c in diff.breaking:
+        console.print(f"  [red]{c.kind}[/red] {c.subject}: {c.detail}")
+    for c in diff.info:
+        console.print(f"  [dim]{c.kind} {c.subject}: {c.detail}[/dim]")
+    if store_id is not None:
+        inst = store.load_store(store_id)
+        if inst is None:
+            console.print(f"[red]Unknown store:[/red] {store_id}")
+            raise typer.Exit(2)
+        impact = store_impact(inst, diff)
+        console.print(f"[bold]ABox impact[/bold] ({store_id}): {len(impact)} individual(s)")
+        for c in impact:
+            console.print(f"  {c.subject}: {c.detail}")
+    if not diff.ok:
+        raise typer.Exit(1)
+
+
+# ---------------------------------------------------------------------------
+# license（离线许可：状态查看 + 签发）
+# ---------------------------------------------------------------------------
+@app.command("license")
+def license_status() -> None:
+    """Show the current license tier, expiry and effective features."""
+    from .license import ENV_LICENSE_KEY, load_license
+
+    info = load_license()
+    _banner("license")
+    console.print(
+        f"tier: [bold cyan]{info.tier}[/bold cyan]"
+        + (" [red](expired — downgraded)[/red]" if info.expired else "")
+    )
+    if info.customer:
+        console.print(f"customer: {info.customer} · license_id: {info.license_id}")
+        console.print(f"seats: {info.seats}")
+        console.print(f"expires: {info.expires_at.date().isoformat() if info.expires_at else 'never'}")
+    else:
+        console.print(
+            f"[dim]no license key ({ENV_LICENSE_KEY} / .fde_scope/license.key) — community tier[/dim]"
+        )
+    console.print("features: " + ", ".join(sorted(info.effective_features())))
+
+
+@app.command("license-issue")
+def license_issue(
+    customer: str = typer.Option(..., "--customer", "-c", help="Customer name"),
+    tier: str = typer.Option(..., "--tier", "-t", help="community | pro | enterprise"),
+    seats: int = typer.Option(1, "--seats", help="Licensed seats"),
+    expires: str | None = typer.Option(None, "--expires", help="Expiry date YYYY-MM-DD (omit = perpetual)"),
+    features: str = typer.Option("", "--features", help="Extra feature grants, comma-separated"),
+    out: str | None = typer.Option(None, "--out", "-o", help="Write the key to this file instead of stdout"),
+) -> None:
+    """Sign a license key for a customer (vendor delivery tool).
+
+    Requires FDE_SCOPE_LICENSE_SECRET in the environment; the secret is
+    never written anywhere. The issued *key* is the deliverable.
+    """
+    from datetime import UTC, datetime
+
+    from .license import ENV_LICENSE_SECRET, LicenseError, issue_license
+
+    expires_at = None
+    if expires:
+        try:
+            expires_at = datetime.strptime(expires, "%Y-%m-%d").replace(tzinfo=UTC)
+        except ValueError:
+            console.print(f"[red]Invalid --expires:[/red] {expires!r} (expected YYYY-MM-DD)")
+            raise typer.Exit(2) from None
+    try:
+        key = issue_license(
+            customer=customer,
+            tier=tier,  # type: ignore[arg-type]
+            seats=seats,
+            expires_at=expires_at,
+            features=[f.strip() for f in features.split(",") if f.strip()],
+        )
+    except LicenseError as exc:
+        console.print(f"[red]Cannot issue license:[/red] {exc}")
+        raise typer.Exit(2) from None
+    if out:
+        from .fsutil import atomic_write_text
+
+        atomic_write_text(Path(out), key + "\n")
+        console.print(f"✅ License key for [bold]{customer}[/bold] ({tier}) → [green]{out}[/green]")
+    else:
+        console.print(f"license key for [bold]{customer}[/bold] ({tier}, seats={seats}):\n{key}")
+    console.print(f"[dim]signed with ${ENV_LICENSE_SECRET} (never stored)[/dim]")
 
 
 if __name__ == "__main__":

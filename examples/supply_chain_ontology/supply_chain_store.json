@@ -87,6 +87,18 @@
       }
     },
     {
+      "curie": "scm:INSULATION",
+      "types": ["scm:RawMaterial"],
+      "object_assertions": {"scm:stored_in": ["scm:wh-RM"]},
+      "data_assertions": {
+        "scm:name": ["绝缘纸"],
+        "scm:qty_on_hand": [80],
+        "scm:safety_stock": [100],
+        "scm:forecast_demand_7d": [300],
+        "scm:lead_time_days": [10]
+      }
+    },
+    {
       "curie": "scm:SO-1001",
       "types": ["scm:SalesOrder"],
       "object_assertions": {

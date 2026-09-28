@@ -63,24 +63,59 @@
   （Origin→channel、Status→state、Description/Subject→content）；
   配置走 `FDE_SCOPE_SF_INSTANCE_URL` / `FDE_SCOPE_SF_ACCESS_TOKEN`，JSONL 回放兜底；
   token 不进日志/异常；`tests/test_salesforce_connector.py`（21 项）
-- [ ] MES ISA-95 / Historian（SQL/OPC 历史库）
+- [x] MES ISA-95 / Historian（2026-09-28 完成，均照 zammad/salesforce 惯例的三态模式）：
+  - MES：`GET {base}/api/v1/work-orders`（offset 分页，endpoint 可覆盖），Bearer 认证，
+    `order_id→id`、`product→category`、`status→state`、`description→content`；
+    env `FDE_SCOPE_MES_BASE_URL` / `FDE_SCOPE_MES_API_TOKEN`；`tests/test_mes_connector.py`（22 项）
+  - Historian：默认 `GET {base}/api/v1/samples?tag=X`（按 tag + offset 分页），
+    endpoint 含 `{tag}` 占位符时走 PI Web API 风格；quality 异常渲染为 content
+    （时序数据的语义载体）；env `FDE_SCOPE_HISTORIAN_BASE_URL` / `FDE_SCOPE_HISTORIAN_API_TOKEN`；
+    `tests/test_historian_connector.py`（21 项）
+  - 注意：两者按常见 MES/Historian REST 约定建模，具体客户现场用 options.endpoint 适配
 - [ ] 用真实连接器跑通一个 POC，替换 `seed_mock_engagements.py` 的至少一个案例
 
 ## P4 — 商业形态
 
-- [ ] 许可模式决策：双许可（开源核心 + 企业版功能开关）vs 纯服务
-- [ ] license 模块：license key 校验 + 功能开关 + seat 计数
-- [ ] mock 数据更名/显著免责声明（去真实公司名）
-- [ ] GTM 站：定价区块 + 联系/demo 表单 + 转化追踪
-- [ ] 客户侧文档：最终用户手册、API 参考（OpenAPI 导出）、onboarding 指南
-- [ ] 第三方依赖 license 审计 + NOTICE 文件
-- [ ] 法务：真实公司名 mock 清理（见差距 B5）
+- [x] 许可模式决策：双许可（开源核心 + 企业版功能开关）——已选定并实现
+- [x] license 模块（2026-09-28 完成）：`fde_scope/license.py` 离线许可——key 格式
+  `base64url(payload).base64url(hmac_sha256)`，签名密钥走 `FDE_SCOPE_LICENSE_SECRET`
+  （不设则 fail closed 所有 key 无效）；key 从 `FDE_SCOPE_LICENSE_KEY` 或
+  `.fde_scope/license.key` 读；tier：community / pro / enterprise（pro=+审计导出/证据留存/
+  LLM 合成，enterprise=+deploy serve/多租户预留），payload 显式 features 与 tier 表取并集；
+  过期降级 community + WARNING（不锁死用户）；`hmac.compare_digest` 常数时间比对；
+  CLI `fde-scope license`（查看）/ `fde-scope license-issue`（签发交付工具）；
+  web 门控：audit/export 与 evidence 上传要求 pro+（无 key → 402 明确文案）；
+  `tests/test_license.py`（25 项）。docstring 注明：诚实防君子机制，非 DRM
+- [x] mock 数据更名/显著免责声明（去真实公司名）（2026-09-28 完成：十个 engagement 全部改为虚构公司名 aurora/atlas/southbay/northern/swift/adnova/teaverse/horizon/riverbend/whitelake，README/GTM/reports/ 同步，种子脚本头部加显著免责声明）
+- [x] GTM 站（2026-09-28 完成）：三档定价区块（Community 免费 / Pro 占位价¥4,800/席位/月
+  标注"以商务洽谈为准" / Enterprise 面议）、联系区块（mailto + GitHub Issues）、导航锚点、
+  页脚 NOTICE 链接 + "演示数据均为虚构"声明；中英双语经 `i18n_split.py` 同步（+11 条映射）。
+  未做：转化追踪（无分析后端，纯静态站定位保留）
+- [x] 客户侧文档：最终用户手册、API 参考（OpenAPI 导出）、onboarding 指南（2026-09-28 完成：`docs/user-guide.md` 用户手册、`docs/api-reference.md` 路由级 API 参考（逐条对照 `web/app.py` + `web/guided_api.py`，OpenAPI 导出本身未做）、`docs/onboarding-customer.md` 现场部署/安全基线/接入决策树/验收模板；README 文档区已索引）
+- [x] 第三方依赖 license 审计 + NOTICE 文件（2026-09-28 完成：根目录 `NOTICE` + `docs/license-audit.md` + `tests/test_third_party_licenses.py` 守护；发现 mysql-connector-python GPLv2+FOSS 例外、asyncua LGPLv3+、paho-mqtt EPL-2.0/BSD 双许可，均为 optional extra）
+- [x] 法务：真实公司名 mock 清理（见差距 B5，2026-09-28 修复）
 
-## P5 — 规模化（视商业验证启动）
+## P5 — 规模化
 
-- [ ] 数据库后端（PostgreSQL）替代 JSON 文件，schema 迁移机制
-- [ ] 多租户/RBAC（user 模型、workspace 隔离）
-- [ ] SSO/LDAP
-- [ ] 飞轮再训练后端接线（现在是 stub）
-- [ ] `deploy --serve` 端到端实测
+- [x] 存储后端抽象 + SQLite（2026-09-28 完成）：`fde_scope/storage.py` `StorageBackend`
+  Protocol + `FileStorage`（默认，JSON 原子写行为零变化）+ `SQLiteStorage`（stdlib sqlite3
+  零新依赖，WAL，事务写，`FDE_SCOPE_STORAGE=file|sqlite` 切换）；web 层全生命周期走后端；
+  CLI `fde-scope storage-migrate --to sqlite` 单向迁移；`tests/test_storage.py`（15 项，
+  含 8 线程并发写不丢）。**PostgreSQL 与 schema 迁移框架未做**——SQLite 已解并发与可靠性，
+  PG 留待多租户落地时一起上
+- [x] 飞轮再训练后端接线（2026-09-28 完成）：`fde_scope/flywheel/backends.py`
+  `TrainingBackend` Protocol + `HTTPTrainingBackend`（通用 webhook 式训练服务，
+  `FDE_SCOPE_TRAINING_URL`/`FDE_SCOPE_TRAINING_TOKEN`，Bearer 认证，token 不进日志/异常）
+  + `NoopBackend`（如实标注 backend=noop，不再写"stub"误导）；scheduler 走工厂+可注入；
+  `tests/test_training_backend.py`（28 项）
+- [x] `deploy --serve` 端到端实测（2026-09-28 完成）：`deploy/e2e/` 验证基建——
+  `fake_model.py`（stdlib OpenAI 兼容假模型）+ `docker-compose.e2e.yml`（redis）+
+  `smoke_test.sh`（全自动：redis→fake model→隔离 FDE_SCOPE_HOME 起 serve→建 credential/
+  agent/session→/chat/ 触发→断言 fake 收到调用）；**已本机实测 PASS（agentscope 2.0.8）**；
+  发现真实缺口：`agentscope[service]` 不含 redis Python 包（已在 e2e README 前置条件标注）；
+  `tests/test_deploy_e2e_fake_model.py`（3 项）
+- [ ] 多租户/RBAC（user 模型、workspace 隔离）——依赖真实商业验证后启动
+- [ ] SSO/LDAP——同上
 - [ ] i18n 框架化（替代手工双份 HTML）
+- [ ] 用真实连接器跑通一个 POC，替换 `seed_mock_engagements.py` 的至少一个案例
+  （P3 遗留，连接器已全部就位）

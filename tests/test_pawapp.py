@@ -104,7 +104,7 @@ def test_pawapp_deploy_plan_route_matches_the_deployer(tmp_path: Path, monkeypat
     r = client.post(
         "/api/fde-scope/deploy/plan",
         json={
-            "tenant": "faw",
+            "tenant": "northern",
             "sources": {"csv": "data/t.csv"},
             "agents": [{"name": "a", "role": "数据分析"}],
         },
@@ -123,7 +123,7 @@ def test_pawapp_deploy_plan_tool_reads_roles_and_sources(tmp_path: Path, monkeyp
     monkeypatch.chdir(tmp_path)
     main = _load_pawapp_main(monkeypatch)
     out = asyncio.run(
-        main.fde_deploy_plan("guming", "数据分析,文件分析", '{"documents": "docs/"}'),
+        main.fde_deploy_plan("teaverse", "数据分析,文件分析", '{"documents": "docs/"}'),
     )
     assert out["summary"]["agents"] == 2
     assert out["summary"]["bound_tools"] == ["documents_sample", "documents_schema"]

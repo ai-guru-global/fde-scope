@@ -81,6 +81,16 @@ B_LABELS = {
     "Atomic writes": "原子写入",
     "Rule grants only": "仅规则授权",
     "Measured AgentScope window": "实测 AgentScope 窗口",
+    "MIT license": "MIT 开源协议",
+    "Community support": "社区支持",
+    "Everything in Community": "社区版全量",
+    "Per-seat subscription": "按席位订阅",
+    "Priority support": "优先支持",
+    "Team onboarding": "团队导入",
+    "Everything in Pro": "Pro 全量",
+    "Audit + evidence chain": "审计 + 证据链",
+    "Custom connector adaptation": "专属连接器适配",
+    "SLA": "SLA 保障",
 }
 
 # figure captions
@@ -235,6 +245,14 @@ def nav_links(html: str, lang: str) -> str:
             '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">技能手册库</a>',
         )
         html = html.replace(
+            '<a href="#pricing">PRICING · 定价</a>',
+            '<a href="#pricing">定价</a>',
+        )
+        html = html.replace(
+            '<a href="#contact">CONTACT · 联系</a>',
+            '<a href="#contact">联系</a>',
+        )
+        html = html.replace(
             '<a href="#crib">QUICK START</a>',
             '<a href="#crib">快速开始</a><a href="./en/" hreflang="en" lang="en">ENGLISH</a>',
         )
@@ -247,6 +265,14 @@ def nav_links(html: str, lang: str) -> str:
         html = html.replace(
             '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS · 技能库</a>',
             '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS</a>',
+        )
+        html = html.replace(
+            '<a href="#pricing">PRICING · 定价</a>',
+            '<a href="#pricing">PRICING</a>',
+        )
+        html = html.replace(
+            '<a href="#contact">CONTACT · 联系</a>',
+            '<a href="#contact">CONTACT</a>',
         )
         html = html.replace(
             '<a href="#crib">QUICK START</a>',

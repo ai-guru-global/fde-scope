@@ -75,7 +75,7 @@ def test_guided_view_empty_ticket_ctx() -> None:
 
 def test_guided_view_industrial_progress_and_gates() -> None:
     ctx = EngagementContext(
-        id="eng-m", customer="BMW", profile="manufacturing", current_phase="success_criteria"
+        id="eng-m", customer="Aurora Motors", profile="manufacturing", current_phase="success_criteria"
     )
     view = guided_view(ctx)
     assert view["phase"]["progress"] == "4/18"

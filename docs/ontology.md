@@ -10,7 +10,9 @@
 |---|---|
 | `fde_scope/ontology/models.py` | TBox/ABox 模型 + CURIE 工具 + xsd 类型映射 |
 | `fde_scope/ontology/validation.py` | SHACL-lite 校验器（错误码 ONTO-xxx）+ overlay import 合并 |
-| `fde_scope/ontology/jsonld.py` | 确定性 JSON-LD 1.1 导出（双语 label 走 language map） |
+| `fde_scope/ontology/jsonld.py` | 确定性 JSON-LD 1.1 导出（双语 label 走 language map；顶层只留 @context+@graph，默认图自包含——graph-object 形式会让 rdflib 等单图工具丢数据） |
+| `fde_scope/ontology/diagram.py` | Mermaid classDiagram 导出（TBox 概念模型图，确定性） |
+| `fde_scope/ontology/diff.py` | TBox 版本 diff：D1 移除 / D2 domain-range 改指 / D3 字面量范围变化 / D4 sub_class_of 收紧 = 破坏；+ ABox 影响面证据清单 |
 | `fde_scope/ontology/store.py` | 内置只读 schema + 工作区 schemas/stores（原子写） |
 | `fde_scope/ontology/extract.py` | ConceptExtractor：match_keywords 规则抽取 + 祖先链并入 + LLM 可选（失败回退 rule） |
 | `fde_scope/ontology/skills_bridge.py` | SkillRecord ↔ SKOS 桥接（category 概念 + tag CURIE + narrower 闭包，纯函数） |
@@ -44,6 +46,8 @@
     fde-scope ontology validate fde-core         # 校验 TBox（exit 1 = 失败）
     fde-scope ontology check <store-id>          # 校验 ABox（exit 1 = 失败）
     fde-scope ontology export fde-core -o out.jsonld   # JSON-LD 导出
+    fde-scope ontology export fde-core --format mermaid  # 概念模型图（Mermaid，仅 schema）
+    fde-scope ontology diff v1-id v2-id --store <store-id>  # 版本 diff（exit 1 = 有破坏性变更；--store 附 ABox 影响面）
 
 ## Web（只读）
 
@@ -56,6 +60,9 @@
 - **P1（已完成）**：核心 + 内置本体 + CLI/Web + 文档。
 - **P2（已完成）**：corpus --ontology——概念注解、概念级覆盖度（祖先合并）、定向合成（见下）。
 - **P3（已完成）**：skills SKOS 桥接——`skill list --concept` 经 broader/narrower 扩展（见下）。
+- **P4（已完成）**：演进与互操作——`ontology diff`（D1-D4 破坏性判据 + ABox
+  影响面）、`export --format mermaid`（概念模型图）、JSON-LD 导出形状修正为
+  默认图自包含（graph-object 形式会被 rdflib 等单图工具丢弃，互操作有测试锁定）。
 
 ## P2 — 语料引擎语义增强（corpus --ontology）
 

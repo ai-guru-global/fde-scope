@@ -43,7 +43,15 @@ UI 宣称 gate 例外"进入审计日志"（`fde_scope/web/i18n.py:254`），实
 
 ### B5. 客户案例 100% mock + 真实公司名风险
 
-`examples/seed_mock_engagements.py`（2288 行）自述 "illustrative"：bmw/faw/fawvw/gac/caocao/eclicktech/guming/chery/lzlj/mengniu 十个 engagement 全部脚本构造，gate 时间戳手填回填（第 78-82 行），corpus 样本是 `"语料样本 #i"` 占位。指标（MAE 12.4、OEE +2.1pp）全是编的数字。对外演示使用真实公司名（华晨宝马、广汽、蒙牛等）存在商标/虚假背书风险——**商业化前必须更名或加显著免责声明**。
+`examples/seed_mock_engagements.py`（约 2300 行）自述 "illustrative"：十个 engagement 全部脚本构造，gate 时间戳手填回填，corpus 样本是 `"语料样本 #i"` 占位。指标（MAE 12.4、OEE +2.1pp）全是编的数字。对外演示使用真实公司名（华晨宝马、广汽、蒙牛等）存在商标/虚假背书风险。
+
+**修复状态**：✅ 已修复（2026-09-28，P4）——十个 engagement 全部更名为明显虚构的公司
+（aurora-motors 奥罗拉汽车 / atlas-auto-alliance 亚特联汽车 / southbay-motors 南湾汽车 /
+northern-auto 北疆汽车 / swift-ride 迅捷出行 / adnova 星澜科技 / teaverse 茶语万象 /
+horizon-auto 宏途汽车 / riverbend-spirits 河湾酒业 / whitelake-dairy 白湖乳业），engagement id、
+`reports/*` 生成物、README/GTM/PRODUCT/tests/web UI 引用全部同步；种子脚本头部加了显著
+中英双语免责声明（"全部为虚构数据，与任何真实公司无关；仅用于产品演示"）；真实人物名
+（罗永浩、邓丽君）一并替换；mock engagement 与技能库已重新播种。
 
 ## 重要差距（C 类：影响交付可信度与可维护性）
 
@@ -51,18 +59,28 @@ UI 宣称 gate 例外"进入审计日志"（`fde_scope/web/i18n.py:254`），实
 
 `connectors/salesforce.py:49,53`、`mes_isa95.py:113,129`、`historian.py:54,58` 全是 TODO 占位（只读 JSONL 文件），README Roadmap 自己承认。企业 POC 接真实系统是必经环节，此前 40% 连接器不可用。
 
-**修复状态**：P3 部分修复（2026-09-28）——`connectors/zammad.py`、`connectors/salesforce.py`
-已升级为真实 HTTP/REST 实现（Zammad `/api/v1/tickets` + Token 认证；Salesforce SOQL
-`query` + Bearer 认证、只读；均 env 配置 + 本地 JSONL 回放兜底，见
-`docs/commercialization-roadmap.md`）；MES ISA-95 / Historian 仍为 stub。
+**修复状态**：P3 已修复（2026-09-28）——四个 stub 连接器全部升级为真实 HTTP/REST 实现
+（Zammad `/api/v1/tickets` + Token；Salesforce SOQL `query` + Bearer 只读；
+MES work-orders REST；Historian 时序 samples REST）。统一三态模式：env 配置 →
+真实 API，本地 `.jsonl` → 离线回放，未配置 → 空结果 + WARNING。MES/Historian 端点
+按常见 REST 约定建模，客户现场用 `options.endpoint` 适配。见 `docs/commercialization-roadmap.md`。
 
 ### C2. 核心卖点"自改进飞轮"未闭环
 
 `flywheel/retrain_scheduler.py:63` 明写 `"submitted (stub — no training backend wired)"`；飞轮引擎是 "rule-based v0"（`engine.py:3`）。线上 drift 检测无实现（mock 里的 PSI 告警是编的）。
 
+**修复状态**：P5 已修复主体（2026-09-28）——新增 `fde_scope/flywheel/backends.py`
+`TrainingBackend` Protocol + `HTTPTrainingBackend`（webhook 式训练服务，env 配置）
++ `NoopBackend`（如实标注），scheduler 走工厂不再有 "stub" 误导字样；
+`tests/test_training_backend.py`（28 项）。未做：真实训练流水线本身（属于客户基础设施集成）。
+
 ### C3. `deploy --serve` 端到端未实测
 
 README Roadmap 明确未勾选。依赖 Redis + 可达模型 + `.[agentscope]` extra；AgentScope 2.0 无 `Agent.stop` 的缺口使运行期稳定性未经生产验证。
+
+**修复状态**：✅ 已修复（2026-09-28）——`deploy/e2e/` 验证基建（fake_model.py +
+docker-compose.e2e.yml + smoke_test.sh）已本机实测 PASS（agentscope 2.0.8）；
+发现真实缺口 `agentscope[service]` 不含 redis Python 包，已在 e2e README 前置条件标注。
 
 ### C4. 零可观测性
 
@@ -85,10 +103,10 @@ degraded 仍 200）。metrics/tracing 未做，留待后续。
 
 ## 商业闭环缺口
 
-- **MIT 裸奔**（`pyproject.toml:11`）：无 license key、无 seat 限制、无功能开关——即便客户愿意付费也没有"付费形态"；竞争者可自由 fork 转售。无 NOTICE、无第三方依赖 license 审计（paho-mqtt 的 EPL/EDL 需注意）。
-- **GTM 站无商务触点**：全站 CTA 只有 GitHub/文档链接，无定价、无联系表单、无 demo 预约（`GTM/index.html`）；PRODUCT.md:41 明确"无真实商务联系渠道"。
+- **MIT 裸奔**（`pyproject.toml:11`）：无 license key、无 seat 限制、无功能开关——即便客户愿意付费也没有"付费形态"；竞争者可自由 fork 转售。无 NOTICE、无第三方依赖 license 审计（paho-mqtt 的 EPL/EDL 需注意）。**修复状态**：✅ 已修复（2026-09-28，P4）——`fde_scope/license.py` 离线许可（HMAC 签名、三档 tier、过期降级、web 门控 pro+、CLI 签发工具）；根目录 `NOTICE` + `docs/license-audit.md` + 守护测试。
+- **GTM 站无商务触点**：全站 CTA 只有 GitHub/文档链接，无定价、无联系表单、无 demo 预约（`GTM/index.html`）；PRODUCT.md:41 明确"无真实商务联系渠道"。**修复状态**：✅ 已修复（2026-09-28，P4）——三档定价区块（Pro 占位价标注"以商务洽谈为准"）+ mailto 联系区块 + 导航锚点 + 虚构数据免责声明；转化追踪未做（纯静态站定位保留）。
 - **企业采购标准件全缺**：SSO/LDAP、安全白皮书、SLA 支持体系。
-- **客户侧文档为零**：无最终用户手册、无 API 参考、无 onboarding 指南（`fde_scope/engagement/guided.py` 刚开始补引导模式）。
+- **客户侧文档为零**：无最终用户手册、无 API 参考、无 onboarding 指南（`fde_scope/engagement/guided.py` 刚开始补引导模式）。**修复状态**：✅ 已修复（2026-09-28，P4）——新增 `docs/user-guide.md` / `docs/api-reference.md` / `docs/onboarding-customer.md`，README 文档区已索引；OpenAPI 自动导出未做，留待后续。
 - **分发形态不成熟**：macOS 默认 ad-hoc 签名（README.md:683）；Android 是 debug keystore 的 WebView 壳（`android/build.sh`）；PawApp 依赖私有宿主 QwenPaw。
 - **i18n 是手工双份 HTML**（`web/i18n.py` 手工对照表），加功能要翻译两遍，无法扩展第三语言。
 

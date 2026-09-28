@@ -1,0 +1,27 @@
+# docker-compose for the `fde-scope deploy --serve` e2e smoke (see deploy/e2e/README.md).
+#
+# Only Redis runs in Docker: `build_app()` wires `RedisStorage(host=..., port=6379)`
+# and the CLI's `--serve` path does not expose host/port overrides, so Redis must
+# listen on 127.0.0.1:6379.
+#
+# The fake model (deploy/e2e/fake_model.py) deliberately runs on the host, not in
+# Docker: the served AgentScope app also runs on the host (`uvicorn.run` in
+# `fde_scope.cli._serve_app`), so host-to-host loopback keeps the smoke hermetic —
+# no container networking, no image builds. It is a stdlib one-liner:
+#
+#     python deploy/e2e/fake_model.py --port 19100
+#
+# and then `FDE_SCOPE_LLM_BASE_URL=http://127.0.0.1:19100/v1` (plus any non-empty
+# `FDE_SCOPE_LLM_API_KEY`) points the fde-scope LLM client at it.
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    # Throwaway instance: no persistence, no auth — loopback-only e2e use.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 2s
+      retries: 30

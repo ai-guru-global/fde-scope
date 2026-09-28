@@ -503,7 +503,7 @@ def test_journal_api_roundtrip(client) -> None:
 
 
 def test_journal_to_skill_bridge(client) -> None:
-    eid = client.post("/api/engagements", data={"customer": "BMW"}).json()["engagement_id"]
+    eid = client.post("/api/engagements", data={"customer": "Aurora"}).json()["engagement_id"]
     jid = client.post(
         f"/api/engagements/{eid}/journal", json={"kind": "implementation", "note": "部署完成"}
     ).json()["id"]
@@ -538,12 +538,12 @@ def test_workbench_api_empty(client) -> None:
 
 def test_workbench_api_stats_matrix_recent(client) -> None:
     client.post("/api/engagements", data={"customer": "Acme"})
-    client.post("/api/engagements", data={"customer": "BMW", "profile": "manufacturing"})
+    client.post("/api/engagements", data={"customer": "Aurora", "profile": "manufacturing"})
     wb = client.get("/api/workbench").json()
     assert wb["stats"]["active_projects"] == 2
     assert wb["stats"]["phase_distribution"] == {"qualification": 2}
     assert len(wb["matrix"]) == 2
-    assert wb["matrix"][0]["customer"] in ("Acme", "BMW")
+    assert wb["matrix"][0]["customer"] in ("Acme", "Aurora")
     # 技能：草稿计入 draft_skills；发布后进入 recent_skills
     sid = client.post(
         "/api/skills", json={"title": "OPC UA 踩坑", "category": "implementation", "tags": ["opcua"]}
@@ -577,8 +577,8 @@ def test_deploy_plan_binds_configured_sources(client) -> None:
     r = client.post(
         "/api/deploy/plan",
         json={
-            "tenant": "caocao",
-            "name": "曹操出行",
+            "tenant": "swift",
+            "name": "迅捷出行",
             "sources": {"csv": "data/t.csv", "documents": "docs/"},
             "agents": [{"name": "analyst", "role": "数据分析"}, {"name": "archivist", "role": "文件分析"}],
         },

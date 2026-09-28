@@ -47,6 +47,9 @@ dependencies = [
 # tools create_app registers import `apscheduler`. `ollama` is the extra name on
 # 2.0.4.post1 and stays a valid alias of `model-ollama` on newer releases.
 agentscope = ["agentscope[ollama,service]>=2.0.4.post1,<3"]
+# `--serve` additionally needs the redis Python client, which
+# `agentscope[service]` does not pull in (found by deploy/e2e smoke test).
+serve = ["redis>=5,<9"]
 mysql = ["mysql-connector-python>=8.3"]
 opcua = ["asyncua>=1.0,<3"]
 mqtt = ["paho-mqtt>=2.0,<3"]
@@ -66,6 +69,7 @@ dev = [
 full = [
     "fde-scope[dev]",
     "fde-scope[agentscope]",
+    "fde-scope[serve]",
     "fde-scope[mysql]",
     "fde-scope[opcua]",
     "fde-scope[mqtt]",

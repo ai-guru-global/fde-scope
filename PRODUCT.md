@@ -48,7 +48,7 @@ FDE Scope 是 Forward Deployed Engineer 的完整现场操作系统：把 FDE �
 
 ## Evidence on Hand
 
-- 可用真实素材：4 zones/18 phases/10 gates 清单；2 profiles；10 门禁的检查语义（README 表格）；6 个 mock engagement（古茗、一汽-大众、广汽、一汽、曹操出行、易点天下——README 声明为 engine 生成的 mock 数据）；quick start 命令；`docs/fde_sop_full.md`（18 阶段 + 12 反模式）；`docs/manufacturing_scenario.md`；CI/coverage 徽章（~89% 覆盖率）。
+- 可用真实素材：4 zones/18 phases/10 gates 清单；2 profiles；10 门禁的检查语义（README 表格）；10 个 mock engagement（茶语万象、亚特联汽车、南湾汽车、北疆汽车、迅捷出行、星澜科技等——全部为虚构公司，engine 生成的演示数据）；quick start 命令；`docs/fde_sop_full.md`（18 阶段 + 12 反模式）；`docs/manufacturing_scenario.md`；CI/coverage 徽章（~89% 覆盖率）。
 - 多 Agent 素材：`--agent 名字:角色[:模型]` CLI 通道（中文角色名实测可用）；真实 Toolkit 广播绑定工具（如 csv_sample/csv_schema）；SubAgentTemplate 蓝图注册进真实 create_app（CI 真库测试）；未配数据源的工具在 manifest 诚实标注 unbound。
 - 不得虚构：真实客户署名与评价、真实基准数据、下载量、联系渠道；mock 数据引用处需可辨识为演示数据。
 

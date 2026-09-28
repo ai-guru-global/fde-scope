@@ -413,6 +413,14 @@ section{padding:96px 0 0}
 .lists-col li .zh{display:block;color:var(--paper-dim);font-size:.78rem;line-height:1.6}
 .lists-note{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;color:var(--text-dim);margin-top:22px;border-top:1px solid var(--line);padding-top:14px}
 
+/* ── pricing tiers ─────────────────────────────── */
+.lists-col.tier-featured{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange),inset 0 1px 0 rgba(230,237,246,.06)}
+.tier-price{font-family:var(--mono);font-weight:600;font-size:1.45rem;color:var(--text);margin:12px 0 0;line-height:1.2}
+.tier-price small{font-size:.7rem;font-weight:400;letter-spacing:.06em;color:var(--text-dim)}
+.tier-note{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;color:var(--amber);margin-top:6px}
+.tier-cta{margin-top:18px}
+.tier-cta .steelbtn{width:100%;justify-content:center}
+
 /* ── close ─────────────────────────────────────── */
 .close{padding:120px 0 90px;text-align:left}
 .close h2{
@@ -486,12 +494,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M5 11h21l18 13H23Z" fill="#1c64d2"/><path d="M23 24h21L9 46l9-14Z" fill="#15448e"/></svg>
     <div class="brand">FDE SCOPE<small>外派工程师作业系统 · MIT</small></div>
     <nav aria-label="Site">
-      <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GitHub 仓库</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP 文档</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">技能手册库</a>
-      <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">ResolveAgent ↗（相关项目）</a>
-      <a href="https://e6cllzitarii.meoo.fun" target="_blank" rel="noopener">产品演示 ↗（功能总览）</a>
-      <a href="#crib">快速开始</a><a href="./en/index.html" hreflang="en" lang="en">English（英文版）</a>
+      <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GITHUB</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP 文档</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">技能手册库</a>
+      <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">RESOLVEAGENT ↗</a>
+      <a href="#pricing">定价</a>
+      <a href="#contact">联系</a>
+      <a href="#crib">快速开始</a><a href="./en/" hreflang="en" lang="en">ENGLISH</a>
     </nav>
   </div>
 </header>
@@ -521,9 +530,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
       <div class="cta-strip cta-top">
         <button class="pushbtn" id="install-btn" type="button">pip install -e ".[dev]"<span class="copied">已复制 ✓</span></button>
-        <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.8 6.3.8-4.6 4.3 1.2 6.1L12 17l-5.6 3 1.2-6.1L3 9.6l6.3-.8Z"/></svg>GitHub 点 Star（收藏）</a>
-        <a class="doclink" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">完整 18 阶段 SOP 文档 →</a>
-        <span class="cta-note">无需大模型密钥（LLM key）· 无需 Docker · Python ≥ 3.11</span>
+        <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.8 6.3.8-4.6 4.3 1.2 6.1L12 17l-5.6 3 1.2-6.1L3 9.6l6.3-.8Z"/></svg>Star on GitHub</a>
+        <a class="doclink" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">Read the full 18-phase SOP · 完整 SOP →</a>
+        <span class="cta-note">NO LLM KEY · NO DOCKER · PYTHON ≥ 3.11</span>
       </div>
 
       <div class="lanes">
@@ -541,7 +550,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <div class="rail">
             <article class="tcard slot" data-i="05" data-phase="connect" data-status="passed"><span class="lamp" aria-hidden="true"></span>数据接入<span class="gates"><span class="g"><i></i>air_gap</span></span></article>
             <article class="tcard slot" data-i="06" data-phase="corpus" data-status="passed"><span class="lamp" aria-hidden="true"></span>语料锻造</article>
-            <article class="tcard slot" data-i="07" data-phase="prototype_real_data" data-status="passed"><span class="lamp" aria-hidden="true"></span>用未加工的真实数据搭原型</article>
+            <article class="tcard slot" data-i="07" data-phase="prototype_real_data" data-status="passed"><span class="lamp" aria-hidden="true"></span>真实未策展数据上原型</article>
             <article class="tcard slot" data-i="08" data-phase="validate" data-status="passed"><span class="lamp" aria-hidden="true"></span>干系人验证</article>
             <article class="tcard slot" data-i="09" data-phase="deploy" data-status="blocked"><span class="lamp" aria-hidden="true"></span><span class="ind-tag"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg></span>部署上线<span class="gates"><span class="g" data-g="fat_sat"><i></i>fat_sat</span><span class="g" data-g="functional_safety"><i></i>functional_safety</span><span class="g" data-g="conformity"><i></i>conformity</span></span><span class="verdict">advance → 拒绝推进<br>缺少危害分析</span></article>
             <article class="tcard slot" data-i="10" data-phase="eval" data-status="pending"><span class="lamp" aria-hidden="true"></span>评估交付</article>
@@ -551,7 +560,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <div class="lane-head"><span class="lane-letter">C</span><span class="lane-name">运营化</span></div>
           <div class="rail">
             <article class="tcard slot" data-i="11" data-phase="slo_sla" data-status="pending"><span class="lamp" aria-hidden="true"></span>SLO/SLA + 轮值<span class="gates"><span class="g"><i></i>slo</span><span class="g"><i></i>shift_handover</span></span></article>
-            <article class="tcard slot" data-i="12" data-phase="runbook" data-status="pending"><span class="lamp" aria-hidden="true"></span>Runbook（应急手册）编写</article>
+            <article class="tcard slot" data-i="12" data-phase="runbook" data-status="pending"><span class="lamp" aria-hidden="true"></span>Runbook 编写</article>
             <article class="tcard slot" data-i="13" data-phase="monitoring_drift" data-status="pending"><span class="lamp" aria-hidden="true"></span>监控与漂移检测</article>
             <article class="tcard slot" data-i="14" data-phase="change_mgmt_training" data-status="pending"><span class="lamp" aria-hidden="true"></span><span class="ind-tag"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg></span>变更管理 + 培训<span class="gates"><span class="g"><i></i>works_council</span></span></article>
             <article class="tcard slot" data-i="15" data-phase="flywheel_productization" data-status="pending"><span class="lamp" aria-hidden="true"></span>飞轮 → 产品化</article>
@@ -586,32 +595,32 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="log-row slot">
         <div class="log-time">2015·05·28<span class="log-view view-fde">FDE</span><small>INC-20150528-CTRIP · SEV-1</small></div>
         <p class="log-entry">携程 5·28 全站瘫痪（运维误删生产服务器执行代码，12 小时全业务中断）</p>
-        <div class="log-catch"><b>FDE · PHASE 12 · RUNBOOK</b>: 回滚路径与安全失败模式，先于上线存在。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/saas-platforms/2015-05-28-ctrip-code-deletion.md" target="_blank" rel="noopener">案例档案 ↗ 携程</a></div>
+        <div class="log-catch"><b>FDE · PHASE 12 · RUNBOOK</b>回滚路径与安全失败模式，先于上线存在。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/saas-platforms/2015-05-28-ctrip-code-deletion.md" target="_blank" rel="noopener">CASE FILE ↗ 携程</a></div>
       </div>
       <div class="log-row slot">
         <div class="log-time">2022·12·18<span class="log-view view-fde">FDE</span><small>INC-20221218-ALIYUN-HK · SEV-1</small></div>
         <p class="log-entry">阿里云香港可用区 C 大规模服务中断（冷机水路气阻+群控死锁，运营十余年最长大故障）</p>
-        <div class="log-catch"><b>FDE · GATE fat_sat</b>: 冷却与群控联动必须通过现场验收，才能放行上线。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/cloud-infrastructure/2022-12-18-aliyun-hongkong-outage.md" target="_blank" rel="noopener">案例档案 ↗ 阿里云</a></div>
+        <div class="log-catch"><b>FDE · GATE fat_sat</b>冷却与群控联动必须通过现场验收，才能放行上线。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/cloud-infrastructure/2022-12-18-aliyun-hongkong-outage.md" target="_blank" rel="noopener">CASE FILE ↗ 阿里云</a></div>
       </div>
       <div class="log-row slot">
         <div class="log-time">2025·09·18<span class="log-view view-fde">FDE</span><small>INC-20250918-CLERK-DATABASE · SEV-1</small></div>
         <p class="log-entry">Clerk 数据库事件（供应商自动升级触发连接池同步回收，惊群效应致间歇性故障 4 天，诊断被监控采样率掩盖）</p>
-        <div class="log-catch"><b>FDE · GATE slo</b>: 错误预算 + 告警路由；采样不能掩盖证据。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2025-09-18-clerk-database-incident.md" target="_blank" rel="noopener">案例档案 ↗ Clerk</a></div>
+        <div class="log-catch"><b>FDE · GATE slo</b>错误预算 + 告警路由；采样不能掩盖证据。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2025-09-18-clerk-database-incident.md" target="_blank" rel="noopener">CASE FILE ↗ Clerk</a></div>
       </div>
       <div class="log-row slot">
         <div class="log-time">2025·06·26<span class="log-view view-sa">SA</span><small>INC-20250626-CLERK-CLOUDRUN · SEV-1</small></div>
         <p class="log-entry">Clerk 全服务中断 45 分钟（单区域架构 + 过度信任 Cloud Run 冗余承诺，认证基础设施整体不可用）</p>
-        <div class="log-catch"><b>SA · PHASE 07 · REAL DATA</b>: 供应商承诺不等于已验证事实，用生产形态的真实环境验证。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2025-06-26-clerk-cloudrun-outage.md" target="_blank" rel="noopener">案例档案 ↗ Clerk</a></div>
+        <div class="log-catch"><b>SA · PHASE 07 · REAL DATA</b>供应商承诺不等于已验证事实，用生产形态的真实环境验证。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2025-06-26-clerk-cloudrun-outage.md" target="_blank" rel="noopener">CASE FILE ↗ Clerk</a></div>
       </div>
       <div class="log-row slot">
         <div class="log-time">2023·09·12<span class="log-view view-sa">SA</span><small>INC-20230912-UNITY-RUNTIME · SEV-2</small></div>
         <p class="log-entry">Unity Runtime Fee 收费政策引爆开发者生态危机（按安装收费决策 + 傲慢沟通，CEO 下台、政策最终取消）</p>
-        <div class="log-catch"><b>SA · GATE success_criteria</b>: 书面标准 + ≥2 发起人 + 干系人对齐的成功指标。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2023-09-12-unity-runtime-fee.md" target="_blank" rel="noopener">案例档案 ↗ Unity</a></div>
+        <div class="log-catch"><b>SA · GATE success_criteria</b>书面标准 + ≥2 发起人 + 干系人对齐的成功指标。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/sa-architecture/2023-09-12-unity-runtime-fee.md" target="_blank" rel="noopener">CASE FILE ↗ Unity</a></div>
       </div>
       <div class="log-row slot">
         <div class="log-time">2021·10·04<span class="log-view view-sa">SA</span><small>INC-20211004-FACEBOOK · SEV-1</small></div>
         <p class="log-entry">Facebook 全球中断（骨干网维护命令撤销全部 BGP 路由）</p>
-        <div class="log-catch"><b>SA · PHASE 12 · RUNBOOK</b>: 带外恢复路径要演练过，不能假设它在。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/networking-dns/2021-10-04-facebook-bgp.md" target="_blank" rel="noopener">案例档案 ↗ Meta (Facebook)</a></div>
+        <div class="log-catch"><b>SA · PHASE 12 · RUNBOOK</b>带外恢复路径要演练过，不能假设它在。<a class="log-src" href="https://github.com/kudig-io/kuba/blob/main/incidents/networking-dns/2021-10-04-facebook-bgp.md" target="_blank" rel="noopener">CASE FILE ↗ Meta (Facebook)</a></div>
       </div>
 <!-- log:sync:end -->
   </div>
@@ -634,7 +643,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="gate-row" data-key="6"><span class="gate-key">6</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">works_council</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg></span><span class="gate-sem">有员工代表时须劳资共决签核。</span></div>
       <div class="gate-row" data-key="7"><span class="gate-key">7</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">air_gap</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg></span><span class="gate-sem">离线部署形态在接入时定论，杜绝事后外联。</span></div>
       <div class="gate-row" data-key="8"><span class="gate-key">8</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">shift_handover</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg></span><span class="gate-sem">多班次现场须有数字交接日志 + 分班次 runbook。</span></div>
-      <div class="gate-row" data-key="9"><span class="gate-key">9</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">slo</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg></span><span class="gate-sem">SLO/SLA（服务等级目标/协议）+ 错误预算 + 告警路由；缺路由 → 警告。</span></div>
+      <div class="gate-row" data-key="9"><span class="gate-key">9</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">slo</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg></span><span class="gate-sem">SLO/SLA + 错误预算 + 告警路由；缺路由 → 警告。</span></div>
       <div class="gate-row" data-key="0"><span class="gate-key">0</span><span class="gate-lamp" aria-hidden="true"></span><span class="gate-slug">handoff_signoff</span><span class="gate-applies"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg></span><span class="gate-sem">交接包齐备（runbook/评估/SLO/培训）且客户签收。</span></div>
     </div>
     <div class="gate-why" role="note">
@@ -659,21 +668,21 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </div>
     <div class="orders">
       <article class="order o-ticket slot">
-        <header><h3>Ticket（客服工单）</h3><span class="stamp stamp-in">PROFILE（场景）· 客服</span></header>
+        <header><h3>Ticket</h3><span class="stamp stamp-in">PROFILE · 客服</span></header>
         <dl>
-          <dt>Phases（阶段）</dt><dd>18 阶段中的 15 个；3 个工业专属阶段自动不适用。</dd>
-          <dt>Connectors（连接器）</dt><dd>CSV · Zammad · Salesforce · MySQL</dd>
-          <dt>Gates（门禁）</dt><dd>success_criteria · slo · handoff_signoff</dd>
-          <dt>Proof（度量证明）</dt><dd class="kpi">解决率 / 满意度 / 分流率 / 坏例挖掘</dd>
+          <dt>Phases</dt><dd>18 阶段中的 15 个；3 个工业专属阶段自动不适用。</dd>
+          <dt>Connectors</dt><dd>CSV · Zammad · Salesforce · MySQL</dd>
+          <dt>Gates</dt><dd>success_criteria · slo · handoff_signoff</dd>
+          <dt>Proof</dt><dd class="kpi">解决率 / 满意度 / 分流率 / 坏例挖掘</dd>
         </dl>
       </article>
       <article class="order o-mfg slot">
-        <header><h3>Manufacturing（制造业）</h3><span class="stamp stamp-in">PROFILE（场景）· 工厂</span></header>
+        <header><h3>Manufacturing</h3><span class="stamp stamp-in">PROFILE · 工厂</span></header>
         <dl>
-          <dt>Phases（阶段）</dt><dd>全 18 阶段，含现场勘察、FAT/SAT（出厂/现场验收测试）部署与共决变更。</dd>
-          <dt>Connectors（连接器）</dt><dd>OPC UA · MQTT-Sparkplug · ROS2 · MES · Historian</dd>
-          <dt>Gates（门禁）</dt><dd>全部 10 个门禁</dd>
-          <dt>Proof（度量证明）</dt><dd class="kpi">OEE（设备综合效率）/ 平均故障间隔 / 良率 / 抓取成功率 / 碰撞率</dd>
+          <dt>Phases</dt><dd>全 18 阶段，含现场勘察、FAT/SAT 部署与共决变更。</dd>
+          <dt>Connectors</dt><dd>OPC UA · MQTT-Sparkplug · ROS2 · MES · Historian</dd>
+          <dt>Gates</dt><dd>all 10 · 全部十个门禁</dd>
+          <dt>Proof</dt><dd class="kpi">OEE / 平均故障间隔 / 良率 / 抓取成功率 / 碰撞率</dd>
         </dl>
       </article>
     </div>
@@ -685,15 +694,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="sec-head">
       <h2 id="crew-h">一次部署，拉起一支 Agent 班组</h2>
-      <p class="lede">点到的每个名字都是真实的 AgentScope 2.0 Agent——接线模型、角色工具包、经 AgentState 注入的权限规则。驻场工程师（FDE）自己点名拉起 Agent；未知角色退化为语料工具，缺数据源的工具在清单里如实标注 unbound（未绑定），绝不假装可用。</p>
+      <p class="lede">点到的每个名字都是真实的 AgentScope 2.0 Agent——接线模型、角色工具包、经 AgentState 注入的权限规则。FDE 自己点名开 Agent；未知角色退化为语料工具，缺数据源的工具在清单里如实标注 unbound，绝不假装可用。</p>
     </div>
     <div class="crib">
       <div class="crib-row"><span class="crib-label">名字:角色[:模型]，可重复</span><code class="crib-cmd">fde-scope deploy --tenant acme --agent 数据员:数据分析 --agent 日志员:日志分析:qwen3-14b --connector-source csv=sample.csv</code><button class="copybtn" data-copy="fde-scope deploy --tenant acme --agent 数据员:数据分析 --agent 日志员:日志分析:qwen3-14b --connector-source csv=sample.csv">复制</button></div>
-      <div class="crib-row"><span class="crib-label">发车前先看计划：Web 控制台 /console#deploy「🤖 Agent 部署」（macOS App 同款标签页），同走 build_deploy_plan</span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">复制</button></div>
+      <div class="crib-row"><span class="crib-label">发车前先看 plan：Web 控制台 /console#deploy「🤖 Agent 部署」（macOS App 同款标签页），同走 build_deploy_plan</span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">复制</button></div>
       <div class="conveyor" aria-label="Agent crew coordination">
         <span class="station"><b>花名册</b>每个名字一个真实 Agent</span><span class="belt"></span>
-        <span class="station"><b>子代理模板</b>蓝图注册进真实应用</span><span class="belt"></span>
-        <span class="station"><b>AGENTCREATE · TEAM SAY</b>队长（leader）派活，成员回报</span><span class="belt"></span>
+        <span class="station"><b>子代理模板</b>蓝图注册进真实 app</span><span class="belt"></span>
+        <span class="station"><b>AGENTCREATE · TEAM SAY</b>leader 派活，成员回报</span><span class="belt"></span>
         <span class="station"><b>SERVE</b>--serve 起真服务（Redis + 模型）</span>
       </div>
     </div>
@@ -705,16 +714,16 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="sec-head">
       <h2 id="ledger-h">一块已经跑起来的看板</h2>
-      <p class="lede">一条命令种入六个示例项目；以下每条门禁记录都由引擎自身生成，面板不会说谎。</p>
+      <p class="lede">一条命令种入六个真实感项目；以下每条门禁记录都由引擎自身生成，面板不会说谎。</p>
     </div>
     <div class="ledger">
-      <div class="ledger-head"><span>Customer（客户）</span><span>Profile（场景）</span><span>Phase（阶段）</span><span>Story（状态故事）</span><span>State（状态）</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">古茗 · tea chain</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">15/15</span><span class="ledger-story">完整交接包，客户签收。</span><span class="ledger-state st-passed"><i></i>已签收</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">一汽-大众 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">11/18</span><span class="ledger-story">9/9 工业门禁通过：三班制、共决、PL d/SIL 2、HAZOP。</span><span class="ledger-state st-running"><i></i>运行中</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">广汽 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">9/18</span><span class="ledger-story">FAT/SAT、功能安全与合规真实阻断 → 拒绝推进。</span><span class="ledger-state st-blocked"><i></i>阻断</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">一汽 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">13/15</span><span class="ledger-story">产品化飞轮运转中。</span><span class="ledger-state st-running"><i></i>飞轮</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">曹操出行 · ride-hailing</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">8/15</span><span class="ledger-story">真实数据原型，SLO 已定义。</span><span class="ledger-state st-running"><i></i>原型</span></div>
-      <div class="ledger-row slot"><span class="ledger-cust">易点天下 · outbound SaaS</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">3/15</span><span class="ledger-story">单一发起人阻断，即 Sponsor Collapse（发起人依赖坍缩）反模式，被门禁拦下。</span><span class="ledger-state st-blocked"><i></i>阻断</span></div>
+      <div class="ledger-head"><span>Customer · 客户</span><span>Profile</span><span>Phase</span><span>Story · 状态故事</span><span>State</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">茶语万象 · tea chain</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">15/15</span><span class="ledger-story">完整交接包，客户签收。</span><span class="ledger-state st-passed"><i></i>已签收</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">亚特联汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">11/18</span><span class="ledger-story">9/9 工业门禁通过：三班制、共决、PL d/SIL 2、HAZOP。</span><span class="ledger-state st-running"><i></i>运行中</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">南湾汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>mfg</span><span class="ledger-phase">9/18</span><span class="ledger-story">FAT/SAT、功能安全与合规真实阻断 → 拒绝推进。</span><span class="ledger-state st-blocked"><i></i>阻断</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">北疆汽车 · automaker</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">13/15</span><span class="ledger-story">产品化飞轮运转中。</span><span class="ledger-state st-running"><i></i>飞轮</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">迅捷出行 · ride-hailing</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">8/15</span><span class="ledger-story">真实数据原型，SLO 已定义。</span><span class="ledger-state st-running"><i></i>原型</span></div>
+      <div class="ledger-row slot"><span class="ledger-cust">星澜科技 · outbound SaaS</span><span class="ledger-prof"><svg viewBox="0 0 24 24"><path d="M5 21V4h9v17M14 9h5v12"/></svg>ticket</span><span class="ledger-phase">3/15</span><span class="ledger-story">单一发起人阻断，即 Sponsor Collapse 反模式，被门禁拦下。</span><span class="ledger-state st-blocked"><i></i>阻断</span></div>
       <div class="ledger-note">演示数据 · 由 examples/seed_mock_engagements.py 种入；每条门禁记录均由引擎生成。</div>
     </div>
   </div>
@@ -725,7 +734,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="sec-head">
       <h2 id="shots-h">真机界面 · macOS App 实拍</h2>
-      <p class="lede">双击即用的 macOS App 实机截图：universal2 双架构、经 codesign 签名的 DMG（安装镜像）、单实例守护、优雅退出。CLI 背后那台引擎，装进了一个免 Python 的桌面图标。</p>
+      <p class="lede">双击即用的 macOS App 实机截图：universal2 双架构、codesign 签名 DMG、单实例守护、优雅退出。CLI 背后那台引擎，装进了一个免 Python 的桌面图标。</p>
     </div>
     <div class="shots">
       <figure class="shot slot">
@@ -746,11 +755,11 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <div class="sec-head">
       <h2 id="crib-h">零配置工具架</h2>
-      <p class="lede">核心与 engagement（驻场项目）层零 AgentScope 依赖：无大模型密钥（LLM key）、无 Docker，五分钟全绿。</p>
+      <p class="lede">核心与 engagement 层零 AgentScope 依赖：无 LLM key、无 Docker，五分钟全绿。</p>
     </div>
     <div class="crib">
       <div class="crib-row"><span class="crib-label">核心 + 开发 + Web</span><code class="crib-cmd">pip install -e ".[dev]"</code><button class="copybtn" data-copy='pip install -e ".[dev]"'>复制</button></div>
-      <div class="crib-row"><span class="crib-label">六个示例 engagement（驻场项目）</span><code class="crib-cmd">python examples/seed_mock_engagements.py</code><button class="copybtn" data-copy="python examples/seed_mock_engagements.py">复制</button></div>
+      <div class="crib-row"><span class="crib-label">六个真实感 engagement</span><code class="crib-cmd">python examples/seed_mock_engagements.py</code><button class="copybtn" data-copy="python examples/seed_mock_engagements.py">复制</button></div>
       <div class="crib-row"><span class="crib-label">http://127.0.0.1:8080</span><code class="crib-cmd">fde-scope web</code><button class="copybtn" data-copy="fde-scope web">复制</button></div>
       <div class="crib-row"><span class="crib-label">TBox/ABox/SKOS 浏览与校验（list/validate/check）；导出 JSON-LD 1.1；Web 控制台 /console#ontology 同款</span><code class="crib-cmd">fde-scope ontology export fde-core</code><button class="copybtn" data-copy="fde-scope ontology export fde-core">复制</button></div>
       <div class="conveyor" aria-label="Skill capture lifecycle">
@@ -777,13 +786,13 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <ul>
           <li><span><b>18 阶段 SOP</b>门禁是代码 Gate.check()，不是检查清单</span></li>
           <li><span><b>2 套场景</b>工业门禁：FAT/SAT · ISO 13849 · CE/EU-AI-Act · BetrVG §87 · 气隙 · 换班</span></li>
-          <li><span><b>10 个数据连接器</b>OPC UA · MQTT-Sparkplug（paho-mqtt 真 broker IO）· MySQL 真实 · Zammad/Salesforce/MES/Historian 接口态 · Documents 延迟导入</span></li>
+          <li><span><b>10 个数据连接器</b>CSV/MySQL/OPC UA 真实 · MQTT-Sparkplug/MES JSONL · Documents 解析延迟导入</span></li>
           <li><span><b>语料锻造</b>脱敏→质量门→覆盖度→缺口检测→补盲区合成</span></li>
-          <li><span><b>评估 + 工业 KPI（关键指标）</b>OEE / MTBF（平均无故障时间）/ 抓取成功率 / 碰撞率</span></li>
+          <li><span><b>评估 + 工业 KPI</b>OEE / MTBF / 抓取成功率 / 碰撞率</span></li>
           <li><span><b>技能库</b>AgentScope 与 QwenPaw 双格式导出</span></li>
-          <li><span><b>本体语义层</b>fde-core + ISA-95 overlay（叠加层）· SKOS 概念体系驱动语料覆盖与技能检索 · ONTO-* 错误码校验</span></li>
-          <li><span><b>部署三支柱</b>Agent 装配 · 权限上下文 · 沙箱工作区（workspace）</span></li>
-          <li><span><b>交接 + 飞轮</b>无密钥时全走规则路径，失败自动回退</span></li>
+          <li><span><b>本体语义层</b>fde-core + ISA-95 overlay · SKOS 概念体系驱动语料覆盖与技能检索 · ONTO-* 错误码校验</span></li>
+          <li><span><b>部署三支柱</b>Agent 装配 · 权限上下文 · 沙箱 workspace</span></li>
+          <li><span><b>交接 + 飞轮</b>无 key 全走规则路径，失败自动回退</span></li>
         </ul>
       </div>
       <div class="lists-col">
@@ -791,10 +800,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <p class="lists-zh" lang="zh">架构清单</p>
         <ul>
           <li><span><b>核心层</b>零顶层 agentscope 依赖：无 key、无 Docker 五分钟全绿</span></li>
-          <li><span><b>deploy/</b>三支柱运行时组装，可选依赖组（optional extra）</span></li>
-          <li><span><b>connectors/documents.py</b>PDF/Word/Excel/PPT 解析按需延迟接入 agentscope.rag</span></li>
-          <li><span><b>横切层</b>唯一大模型（LLM）出口 llm.py；本体 TBox/ABox/SKOS 原子落盘；data_root() 四级解析</span></li>
-          <li><span><b>4 个界面</b>CLI · Web 控制台 36 路由 · PawApp 18 路由 · macOS DMG 双击即用</span></li>
+          <li><span><b>deploy/</b>三支柱运行时组装，optional extra</span></li>
+          <li><span><b>connectors/documents.py</b>PDF/Word/Excel/PPT 解析延迟用 agentscope.rag</span></li>
+          <li><span><b>横切层</b>唯一 LLM 出口 llm.py；本体 TBox/ABox/SKOS 原子落盘；data_root() 四级解析</span></li>
+          <li><span><b>4 个界面</b>CLI · Web 控制台 32 路由 · PawApp 18 路由 · macOS DMG 双击即用</span></li>
           <li><span><b>证据模型</b>Structurizr DSL + DOT 为事实源，Mermaid 沉淀可读图</span></li>
         </ul>
       </div>
@@ -811,7 +820,74 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         </ul>
       </div>
     </div>
-    <p class="lists-note">验证来源：CI（持续集成）全绿套件 · 契约测试 tests/test_architecture_guard.py · 证据模型 docs/architecture-model/architecture-map.md · 完整功能清单与「功能 → 优点」速查表：<a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/features.md" target="_blank" rel="noopener">docs/features.md</a>（<a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/features-en.md" target="_blank" rel="noopener">EN</a>）</p>
+    <p class="lists-note">验证来源：CI 全绿套件 · 契约测试 tests/test_architecture_guard.py · 证据模型 docs/architecture-model/architecture-map.md</p>
+  </div>
+</section>
+
+<!-- ══ PRICING ══ -->
+<section id="pricing" aria-labelledby="pricing-h">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="pricing-h">定价 · 三档</h2>
+      <p class="lede">引擎开源，席位商用：Community 免费起步，Pro 按 FDE 席位订阅，Enterprise 由我们陪跑进现场。</p>
+    </div>
+    <div class="lists-grid">
+      <div class="lists-col slot">
+        <h3><i>CE</i>Community</h3>
+        <p class="lists-zh" lang="zh">社区版 · 开源 MIT</p>
+        <p class="tier-price">¥0<small> / 永久免费</small></p>
+        <ul>
+          <li><span><b>18 阶段 SOP</b>完整状态机引擎，与商业版同一台</span></li>
+          <li><span><b>10 个数据连接器</b>全部连接器与两种场景配置</span></li>
+          <li><span><b>MIT 开源协议</b>可自由商用、修改与再分发</span></li>
+          <li><span><b>社区支持</b>经 GitHub Issues 的社区支持</span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.8 6.3.8-4.6 4.3 1.2 6.1L12 17l-5.6 3 1.2-6.1L3 9.6l6.3-.8Z"/></svg>Star on GitHub</a></p>
+      </div>
+      <div class="lists-col tier-featured slot">
+        <h3><i>PRO</i>Pro</h3>
+        <p class="lists-zh" lang="zh">专业版 · 按席位订阅</p>
+        <p class="tier-price">¥4,800<small> / 席位 / 月</small></p>
+        <p class="tier-note">占位价格 · 价格以商务洽谈为准</p>
+        <ul>
+          <li><span><b>社区版全量</b>包含社区版全部功能</span></li>
+          <li><span><b>按席位订阅</b>按 FDE 席位计费，随团队规模伸缩</span></li>
+          <li><span><b>优先支持</b>工单优先响应，远程排障</span></li>
+          <li><span><b>团队导入</b>团队导入培训与 SOP 配置辅导</span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope%20Pro">邮件咨询</a></p>
+      </div>
+      <div class="lists-col slot">
+        <h3><i>ENT</i>Enterprise</h3>
+        <p class="lists-zh" lang="zh">企业版 · 面议</p>
+        <p class="tier-price">Custom<small>面议 · 按部署规模报价</small></p>
+        <ul>
+          <li><span><b>Pro 全量</b>包含 Pro 全部功能</span></li>
+          <li><span><b>审计 + 证据链</b>审计日志与证据链留存，面向合规检查</span></li>
+          <li><span><b>专属连接器适配</b>专属连接器适配你的现场系统</span></li>
+          <li><span><b>SLA 保障</b>SLA 服务保障与专属响应通道</span></li>
+        </ul>
+        <p class="tier-cta"><a class="steelbtn" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope%20Enterprise">预约洽谈</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CONTACT ══ -->
+<section id="contact" aria-labelledby="contact-h">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="contact-h">联系我们</h2>
+      <p class="lede">本页无表单、无追踪、无后端。直接发邮件，由工程师回复；或开公开 Issue，让社区一起看到答案。</p>
+    </div>
+    <div class="crib">
+      <div class="crib-row"><span class="crib-label">销售 / 试用 / 企业部署</span><code class="crib-cmd">contact@fde-scope.dev</code><button class="copybtn" data-copy="contact@fde-scope.dev">复制</button></div>
+      <div class="cta-strip" style="border-top:none;padding:18px 6px 6px">
+        <a class="pushbtn" style="text-decoration:none;display:inline-block" href="mailto:contact@fde-scope.dev?subject=FDE%20Scope">Write to us · 写邮件 →</a>
+        <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/issues" target="_blank" rel="noopener">或访问 GitHub Issues</a>
+        <span class="cta-note">REPLIES FROM ENGINEERS · NOT A TICKET BOT</span>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -820,8 +896,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   <div class="wrap">
     <h2 id="close-h">带着完整 SOP 进场。</h2>
     <div class="cta-strip">
-      <a class="pushbtn" style="text-decoration:none;display:inline-block" href="https://github.com/ai-guru-global/fde-scope">Star（收藏）· 安装 · 进场 →</a>
-      <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/manufacturing_scenario.md" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>工厂现场走查（Factory Walkthrough）</a>
+      <a class="pushbtn" style="text-decoration:none;display:inline-block" href="https://github.com/ai-guru-global/fde-scope">Star · 安装 · 进场 →</a>
+      <a class="steelbtn" href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/manufacturing_scenario.md" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V10l6 4v-4l6 4V5h6v16H3Z"/></svg>Factory walkthrough · 工厂 walkthrough</a>
     </div>
   </div>
 </section>
@@ -830,18 +906,18 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <footer>
   <div class="wrap">
     <nav aria-label="Footer">
-      <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GitHub 仓库</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP（标准作业程序）</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/architecture.md" target="_blank" rel="noopener">架构文档（Architecture）</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/features.md" target="_blank" rel="noopener">功能清单（Features）</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/ontology.md" target="_blank" rel="noopener">本体文档（Ontology）</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">Skills 手册库</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/agentscope_api_mapping.md" target="_blank" rel="noopener">AgentScope API 映射</a>
-      <a href="https://github.com/ai-guru-global/fde-scope/blob/master/LICENSE" target="_blank" rel="noopener">MIT 开源许可证</a>
-      <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">ResolveAgent ↗（相关项目）</a>
-      <a href="https://e6cllzitarii.meoo.fun" target="_blank" rel="noopener">产品演示 ↗（功能总览）</a>
+      <a href="https://github.com/ai-guru-global/fde-scope" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/architecture.md" target="_blank" rel="noopener">Architecture</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/ontology.md" target="_blank" rel="noopener">Ontology</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">Skills 手册库</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/agentscope_api_mapping.md" target="_blank" rel="noopener">AgentScope mapping</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      <a href="https://github.com/ai-guru-global/fde-scope/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>
+      <a href="mailto:contact@fde-scope.dev">contact@fde-scope.dev</a>
+      <a href="https://gjbs6uhxeute.meoo.fun" target="_blank" rel="noopener">ResolveAgent ↗</a>
     </nav>
-    <p class="colophon">FDE SCOPE · GTM 看板<br>DIRECTION: ENTERPRISE LIGHT · SEED 773793EF<br><span lang="zh">门禁即工程 · 全程覆盖 · 现场优先</span></p>
+    <p class="colophon">FDE SCOPE · GTM 看板<br>DIRECTION: ENTERPRISE LIGHT · SEED 773793EF<br><span lang="zh">门禁即工程 · 全程覆盖 · 现场优先</span><br>ALL DEMO DATA ON THIS PAGE IS FICTIONAL · <span lang="zh">本页演示数据均为虚构</span><br>CONTACT@FDE-SCOPE.DEV · DOMAIN PENDING REGISTRATION, SUBJECT TO CHANGE · <span lang="zh">域名待注册，以最终公布为准</span></p>
   </div>
 </footer>
 

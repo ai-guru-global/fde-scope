@@ -162,8 +162,8 @@ flowchart LR
 | MySQL | `mysql` | SQL 实现(`[mysql]` extra) |
 | Zammad | `zammad` | 真实 HTTP API(`/api/v1/tickets` 分页 + Token 认证;env 配置,JSONL 回放兜底) |
 | Salesforce | `salesforce` | 真实 REST API(`/services/data/vXX.X/query` SOQL + Bearer 认证;env 配置,JSONL 回放兜底;只读) |
-| MES(ISA-95) | `mes` | 同上 |
-| Historian | `historian` | 同上（stub,JSONL 回放兜底） |
+| MES(ISA-95) | `mes` | 真实 REST API(work-orders 分页 + Bearer 认证;env 配置,endpoint 可覆盖,JSONL 回放兜底) |
+| Historian | `historian` | 真实 REST API(时序 samples 按 tag 查询 + Bearer 认证;env 配置,通用/PI 风格双端点,JSONL 回放兜底) |
 | ROS2 bag | `ros2` | rosbags 真实回放(rosbags>=0.11 驱动;mock + 真 bag env-gated 测试) |
 | 文档解析 | — | PDF / Word / Excel / PPT(lazy import) |
 
@@ -288,6 +288,4 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 
 ## 17. 尚未完成(Roadmap)
 
-- `deploy --serve` 端到端实测(Redis 后端 + 可达模型)
-- Salesforce / MES / Historian 完整 HTTP/SQL 实现(Zammad、Salesforce 已完成)
 - AgentScope Studio(`@agentscope/studio`)集成

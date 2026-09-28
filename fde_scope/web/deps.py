@@ -19,7 +19,8 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from .. import paths
-from ..engagement import Engagement, EngagementContext
+from ..engagement import Engagement
+from ..storage import get_storage_backend
 
 
 def _slugify(value: str) -> str:
@@ -51,29 +52,45 @@ def _eng_path(eid: str) -> Path:
     return path
 
 
+def _validate_eid(eid: str) -> None:
+    """Reject path-traversal-y ids before touching any storage backend."""
+    _eng_path(eid)
+
+
 def _load(eid: str) -> Engagement:
-    p = _eng_path(eid)
-    if not p.exists():
-        raise HTTPException(status_code=404, detail=f"engagement '{eid}' not found")
-    return Engagement(EngagementContext.load(p))
+    _validate_eid(eid)
+    try:
+        ctx = get_storage_backend().load_engagement(eid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"engagement '{eid}' not found") from None
+    return Engagement(ctx)
 
 
 def _save(eng: Engagement) -> None:
-    _eng_path(eng.ctx.id).parent.mkdir(parents=True, exist_ok=True)
-    eng.ctx.save(_eng_path(eng.ctx.id))
+    _validate_eid(eng.ctx.id)
+    get_storage_backend().save_engagement(eng.ctx)
 
 
 def _all_engagements() -> list[Engagement]:
-    eng_dir = paths.engagements_dir()
-    if not eng_dir.exists():
-        return []
-    out = []
-    for p in sorted(eng_dir.glob("*.json")):
-        try:
-            out.append(Engagement(EngagementContext.load(p)))
-        except ValueError:
-            continue  # skip a corrupt file instead of 500ing the whole list
-    return out
+    return [Engagement(ctx) for ctx in get_storage_backend().list_engagements()]
+
+
+def _archive(eid: str) -> str:
+    """Archive an engagement via the active backend; returns the destination."""
+    _validate_eid(eid)
+    try:
+        return get_storage_backend().archive_engagement(eid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"engagement '{eid}' not found") from None
+
+
+def _delete(eid: str) -> None:
+    """Delete an engagement via the active backend."""
+    _validate_eid(eid)
+    try:
+        get_storage_backend().delete_engagement(eid)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"engagement '{eid}' not found") from None
 
 
 def catalog_site_dir() -> Path | None:

@@ -118,7 +118,7 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
    AgentScope dependency — no LLM key, no Docker. `pip install -e ".[dev]"` and
    `pytest` is green. The Web UI is one extra.
 6. **A real workbench, not a mock.** Ship with `examples/seed_mock_engagements.py`
-   to demo the console with six realistic Alibaba-Cloud-style enterprise
+   to demo the console with ten realistic but entirely fictional enterprise
    engagements (EV/factory, ride-hailing, retail-tea-chain, outbound-SaaS …),
    each with engine-generated gate records, runbooks and corpus reports — see
    [Mock demo data](#-mock-demo-data).
@@ -137,7 +137,7 @@ fde-scope corpus --input examples/quickstart_csv/sample_tickets.csv --out report
 
 # ── Scenario 2: embodied-robotics factory (the new one) ──
 fde-scope profiles                                    # see ticket + manufacturing
-fde-scope engage init --customer "BMW Spartanburg" --profile manufacturing
+fde-scope engage init --customer "Aurora Motors" --profile manufacturing
 fde-scope kpi <engagement-id> --samples examples/quickstart_manufacturing/station_samples.jsonl
 fde-scope gate list --profile manufacturing           # 10 gates, 7 industrial-only
 
@@ -199,8 +199,11 @@ python examples/seed_mock_engagements.py   # idempotent; re-run to re-seed
 fde-scope web                              # open the console, pick any engagement
 ```
 
-Seeds `.fde_scope/engagements/` with six realistic engagements based on real
-Alibaba Cloud enterprise customers. Every gate record is produced by the engine
+Seeds `.fde_scope/engagements/` with ten realistic engagements. **All customer
+names are fictional** (Aurora Motors, Atlas Auto Alliance, Southbay Motors,
+Northern Auto, Swift Ride, Adnova, Teaverse, Horizon Auto, Riverbend Spirits,
+Whitelake Dairy) — invented for product demo only, not affiliated with any real
+company. Every gate record is produced by the engine
 itself (`Engagement.evaluate_gate`), so the console's gate panels and the
 engagement context are always self-consistent. Each engagement also writes a
 rendered runbook (`reports/<slug>-runbook.md`) and corpus report
@@ -208,12 +211,12 @@ rendered runbook (`reports/<slug>-runbook.md`) and corpus report
 
 | Customer | Profile | Phase | Story |
 |---|---|---|---|
-| 古茗 (tea-chain) | ticket | 15/15 disengage | Full handoff package, customer accepted |
-| 一汽-大众 (automaker) | manufacturing | 11/18 runbook | 9/9 industrial gates passed (3 shifts + works council + PL d/SIL 2 + HAZOP) |
-| 广汽 (automaker) | manufacturing | 9/18 deploy | FAT/SAT + functional safety + conformity genuinely BLOCKED → advance refused |
-| 一汽 (automaker) | ticket | 13/15 flywheel | Productization flywheel running |
-| 曹操出行 (ride-hailing) | ticket | 8/15 prototype | Real-data prototyping, SLO defined |
-| 易点天下 (outbound SaaS) | ticket | 3/15 success_criteria | Single-sponsor blocker — the Sponsor Collapse anti-pattern |
+| 茶语万象 Teaverse (tea-chain) | ticket | 15/15 disengage | Full handoff package, customer accepted |
+| 亚特联汽车 Atlas Auto Alliance (automaker) | manufacturing | 11/18 runbook | 9/9 industrial gates passed (3 shifts + works council + PL d/SIL 2 + HAZOP) |
+| 南湾汽车 Southbay Motors (automaker) | manufacturing | 9/18 deploy | FAT/SAT + functional safety + conformity genuinely BLOCKED → advance refused |
+| 北疆汽车 Northern Auto (automaker) | ticket | 13/15 flywheel | Productization flywheel running |
+| 迅捷出行 Swift Ride (ride-hailing) | ticket | 8/15 prototype | Real-data prototyping, SLO defined |
+| 星澜科技 Adnova (outbound SaaS) | ticket | 3/15 success_criteria | Single-sponsor blocker — the Sponsor Collapse anti-pattern |
 
 ---
 
@@ -408,7 +411,7 @@ See [`docs/architecture.md`](docs/architecture.md) and
 
 ## 📐 Engineering best practices (enforced, not aspirational)
 
-Six invariants every change must preserve — [`AGENTS.md`](AGENTS.md) is the
+Seven invariants every change must preserve — [`AGENTS.md`](AGENTS.md) is the
 machine-readable source, and the guard tests fail when they drift:
 
 1. **Gate re-evaluation is live.** `Engagement.advance()` re-evaluates the
@@ -427,6 +430,9 @@ machine-readable source, and the guard tests fail when they drift:
 6. **The AgentScope window is measured, not aspirational.** `pyproject.toml`
    and `docs/agentscope_api_mapping.md` must quote the same specifier
    verbatim (`>=2.0.4.post1,<3` today); re-measure per version before widening.
+7. **Web mutating 路由必须过认证依赖。** 新增 `web/` 路由时确认未被 auth
+   白名单（`fde_scope/web/auth.py` 的 `PUBLIC_PATHS`）误放；token 只从
+   `FDE_SCOPE_API_TOKEN` env 读。
 
 Verification anchors: `make test` ·
 `pytest tests/test_architecture_guard.py` (contract pins) ·
@@ -453,6 +459,8 @@ gate      [SOP] list (per profile) / check (per engagement)
 skill     [Skills] 技能/方法论沉淀库（add / list / show / edit / publish / archive / review / export）
 ontology  [Ontology] 本体语义层（list / validate / check / export — JSON-LD 1.1）
 qwenpaw   [QwenPaw] Export / validate QwenPaw-compatible bundles (agents + skills + corpus)
+license   [商业] 查看当前许可 tier / 到期 / 功能开关；license-issue 签发客户 key
+storage-migrate [存储] engagement 持久化 file → sqlite 单向迁移
 ```
 
 ---
@@ -633,6 +641,23 @@ export FDE_SCOPE_ZAMMAD_API_TOKEN="..."
 # access token 直配（在进程外获取），两个都设置才启用真实 REST API
 export FDE_SCOPE_SF_INSTANCE_URL="https://acme.my.salesforce.com"
 export FDE_SCOPE_SF_ACCESS_TOKEN="..."
+
+# MES / Historian 连接器（manufacturing profile）：两个变量都设置才启用真实 REST API
+export FDE_SCOPE_MES_BASE_URL="https://mes.example.com"
+export FDE_SCOPE_MES_API_TOKEN="..."
+export FDE_SCOPE_HISTORIAN_BASE_URL="https://historian.example.com"
+export FDE_SCOPE_HISTORIAN_API_TOKEN="..."
+
+# 商业许可（可选）：不设置即 community tier；签发走 fde-scope license-issue
+export FDE_SCOPE_LICENSE_SECRET="..."   # 签发方持有，验签用
+export FDE_SCOPE_LICENSE_KEY="..."      # 客户侧设置
+
+# 存储后端（可选）：默认 file（JSON 原子写）；sqlite 启用 WAL 单文件库
+export FDE_SCOPE_STORAGE="sqlite"
+
+# 飞轮训练后端（可选）：不配置则 noop（如实标注）
+export FDE_SCOPE_TRAINING_URL="https://training.example.com"
+export FDE_SCOPE_TRAINING_TOKEN="..."
 ```
 
 所有 LLM 入口都是**失败自动回退规则路径**——网络错误、坏 JSON、无 key 都不会中断流水线：
@@ -716,6 +741,9 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 ## 📄 Documentation
 
 - [`docs/features.md`](docs/features.md) — 完整功能清单：18 阶段逐条说明 / 10 门禁执行流 / 连接器成熟度 / "功能 → 优点"速查表（English: [`docs/features-en.md`](docs/features-en.md)）
+- [`docs/user-guide.md`](docs/user-guide.md) — 客户侧快速上手：5 分钟跑通、核心概念、常用操作、env 速查、故障 FAQ
+- [`docs/api-reference.md`](docs/api-reference.md) — Web 控制台 REST API 参考（认证 + 全路由逐条对照代码）
+- [`docs/onboarding-customer.md`](docs/onboarding-customer.md) — 客户现场 onboarding：部署形态、安全基线、数据/LLM 接入决策树、POC 验收模板
 - [`docs/fde_sop_full.md`](docs/fde_sop_full.md) — the 18-phase SOP, 12 anti-patterns, sources
 - [`docs/manufacturing_scenario.md`](docs/manufacturing_scenario.md) — embodied-robotics factory end-to-end walkthrough
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
@@ -746,7 +774,7 @@ pytest tests/test_architecture_guard.py      # contract guards
 
 Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
 
-- Don't weaken the six invariants above; the guard tests fail on purpose when they drift.
+- Don't weaken the seven invariants above; the guard tests fail on purpose when they drift.
 - `engagement/phases.py` (18 phases) and the default gate registry (10 gates) are contract-pinned: changing them requires a deliberate contract update **and** a description in `docs/`.
 - Credentials flow through environment variables only — never persisted into manifests, reports, engagement JSON or logs.
 - Large or risky changes: open an issue / draft PR first so the invariants can be discussed before code lands.
@@ -765,10 +793,13 @@ Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
 - [x] Skill 沉淀库（四类分类 + 生命周期 + AgentScope/QwenPaw 双格式导出）
 - [x] 多 Agent 生产（真实 Agent 装配 + 模型 wiring + SubAgentTemplate 蓝图 + FDE 三通道自开 Agent）
 - [x] QwenPaw 集成（qwenpaw export/validate + PawApp 桌面应用，真机验证通过）
-- [ ] `deploy --serve` 端到端实测（Redis 后端 + 可达模型）
+- [x] `deploy --serve` 端到端实测（Redis 后端 + fake OpenAI 兼容模型，2026-09-28 本机 PASS，agentscope 2.0.8；见 `deploy/e2e/`）
 - [x] Zammad HTTP API 连接器（`/api/v1/tickets` + Token 认证，env 配置，JSONL 回放兜底）
 - [x] Salesforce REST 连接器（SOQL `query` + Bearer 认证，只读，env 配置，JSONL 回放兜底）
-- [ ] Full MES / Historian HTTP/SQL implementations
+- [x] Full MES / Historian HTTP/SQL implementations（MES work-orders REST、Historian 时序 samples REST，均 env 配置 + JSONL 回放兜底）
+- [x] 离线 License 模块（HMAC-SHA256 签名 key，community/pro/enterprise 三档功能开关，`fde-scope license` / `license-issue`，web 层审计导出与证据留存门控 pro+）
+- [x] 存储后端抽象（`FDE_SCOPE_STORAGE=file|sqlite`；SQLite 走 stdlib + WAL，`fde-scope storage-migrate` 迁移工具）
+- [x] 飞轮训练后端接口（`TrainingBackend` Protocol：HTTP webhook 后端 env 配置 + 显式 noop 兜底）
 - [ ] AgentScope Studio (npm `@agentscope/studio`) integration
 
 ---

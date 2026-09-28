@@ -2,7 +2,7 @@
 
 运行（仓库根目录）：
 
-    .venv/bin/python examples/supply_chain_ontology/demo.py
+    PYTHONPATH=. .venv/bin/python examples/supply_chain_ontology/demo.py
 
 三个能力问题（步骤1 提炼）都在 ABox 图上以纯图遍历回答：
 - CQ1 状态查询：两张销售订单按交期能否齐套（ATP 检查）。
@@ -11,6 +11,7 @@
 
 规则1/规则2 作为确定性函数写在本文件（仓库的本体层不带推理机，
 TBox 只承载规则读取的分类，如 scm:StrategicMaterial）。
+CQ 的黄金答案固化在 tests/test_supply_chain_demo.py（方法论步骤5）。
 """
 
 from __future__ import annotations
@@ -30,6 +31,13 @@ HERE = Path(__file__).parent
 OUT = HERE / "out"
 TBOX = HERE / "supply_chain_tbox.yaml"
 ABOX = HERE / "supply_chain_store.json"
+
+
+def load() -> tuple[OntologySchema, InstanceStore]:
+    """TBox/ABox 一次装载，供 demo 主流程与黄金测试共用。"""
+    schema = OntologySchema.model_validate(yaml.safe_load(TBOX.read_text(encoding="utf-8")))
+    store = InstanceStore.model_validate(json.loads(ABOX.read_text(encoding="utf-8")))
+    return schema, store
 
 
 def d(iso: str) -> date:
@@ -181,30 +189,57 @@ def answer_cq2(store: InstanceStore, isa=None) -> None:
                 print(f"      - {issue}")
 
 
-def answer_cq3(store: InstanceStore, isa=None) -> None:
-    print("\n== CQ3 行动触发：紧急采购建议（规则1 + 规则2） ==")
+def cq3_rows(store: InstanceStore, isa=None) -> list[dict]:
+    """CQ3 的纯计算：规则1 触发判定 + 建议量 + 规则2 分类路由。
+
+    demo 打印与黄金测试（tests/test_supply_chain_demo.py）共用同一结果，
+    断言的是这里，不是终端输出。
+    """
     lots = supply_lots(store, {})
+    rows = []
     for mat in by_type(store, "scm:RawMaterial", isa):
         on_hand = one(mat, "scm:qty_on_hand")
         in_transit = sum(lot["qty"] for lot in lots.get(mat.curie, []))
         forecast = one(mat, "scm:forecast_demand_7d")
-        name = one(mat, "scm:name")
         available = on_hand + in_transit
-        if available >= forecast:
-            print(f"  ✅ {name}：现有 {on_hand} + 在途 {in_transit} ≥ 7天预测 {forecast}，不触发")
+        rows.append(
+            {
+                "curie": mat.curie,
+                "name": one(mat, "scm:name"),
+                "on_hand": on_hand,
+                "in_transit": in_transit,
+                "forecast": forecast,
+                "available": available,
+                "triggered": available < forecast,
+                "suggest": max(forecast - available + one(mat, "scm:safety_stock"), 0),
+                "strategic": "scm:StrategicMaterial" in mat.types,
+            }
+        )
+    return rows
+
+
+def answer_cq3(store: InstanceStore, isa=None) -> None:
+    print("\n== CQ3 行动触发：紧急采购建议（规则1 + 规则2） ==")
+    for row in cq3_rows(store, isa):
+        if not row["triggered"]:
+            print(
+                f"  ✅ {row['name']}：现有 {row['on_hand']} + 在途 {row['in_transit']}"
+                f" ≥ 7天预测 {row['forecast']}，不触发"
+            )
             continue
-        suggest = forecast - available + one(mat, "scm:safety_stock")
-        strategic = "scm:StrategicMaterial" in mat.types
-        route = "供应链总监审批（HITL ASK）" if strategic else "自动下发给采购员"
-        level = "战略级" if strategic else "常规"
-        print(f"  🔥 触发紧急采购：{name}（{level}物料）")
-        print(f"      规则1：现有 {on_hand} + 在途 {in_transit} = {available} < 7天预测 {forecast}")
-        print(f"      建议量：{suggest} 件（补足预测缺口 + 安全库存）")
+        route = "供应链总监审批（HITL ASK）" if row["strategic"] else "自动下发给采购员"
+        level = "战略级" if row["strategic"] else "常规"
+        print(f"  🔥 触发紧急采购：{row['name']}（{level}物料）")
+        print(
+            f"      规则1：现有 {row['on_hand']} + 在途 {row['in_transit']}"
+            f" = {row['available']} < 7天预测 {row['forecast']}"
+        )
+        print(f"      建议量：{row['suggest']} 件（补足预测缺口 + 安全库存）")
         print(f"      规则2 路由：{route}")
 
 
 def main() -> None:
-    schema = OntologySchema.model_validate(yaml.safe_load(TBOX.read_text(encoding="utf-8")))
+    schema, store = load()
     loader = lambda sid: schema if sid == schema.id else None  # noqa: E731
 
     report = validate_schema(schema, loader)
@@ -216,7 +251,6 @@ def main() -> None:
     for issue in report.errors:
         print(f"  [{issue.code}] {issue.subject}: {issue.message}")
 
-    store = InstanceStore.model_validate(json.loads(ABOX.read_text(encoding="utf-8")))
     store_report = validate_store(store, loader)
     print(f"ABox 校验：{'通过' if store_report.ok else '失败'}（{store.id}，{len(store.individuals)} 个体）")
     for issue in store_report.errors:

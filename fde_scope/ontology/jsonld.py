@@ -4,6 +4,12 @@
 ``json.dumps(..., ensure_ascii=False, indent=2, sort_keys=True)``。
 双语 label 走 JSON-LD language map（@context 中 rdfs:label/skos:prefLabel
 声明为 @container: @language）。match_keywords 等操作性元数据不进 JSON-LD。
+
+形状契约：顶层只有 ``@context`` + ``@graph``——owl:Ontology / store 元数据
+节点是 graph 的首元素。不要改回"顶层 @id + @graph"的 graph-object 形式：
+标准处理器（rdflib 7.6 实测）会把 @graph 内容送进 named graph，单图工具
+（Graph.parse、多数 Protégé 载入路径）读不到那些三元组。默认图自包含
+才是可互操作的形状（tests/test_ontology_jsonld.py 锁定）。
 """
 
 from __future__ import annotations
@@ -58,6 +64,13 @@ def _labels(label: str, label_zh: str | None) -> dict[str, str]:
 
 def schema_to_jsonld(schema: OntologySchema) -> dict[str, Any]:
     graph: list[dict[str, Any]] = []
+    graph.append(
+        {
+            "@id": f"{schema.base_iri}{schema.id}/{schema.version}",
+            "@type": "owl:Ontology",
+            "owl:versionInfo": schema.version,
+        }
+    )
     for c in schema.classes:
         node: dict[str, Any] = {
             "@id": _expand(schema, c.curie),
@@ -114,18 +127,13 @@ def schema_to_jsonld(schema: OntologySchema) -> dict[str, Any]:
             if con.deprecated:
                 cnode["owl:deprecated"] = True
             graph.append(cnode)
-    return {
-        "@context": _context(schema),
-        "@id": f"{schema.base_iri}{schema.id}/{schema.version}",
-        "@type": "owl:Ontology",
-        "owl:versionInfo": schema.version,
-        "@graph": graph,
-    }
+    return {"@context": _context(schema), "@graph": graph}
 
 
 def store_to_jsonld(store: InstanceStore, schema: OntologySchema) -> dict[str, Any]:
     """ABox 导出：CURIE 全部展开为绝对 IRI（个体/类型/属性键/对象目标）。"""
     graph: list[dict[str, Any]] = []
+    graph.append({"@id": f"{schema.base_iri}stores/{store.id}", "rdfs:label": store.id})
     for ind in store.individuals:
         node: dict[str, Any] = {"@id": _expand(schema, ind.curie)}
         if ind.types:
@@ -135,9 +143,4 @@ def store_to_jsonld(store: InstanceStore, schema: OntologySchema) -> dict[str, A
         for prop, values in ind.data_assertions.items():
             node[_expand(schema, prop)] = list(values)
         graph.append(node)
-    return {
-        "@context": _context(schema),
-        "@id": f"{schema.base_iri}stores/{store.id}",
-        "rdfs:label": store.id,
-        "@graph": graph,
-    }
+    return {"@context": _context(schema), "@graph": graph}
