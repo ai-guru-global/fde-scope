@@ -480,8 +480,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ('<div class="name">UI 层</div>', '<div class="name">UI layer</div>'),
     (
-        "CLI（Typer，全延迟导入）· Web 控制台（32 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
-        "CLI (Typer, fully lazy imports) · Web console (32 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
+        "CLI（Typer，全延迟导入）· Web 控制台（43 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
+        "CLI (Typer, fully lazy imports) · Web console (43 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
         "macOS app (double-click DMG — this console).",
     ),
     ('<div class="name">SOP 层</div>', '<div class="name">SOP layer</div>'),
@@ -515,13 +515,19 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "(credentials via env vars only) · QwenPaw host.",
     ),
     # -- overview: invariants ---------------------------------------------------
-    ("<h2>工程最佳实践 · 六条不变式</h2>", "<h2>Engineering best practices · six invariants</h2>"),
+    ("<h2>工程最佳实践 · 七条不变式</h2>", "<h2>Engineering best practices · seven invariants</h2>"),
     ("</span>Gate 实时重评估</div>", "</span>Live gate re-evaluation</div>"),
     ("</span>ID 服务端生成</div>", "</span>Server-generated IDs</div>"),
     ("</span>凭据只走环境变量</div>", "</span>Credentials via env vars only</div>"),
     ("</span>原子写盘</div>", "</span>Atomic writes</div>"),
     ("</span>规则授权是唯一通道</div>", "</span>Rule grants are the only channel</div>"),
     ("</span>实测版本窗口</div>", "</span>Measured version window</div>"),
+    ("</span>Web 变更路由须过认证</div>", "</span>Web mutating routes require auth</div>"),
+    (
+        "新路由确认未被 auth 白名单误放；token 只从 FDE_SCOPE_API_TOKEN 环境变量读，不落文件/日志/响应。",
+        "New routes must not slip into the auth allowlist by mistake; the token is read from the "
+        "FDE_SCOPE_API_TOKEN env var only — never in files / logs / responses.",
+    ),
     ("AGENTS.md 契约，由架构守护测试钉住。", "The AGENTS.md contract, pinned by architecture-guard tests."),
     (
         "advance() 每次重评当前阶段全部 gate，过期通过不作数；强推也评估留痕。禁止缓存/短路。",
@@ -958,6 +964,77 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ('placeholder="粘贴新的 Markdown 正文…"', 'placeholder="paste the new Markdown body…"'),
     (">取消</button>", ">Cancel</button>"),
     (">保存</button>", ">Save</button>"),
+    # -- dashboard: guided mode tab（领域数据——阶段说明/产出清单/blocker 建议——按规约保持中文） --
+    ("""onclick="tab('guided',this)">引导</button>""", """onclick="tab('guided',this)">Guided</button>"""),
+    (
+        '引导数据不可用<div class="hint">可能是接口瞬时失败，重新进入该 engagement 详情会重试。</div>',
+        'Guided data unavailable<div class="hint">The API may have failed transiently; re-opening this engagement retries.</div>',
+    ),
+    ("<h2>当前阶段：", "<h2>Current phase: "),
+    ("<h2>本阶段要产出什么</h2>", "<h2>What to deliver in this phase</h2>"),
+    (
+        "产出写入 Context / assets 后，门禁会自动重评——引导不代替验收。",
+        "Once deliverables land in Context / assets, gates re-evaluate automatically — guidance never replaces acceptance.",
+    ),
+    ('<div class="hint">下一步做什么</div>', '<div class="hint">Next steps</div>'),
+    ("门禁已通过，可推进下一阶段。", "Gate passed — you may advance to the next phase."),
+    (
+        "'<div class=\"empty\">本阶段无门禁——完成产出清单后即可推进</div>'",
+        "'<div class=\"empty\">No gate on this phase — finish the deliverables, then advance</div>'",
+    ),
+    ("<h2>相关阅读（技能手册库）</h2>", "<h2>Further reading (skills catalog)</h2>"),
+    # -- guided mode: goal plan + AI draft cards --------------------------------------------------
+    ("<h2>项目目标与任务清单</h2>", "<h2>Project goal & task plan</h2>"),
+    (
+        'placeholder="输入项目目标（例：把客服首响缩到 8s 内，坏例率降到 5% 以下）"',
+        'placeholder="Project goal (e.g. cut first-response to <8s, bad-case rate below 5%)"',
+    ),
+    (">生成任务清单</button>", ">Generate task plan</button>"),
+    (
+        "目标会被拆解到 SOP 各阶段，勾选状态自动保存。",
+        "The goal is broken down across SOP phases; checkbox state autosaves.",
+    ),
+    ("（规则版：未配置 AI key）", " (rule-based: no AI key configured)"),
+    (">重新生成</button>", ">Regenerate</button>"),
+    ("'AI 生成'", "'AI-generated'"),
+    ("'规则生成'", "'Rule-based'"),
+    ("覆盖现有任务清单？勾选状态会丢失。", "Replace the existing task plan? Checkbox state will be lost."),
+    ("<h2>AI 起草 Context</h2>", "<h2>Draft context with AI</h2>"),
+    (
+        "用自然语言描述业务，AI 起草 现场/干系人/成功标准/SLO 草稿。写入前逐项确认，门禁通过才算数。",
+        "Describe the business in plain language; AI drafts site / stakeholders / success criteria / SLOs. "
+        "Review every block before applying — only the gates make it count.",
+    ),
+    (
+        "未配置 AI key（FDE_SCOPE_MIMO_API_KEY），可打开手动填写指引，按字段说明逐项录入。",
+        "No AI key configured (FDE_SCOPE_MIMO_API_KEY) — open the manual field guide and fill in each field.",
+    ),
+    (
+        'placeholder="例：我们是一家茶饮连锁，国内 2000 家门店，客服团队每天处理大量加盟咨询与客诉，希望用工单 AI 缩短首响时间…"',
+        'placeholder="e.g. We are a tea chain with 2,000 stores; our support team handles heavy franchise and complaint volume daily — we want a ticket AI to cut first-response time…"',
+    ),
+    ("'✨ AI 起草'", "'✨ Draft with AI'"),
+    ("'✍️ 手动填写指引'", "'✍️ Manual field guide'"),
+    (
+        "'<div class=\"meta\">由 MiMo 起草，待你确认。勾选要采纳的块后写入；写入后门禁会实时重评。</div>'",
+        "'<div class=\"meta\">Drafted by MiMo, pending your review. Tick the blocks to adopt and apply; gates re-evaluate live afterwards.</div>'",
+    ),
+    ('<span class="k">当前值</span>', '<span class="k">Current</span>'),
+    ('<span class="k">起草值</span>', '<span class="k">Drafted</span>'),
+    (">JSON 微调</summary>", ">Tweak JSON</summary>"),
+    (">确认写入勾选项</button>", ">Apply selected</button>"),
+    (">手动填写表单</button>", ">Manual entry form</button>"),
+    (">保存${esc(b.label)}</button>", ">Save ${esc(b.label)}</button>"),
+    ("'也可完全手动录入：'", "'Or enter everything manually:'"),
+    ("还没有 engagement", "No engagements yet"),
+    (
+        "在左侧「新建 Engagement」填写客户名与 profile，开始你的第一条 SOP。",
+        'Create your first SOP run from "New Engagement" in the sidebar (customer + profile).',
+    ),
+    ("起草请求失败", "Draft request failed"),
+    (" —— 可重试，或改用手动填写。", " — retry, or switch to manual entry."),
+    ("<label>目标</label>", "<label>Goal</label>"),
+    ('<span class="pill">当前阶段</span>', '<span class="pill">current</span>'),
 ]
 
 _PAIRS_SORTED = sorted(I18N_PAIRS, key=lambda pair: len(pair[0]), reverse=True)

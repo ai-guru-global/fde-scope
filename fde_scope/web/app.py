@@ -15,19 +15,26 @@ FastAPI; JSON endpoints back the interactive bits. The app imports lazily so
 from __future__ import annotations
 
 import json
-import re
+import os
+import shutil
+import tempfile
 import uuid
+from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import TypeAdapter, ValidationError
 
-from .. import paths
+from .. import audit, fsutil, paths
 from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
+from ..logutil import configure_logging, get_logger
 from ..profiles import all_profiles, get_profile
 from .i18n import GLOSSARY_EN, to_en
+
+configure_logging()
+logger = get_logger("web.app")
 
 # Import-time resolution is safe here: under the CWD fallback reports_dir()
 # stays RELATIVE, so every use re-resolves against the current CWD (test
@@ -50,48 +57,26 @@ async def _read_limited(file: UploadFile, limit: int = MAX_UPLOAD_BYTES) -> byte
 
 
 # ---------------------------------------------------------------------------
-# persistence helpers
+# persistence helpers (shared with guided_api via deps — extracted verbatim)
 # ---------------------------------------------------------------------------
 _STR_LIST = TypeAdapter(list[str])
 
+from .deps import (  # noqa: E402
+    _all_engagements,
+    _eng_path,
+    _load,
+    _save,
+    _slugify,
+    catalog_site_dir,
+    engagement_lock,
+)
+from .guided_api import router as _guided_router  # noqa: E402
 
-def _slugify(value: str) -> str:
-    """Whitelist-sanitize a value for use in an engagement id / file name."""
-    return re.sub(r"[^a-z0-9-]", "-", value.lower().replace(" ", "-"))
+app.include_router(_guided_router)
 
+from .auth import ApiTokenAuthMiddleware  # noqa: E402
 
-def _eng_path(eid: str) -> Path:
-    eng_dir = paths.engagements_dir()
-    path = (eng_dir / f"{eid}.json").resolve()
-    base = eng_dir.resolve()
-    if not path.is_relative_to(base):
-        raise HTTPException(status_code=400, detail=f"invalid engagement id: {eid!r}")
-    return path
-
-
-def _load(eid: str) -> Engagement:
-    p = _eng_path(eid)
-    if not p.exists():
-        raise HTTPException(status_code=404, detail=f"engagement '{eid}' not found")
-    return Engagement(EngagementContext.load(p))
-
-
-def _save(eng: Engagement) -> None:
-    _eng_path(eng.ctx.id).parent.mkdir(parents=True, exist_ok=True)
-    eng.ctx.save(_eng_path(eng.ctx.id))
-
-
-def _all_engagements() -> list[Engagement]:
-    eng_dir = paths.engagements_dir()
-    if not eng_dir.exists():
-        return []
-    out = []
-    for p in sorted(eng_dir.glob("*.json")):
-        try:
-            out.append(Engagement(EngagementContext.load(p)))
-        except ValueError:
-            continue  # skip a corrupt file instead of 500ing the whole list
-    return out
+app.add_middleware(ApiTokenAuthMiddleware)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +84,35 @@ def _all_engagements() -> list[Engagement]:
 # ---------------------------------------------------------------------------
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "version": "0.1.0"}
+    """Liveness + readiness probe: real subsystem state, HTTP 200 even when
+    degraded (probe semantics — the process is up, subsystems may not be).
+    Public route (auth.PUBLIC_PATHS); never exposes credentials."""
+    checks: dict[str, dict] = {}
+
+    root = paths.data_root()
+    root_abs = root.resolve()
+    checks["data_root"] = {"ok": root_abs.is_dir() and os.access(root_abs, os.W_OK), "path": str(root_abs)}
+
+    reports = paths.reports_dir(create=True)
+    checks["reports_dir"] = {"ok": reports.is_dir() and os.access(reports, os.W_OK)}
+
+    from ..llm import get_llm_client
+
+    # env-configured only — no request is ever sent from a health probe.
+    checks["llm"] = {"ok": True, "configured": get_llm_client().available}
+
+    eng_dir = paths.engagements_dir()
+    checks["engagements_count"] = {
+        "ok": True,
+        "count": len(list(eng_dir.glob("*.json"))) if eng_dir.is_dir() else 0,
+    }
+
+    degraded = any(not c["ok"] for c in checks.values())
+    return {
+        "status": "degraded" if degraded else "ok",
+        "version": "0.1.0",
+        "checks": checks,
+    }
 
 
 @app.get("/api/profiles")
@@ -137,7 +150,12 @@ def create_engagement(customer: str = Form(...), profile: str = Form("ticket")) 
     eid = f"eng-{_slugify(customer)}-{_slugify(profile)}-{uuid.uuid4().hex[:6]}"
     ctx = EngagementContext(id=eid, customer=customer, profile=profile)
     eng = Engagement(ctx)
-    _save(eng)
+    with engagement_lock(eid):
+        _save(eng)
+    audit.log_event(
+        "engagement.create",
+        detail={"engagement_id": eid, "customer": customer, "profile": profile},
+    )
     return eng.status()
 
 
@@ -164,28 +182,266 @@ def engagement_gates(eid: str) -> dict:
 
 
 @app.post("/api/engagements/{eid}/advance")
-def advance_engagement(eid: str, force: bool = False) -> dict:
-    eng = _load(eid)
-    try:
-        eng.advance(force=force)
-    except AdvanceBlocked as exc:
-        _save(eng)
-        return {"advanced": False, "result": exc.result.__dict__}
-    except StopIteration:
-        return {"advanced": False, "reason": "complete"}
-    _save(eng)
-    return {"advanced": True, "status": eng.status()}
+def advance_engagement(
+    eid: str,
+    force: bool = False,
+    reason: str | None = Form(None),
+    operator: str | None = Form(None),
+) -> dict:
+    # A forced advance overrides a blocking gate — it must always say why
+    # (and ideally who); without a reason it is refused before touching state.
+    if force and not (reason and reason.strip()):
+        raise HTTPException(status_code=422, detail="force advance requires a non-empty 'reason'") from None
+    with engagement_lock(eid):
+        eng = _load(eid)
+        try:
+            eng.advance(force=force)
+        except AdvanceBlocked as exc:
+            _save(eng)
+            logger.debug("advance blocked for %s: %s", eid, exc.result.blockers)
+            result = {"advanced": False, "result": exc.result.__dict__}
+        except StopIteration:
+            result = {"advanced": False, "reason": "complete"}
+        else:
+            _save(eng)
+            logger.debug("advanced %s → %s (force=%s)", eid, eng.ctx.current_phase, force)
+            result = {"advanced": True, "status": eng.status()}
+    detail: dict = {"engagement_id": eid, "force": force, "advanced": result["advanced"]}
+    if reason and reason.strip():
+        detail["reason"] = reason.strip()
+    if operator and operator.strip():
+        detail["operator"] = operator.strip()
+    audit.log_event("engagement.advance", detail=detail)
+    return result
 
 
 @app.post("/api/engagements/{eid}/gate/{slug}")
-def evaluate_gate(eid: str, slug: str) -> dict:
-    eng = _load(eid)
-    try:
-        result = eng.evaluate_gate(slug)
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"unknown gate: {slug!r}") from None
-    _save(eng)
+def evaluate_gate(eid: str, slug: str, operator: str | None = Form(None)) -> dict:
+    with engagement_lock(eid):
+        eng = _load(eid)
+        try:
+            result = eng.evaluate_gate(slug)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown gate: {slug!r}") from None
+        _save(eng)
+    detail = {"engagement_id": eid, "gate": slug, "passed": result.passed}
+    if operator and operator.strip():
+        detail["operator"] = operator.strip()
+    audit.log_event("engagement.gate_evaluate", detail=detail)
     return {"slug": slug, "passed": result.passed, "blockers": result.blockers, "warnings": result.warnings}
+
+
+# ---------------------------------------------------------------------------
+# audit export（审计导出：按 engagement 过滤 + Markdown 报告）
+# ---------------------------------------------------------------------------
+def _export_audit_md(eid: str, events: list[dict]) -> Path:
+    out = paths.reports_dir(create=True) / f"audit_{eid}.md"
+    fsutil.atomic_write_text(out, audit.render_markdown(events, eid))
+    return out
+
+
+@app.get("/api/engagements/{eid}/audit/export")
+def export_audit(eid: str) -> dict:
+    """Write a Markdown audit report for *eid* into the reports dir."""
+    events = list(audit.read_events(eid))
+    out = _export_audit_md(eid, events)
+    return {"engagement_id": eid, "count": len(events), "path": str(out)}
+
+
+@app.get("/api/engagements/{eid}/audit")
+def engagement_audit(eid: str, format: str | None = None) -> dict:
+    """Audit events for one engagement (JSON); ``?format=md`` also exports a file."""
+    events = list(audit.read_events(eid))
+    out = {"engagement_id": eid, "count": len(events), "events": events}
+    if format == "md":
+        out["path"] = str(_export_audit_md(eid, events))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# handoff（移交包：runbook + package JSON，sha256 证据入审计）
+# ---------------------------------------------------------------------------
+def _file_evidence(path: Path) -> dict:
+    digest, size = audit.sha256_file(path)
+    return {"path": str(path), "sha256": digest, "bytes": size}
+
+
+@app.post("/api/engagements/{eid}/handoff")
+def handoff_package(
+    eid: str,
+    accept: bool = Form(False),
+    operator: str | None = Form(None),
+) -> dict:
+    """Render the runbook, assemble the handoff package, hash both into the audit trail."""
+    from ..engagement import build_handoff_package, render_handoff_summary
+    from ..engagement.operationalization import render_runbook
+
+    with engagement_lock(eid):
+        eng = _load(eid)
+        runbook_path = paths.reports_dir(create=True) / f"runbook_{eid}.md"
+        fsutil.atomic_write_text(runbook_path, render_runbook(eng.ctx))
+        package = build_handoff_package(
+            eng.ctx,
+            runbook_path=str(runbook_path),
+            customer_accepted=accept,
+        )
+        package_path = paths.reports_dir() / f"handoff_package_{eid}.json"
+        fsutil.atomic_write_text(package_path, json.dumps(package, ensure_ascii=False, indent=2))
+        _save(eng)
+        summary = render_handoff_summary(eng.ctx)
+    detail = {
+        "engagement_id": eid,
+        "runbook": _file_evidence(runbook_path),
+        "package": _file_evidence(package_path),
+    }
+    if operator and operator.strip():
+        detail["operator"] = operator.strip()
+    audit.log_event("handoff.package", detail=detail)
+    if accept:
+        accepted = {"engagement_id": eid, **_file_evidence(package_path)}
+        if operator and operator.strip():
+            accepted["operator"] = operator.strip()
+        audit.log_event("handoff.accepted", detail=accepted)
+    return {
+        "engagement_id": eid,
+        "customer_accepted": accept,
+        "runbook": str(runbook_path),
+        "package": str(package_path),
+        "summary": summary,
+    }
+
+
+# ---------------------------------------------------------------------------
+# evidence（签字/验收证据留存：FAT/SAT 扫描件等，sha256 + 时间戳）
+# ---------------------------------------------------------------------------
+def _evidence_index_path(eid: str) -> Path:
+    return paths.evidence_dir(eid) / "index.json"
+
+
+def _read_evidence_index(eid: str) -> list[dict]:
+    path = _evidence_index_path(eid)
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    """Binary sibling of fsutil.atomic_write_text (temp file + os.replace)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".tmp-")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(content)
+        os.replace(tmp, path)
+    except BaseException:
+        with suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+@app.post("/api/engagements/{eid}/evidence")
+async def attach_evidence(
+    eid: str,
+    name: str = Form(...),
+    operator: str | None = Form(None),
+    file: UploadFile | None = File(None),
+    path: str | None = Form(None),
+) -> dict:
+    """Attach an external evidence file (signed FAT/SAT scan …) to an engagement."""
+    from datetime import UTC, datetime
+
+    if file is None and not (path and path.strip()):
+        raise HTTPException(status_code=422, detail="either 'file' or 'path' is required") from None
+    if file is not None:
+        content = await _read_limited(file)
+    else:
+        src = Path(path.strip())  # type: ignore[union-attr]
+        if not src.is_file():
+            raise HTTPException(status_code=404, detail=f"evidence source not found: {src}") from None
+        if src.stat().st_size > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail=f"file exceeds {MAX_UPLOAD_BYTES} byte limit")
+        content = src.read_bytes()
+    if not name.strip():
+        raise HTTPException(status_code=422, detail="'name' must not be empty") from None
+    safe_name = Path(name).name
+    with engagement_lock(eid):
+        _load(eid)  # 404 for unknown engagements; nothing attaches to ghosts
+        dest = paths.evidence_dir(eid, create=True) / safe_name
+        _atomic_write_bytes(dest, content)
+        digest, size = audit.sha256_file(dest)
+        entry = {
+            "name": safe_name,
+            "sha256": digest,
+            "bytes": size,
+            "ts": datetime.now(UTC).isoformat(),
+            "operator": (operator or "").strip() or None,
+        }
+        index = [r for r in _read_evidence_index(eid) if r.get("name") != safe_name]
+        index.append(entry)
+        fsutil.atomic_write_text(_evidence_index_path(eid), json.dumps(index, ensure_ascii=False, indent=2))
+    audit.log_event(
+        "evidence.attached",
+        detail={
+            "engagement_id": eid,
+            "name": safe_name,
+            "path": str(dest),
+            "sha256": digest,
+            "bytes": size,
+            **({"operator": operator.strip()} if operator and operator.strip() else {}),
+        },
+    )
+    return entry
+
+
+@app.get("/api/engagements/{eid}/evidence")
+def list_evidence(eid: str) -> dict:
+    return {"engagement_id": eid, "evidence": _read_evidence_index(eid)}
+
+
+# ---------------------------------------------------------------------------
+# lifecycle（归档 / GDPR 删除权）
+# ---------------------------------------------------------------------------
+@app.post("/api/engagements/{eid}/archive")
+def archive_engagement(eid: str) -> dict:
+    """Move the engagement JSON to .fde_scope/archive/ (out of every listing)."""
+    with engagement_lock(eid):
+        eng = _load(eid)
+        src = _eng_path(eid)
+        dest = paths.archive_dir(create=True) / f"{eid}.json"
+        fsutil.atomic_write_text(dest, src.read_text(encoding="utf-8"))
+        src.unlink()
+    audit.log_event(
+        "engagement.archived",
+        detail={"engagement_id": eid, "customer": eng.ctx.customer, "archive_path": str(dest)},
+    )
+    return {"archived": True, "engagement_id": eid}
+
+
+@app.delete("/api/engagements/{eid}")
+def delete_engagement(eid: str, confirm: str = Form(...)) -> dict:
+    """Delete the engagement JSON + its evidence (right to erasure).
+
+    Requires ``confirm=<customer name>`` verbatim. The audit log itself is
+    kept on purpose — erasure covers customer data, not the compliance trail.
+    """
+    with engagement_lock(eid):
+        eng = _load(eid)
+        customer = eng.ctx.customer
+        if confirm != customer:
+            raise HTTPException(
+                status_code=400,
+                detail=f"confirm must exactly match the customer name {customer!r}",
+            ) from None
+        _eng_path(eid).unlink()
+        ev_dir = paths.evidence_dir(eid)
+        if ev_dir.exists():
+            shutil.rmtree(ev_dir)
+    audit.log_event("engagement.deleted", detail={"engagement_id": eid, "customer": customer})
+    return {"deleted": True, "engagement_id": eid}
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +458,6 @@ def engagement_journal(eid: str) -> list[dict]:
 
 @app.post("/api/engagements/{eid}/journal")
 def journal_append(eid: str, body: dict | None = None) -> dict:
-    eng = _load(eid)
     body = body or {}
     note = body.get("note")
     if not isinstance(note, str) or not note.strip():
@@ -213,20 +468,16 @@ def journal_append(eid: str, body: dict | None = None) -> dict:
     from ..engagement.context import JournalEntry
 
     entry = JournalEntry(kind=kind, note=note.strip(), skill_id=body.get("skill_id"))
-    eng.ctx.journal.append(entry)
-    _save(eng)
+    with engagement_lock(eid):
+        eng = _load(eid)
+        eng.ctx.journal.append(entry)
+        _save(eng)
     return entry.model_dump()
 
 
 @app.post("/api/engagements/{eid}/journal/{jid}/skill")
 def journal_to_skill(eid: str, jid: str) -> dict:
     """把一条现场记录沉淀为技能草稿（kind → category 映射预填）。"""
-    eng = _load(eid)
-    entry = next((e for e in eng.ctx.journal if e.id == jid), None)
-    if entry is None:
-        raise HTTPException(status_code=404, detail=f"journal entry '{jid}' not found") from None
-    if entry.skill_id:
-        raise HTTPException(status_code=409, detail=f"already linked to skill {entry.skill_id}") from None
     from ..skills.models import SkillCategory, SkillDraft
 
     mapping = {
@@ -234,43 +485,58 @@ def journal_to_skill(eid: str, jid: str) -> dict:
         "implementation": SkillCategory.IMPLEMENTATION,
         "optimization": SkillCategory.OPTIMIZATION,
     }
-    draft = SkillDraft(
-        title=entry.note[:60],
-        category=mapping[entry.kind],
-        body_md=entry.note,
-        source_engagement=eid,
-    )
-    rec = _skill_service().create(draft)
-    entry.skill_id = rec.id
-    _save(eng)
+    with engagement_lock(eid):
+        eng = _load(eid)
+        entry = next((e for e in eng.ctx.journal if e.id == jid), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"journal entry '{jid}' not found") from None
+        if entry.skill_id:
+            raise HTTPException(status_code=409, detail=f"already linked to skill {entry.skill_id}") from None
+        draft = SkillDraft(
+            title=entry.note[:60],
+            category=mapping[entry.kind],
+            body_md=entry.note,
+            source_engagement=eid,
+        )
+        rec = _skill_service().create(draft)
+        entry.skill_id = rec.id
+        _save(eng)
     return rec.model_dump()
 
 
 @app.post("/api/engagements/{eid}/context")
 def update_context(eid: str, body: dict | None = None) -> dict:
     """Patch an engagement context (site / safety / slo / stakeholders / assets)."""
-    eng = _load(eid)
     body = body or {}
     try:
+        patched: dict = {}
         if "site" in body:
-            eng.ctx.site = type(eng.ctx.site).model_validate(body["site"])
+            from ..engagement.context import SiteInfo
+
+            patched["site"] = SiteInfo.model_validate(body["site"])
         if "safety" in body:
-            eng.ctx.safety = type(eng.ctx.safety).model_validate(body["safety"])
+            from ..engagement.context import SafetyPosture
+
+            patched["safety"] = SafetyPosture.model_validate(body["safety"])
         if "success_criteria" in body:
-            eng.ctx.success_criteria = _STR_LIST.validate_python(body["success_criteria"])
+            patched["success_criteria"] = _STR_LIST.validate_python(body["success_criteria"])
         if "stakeholders" in body:
             from ..engagement.context import Stakeholder
 
-            eng.ctx.stakeholders = [Stakeholder.model_validate(s) for s in body["stakeholders"]]
+            patched["stakeholders"] = [Stakeholder.model_validate(s) for s in body["stakeholders"]]
         if "slos" in body:
             from ..engagement.context import SLOSpec
 
-            eng.ctx.slos = [SLOSpec.model_validate(s) for s in body["slos"]]
+            patched["slos"] = [SLOSpec.model_validate(s) for s in body["slos"]]
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from None
-    if "assets" in body:
-        eng.ctx.assets.update(body["assets"])
-    _save(eng)
+    with engagement_lock(eid):
+        eng = _load(eid)
+        for field, value in patched.items():
+            setattr(eng.ctx, field, value)
+        if "assets" in body:
+            eng.ctx.assets.update(body["assets"])
+        _save(eng)
     return eng.status()
 
 
@@ -296,15 +562,30 @@ async def forge_corpus(
     from fastapi.concurrency import run_in_threadpool
 
     from ..connectors.csv_fallback import CSVConnector
-    from ..llm import MiMoClient
+    from ..llm import get_llm_client
 
     rows = CSVConnector(str(tmp)).extract_sample(100000)
     cfg = CorpusConfig(min_samples_per_category=min_samples, synth_per_gap=synth_per_gap)
-    # LLM synthesis kicks in automatically when FDE_SCOPE_MIMO_API_KEY is
-    # set (env-configured); without a key the forge stays rule-based.
+    # LLM synthesis kicks in automatically when an LLM credential is
+    # configured (env); without a key the forge stays rule-based.
     # forge_rows may make blocking LLM calls (up to ~60s each) — run it in a
     # worker thread so the event loop (and every other endpoint) stays live.
-    report = await run_in_threadpool(CorpusForge(cfg, llm=MiMoClient()).forge_rows, rows)
+    llm = get_llm_client()
+    logger.info(
+        "forge start: %d rows from %s (llm=%s)",
+        len(rows),
+        safe_name,
+        llm.describe()["provider"] if llm.available else "off",
+    )
+    report = await run_in_threadpool(CorpusForge(cfg, llm=llm).forge_rows, rows)
+    logger.info(
+        "forge done: total=%d real=%d synthetic=%d dropped=%d pii_masked=%d",
+        report.total,
+        report.real,
+        report.synthetic,
+        report.dropped,
+        report.pii_entities_masked,
+    )
     report_id = uuid.uuid4().hex[:8]
     out_html = paths.reports_dir() / f"corpus_report_{report_id}.html"
     out_json = paths.reports_dir() / f"corpus_report_{report_id}.json"
@@ -356,9 +637,16 @@ def deploy_plan(body: dict | None = None) -> dict:
     from ..deploy import build_deploy_plan
 
     try:
-        return build_deploy_plan(body)
+        plan = build_deploy_plan(body)
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors()) from exc
+    logger.debug(
+        "deploy plan built: agents=%d bound=%d unbound=%d",
+        plan["summary"]["agents"],
+        len(plan["summary"]["bound_tools"]),
+        len(plan["summary"]["unbound_tools"]),
+    )
+    return plan
 
 
 # ---------------------------------------------------------------------------
@@ -458,11 +746,13 @@ def api_skill_patch(sid: str, patch: SkillPatch) -> dict:
 @app.post("/api/skills/{sid}/publish")
 def api_skill_publish(sid: str) -> dict:
     try:
-        return _skill_service().publish(sid).model_dump()
+        rec = _skill_service().publish(sid)
     except KeyError:
         raise HTTPException(status_code=404, detail="skill not found") from None
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from None
+    audit.log_event("skill.publish", detail={"skill_id": sid})
+    return rec.model_dump()
 
 
 @app.post("/api/skills/{sid}/archive")
@@ -554,6 +844,13 @@ def api_ontology_export(target_id: str) -> dict:
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")
+
+# Skills-catalog portal (generated site/, self-contained). Read-only repo
+# asset; conditional so installed wheels without docs/ degrade to GitHub
+# links instead of failing at import.
+_CATALOG_DIR = catalog_site_dir()
+if _CATALOG_DIR is not None:
+    app.mount("/catalog", StaticFiles(directory=str(_CATALOG_DIR), html=True), name="catalog")
 
 
 # ---------------------------------------------------------------------------
@@ -997,8 +1294,8 @@ __ICON_SPRITE__
   <div class="tile"><svg class="ic"><use href="#i-cpu"/></svg><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-bot"/></svg><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
   <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-ticket"/></svg><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-cloud"/></svg><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-stub">stub</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-ticket"/></svg><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-ok">真实可用</span></div>
+  <div class="tile"><svg class="ic"><use href="#i-cloud"/></svg><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-ok">真实可用</span></div>
   <div class="tile"><svg class="ic"><use href="#i-docs"/></svg><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
 </div>
 </section>
@@ -1029,7 +1326,7 @@ __ICON_SPRITE__
 <div class="sec-head"><svg class="ic"><use href="#i-layers"/></svg><h2>架构清单 · 四层 + 横切</h2><span class="n">06</span></div>
 <p class="sec-note">证据化建模见 docs/architecture-model/。</p>
 <div class="grid cols-3">
-  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（32 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（43 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-compass"/></svg><div class="name">SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-gears"/></svg><div class="name">能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · ontology · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-wrench"/></svg><div class="name">横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>
@@ -1039,7 +1336,7 @@ __ICON_SPRITE__
 </section>
 
 <section id="practices">
-<div class="sec-head"><svg class="ic"><use href="#i-check-badge"/></svg><h2>工程最佳实践 · 六条不变式</h2><span class="n">07</span></div>
+<div class="sec-head"><svg class="ic"><use href="#i-check-badge"/></svg><h2>工程最佳实践 · 七条不变式</h2><span class="n">07</span></div>
 <p class="sec-note">AGENTS.md 契约，由架构守护测试钉住。</p>
 <div class="grid cols-3">
   <div class="tile"><div class="name"><span class="inv-n">1</span>Gate 实时重评估</div><div class="desc">advance() 每次重评当前阶段全部 gate，过期通过不作数；强推也评估留痕。禁止缓存/短路。</div></div>
@@ -1048,6 +1345,7 @@ __ICON_SPRITE__
   <div class="tile"><div class="name"><span class="inv-n">4</span>原子写盘</div><div class="desc">一切用户状态经 fsutil.atomic_write_text（临时文件 + os.replace），禁止裸 write_text。</div></div>
   <div class="tile"><div class="name"><span class="inv-n">5</span>规则授权是唯一通道</div><div class="desc">build_toolkit 不打 is_read_only（上游 ≥2.0.5 read-only 先放行）；未匹配工具按模式回退 DEFAULT→ASK / DONT_ASK→DENY。</div></div>
   <div class="tile"><div class="name"><span class="inv-n">6</span>实测版本窗口</div><div class="desc">pyproject 与 docs 逐字引用同一 agentscope specifier，放宽前逐版本真库跑测。</div></div>
+  <div class="tile"><div class="name"><span class="inv-n">7</span>Web 变更路由须过认证</div><div class="desc">新路由确认未被 auth 白名单误放；token 只从 FDE_SCOPE_API_TOKEN 环境变量读，不落文件/日志/响应。</div></div>
 </div>
 <p class="sec-note">验证锚点：make test · pytest tests/test_architecture_guard.py（6 项契约）· pytest -m agentscope（真库运行时）· ruff check + format --check · 架构证据模型 docs/architecture-model/architecture-map.md</p>
 </section>
@@ -1166,6 +1464,7 @@ html[data-theme="dark"]{
 --accent-dim:oklch(0.74 0.085 232/0.13);--good:oklch(0.76 0.13 152);--warn:oklch(0.8 0.13 85);
 --bad:oklch(0.7 0.16 25);--code:oklch(0.14 0.012 255);
 color-scheme:dark}
+:root{--z-sticky:60;--z-toast:70}
 *{box-sizing:border-box}
 html,body{overflow-x:clip}
 body{margin:0;font-family:var(--font);background:var(--bg);color:var(--fg);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
@@ -1181,7 +1480,7 @@ a{color:var(--accent);text-decoration:none}
 .when-dark{display:none}
 html[data-theme="dark"] .when-light{display:none}
 html[data-theme="dark"] .when-dark{display:inline-block}
-header{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+header{position:sticky;top:0;z-index:var(--z-sticky);display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 @supports not (backdrop-filter:blur(1px)){header{background:var(--bg)}}
 .logo{font-weight:800;letter-spacing:-.01em;font-size:1.02rem}
 .v{font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-dim);border:1px solid color-mix(in oklab,var(--accent) 28%,transparent);padding:3px 9px;border-radius:999px;white-space:nowrap}
@@ -1196,7 +1495,7 @@ header{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:10px
 .layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 57px)}
 .sidebar{border-right:1px solid var(--border);padding:16px 14px;overflow-y:auto;background:var(--bg2)}
 .main{padding:20px 22px;overflow-x:clip}
-h2{font-size:.8rem;margin:0 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+h2{font-size:.92rem;margin:0 0 10px;color:var(--fg);font-weight:650;letter-spacing:0;text-wrap:balance}
 .nav{display:flex;flex-direction:column;gap:4px;margin-bottom:18px}
 .navbtn{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 11px;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .13s,color .13s;text-align:left}
 .navbtn:hover{background:var(--panel2);color:var(--fg)}
@@ -1217,9 +1516,10 @@ button.ghost,.btn.ghost{background:transparent;border-color:var(--border);color:
 button.ghost:hover,.btn.ghost:hover{border-color:var(--border-strong);background:var(--panel2)}
 button:disabled{opacity:.4;cursor:not-allowed}
 input,select,textarea{background:var(--code);border:1px solid var(--border);color:var(--fg);padding:7px 10px;border-radius:7px;font-size:.85rem;width:100%;font-family:inherit;transition:border-color .13s}
+input[type=checkbox]{width:auto;flex:none;padding:0}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 textarea{resize:vertical;line-height:1.5}
-.row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.row{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .row label{min-width:90px;color:var(--muted);font-size:.8rem;flex:none}
 .phases{display:flex;flex-direction:column;gap:6px}
 .phase{display:flex;align-items:center;gap:8px;padding:7px 11px;border-radius:7px;background:var(--panel2);font-size:.85rem;border:1px solid transparent}
@@ -1228,15 +1528,43 @@ textarea{resize:vertical;line-height:1.5}
 .phase .idx{width:22px;height:22px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-family:var(--mono);flex:none}
 .phase.current .idx{background:var(--accent);color:var(--accent-ink)}
 .zone-tag{font-size:.64rem;color:var(--faint);margin-left:auto;font-family:var(--mono);letter-spacing:.04em;flex:none}
-.gate{padding:10px 13px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);border-left:3px solid var(--border-strong);background:var(--panel2)}
-.gate.pass{border-left-color:var(--good)}
-.gate.fail{border-left-color:var(--bad)}
+.gate{padding:10px 13px;border-radius:8px;margin-bottom:8px;border:1px solid var(--border);background:var(--panel2)}
+.gate.fail{background:color-mix(in oklab,var(--bad) 5%,var(--panel2));border-color:color-mix(in oklab,var(--bad) 32%,var(--border))}
+.gate.pass{background:color-mix(in oklab,var(--good) 4%,var(--panel2))}
 .gate .h{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;font-size:.9rem}
 .gate ul{margin:6px 0 0;padding-left:4px;font-size:.8rem;color:var(--muted);list-style:none;display:flex;flex-direction:column;gap:3px}
 .gate li{display:flex;gap:6px;align-items:flex-start}
 .gate li .ic{margin-top:2px;width:12px;height:12px;color:var(--faint)}
 .gate li.bl .ic{color:var(--bad)}
 .gate li.wn .ic{color:var(--warn)}
+.steps{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:7px;font-size:.85rem}
+.steps li::marker{color:var(--faint);font-family:var(--mono);font-size:.72rem}
+.steps .adv{color:var(--muted);font-size:.8rem;margin-top:2px}
+.list-plain{margin:4px 0 0;padding-left:18px;font-size:.87rem;display:flex;flex-direction:column;gap:4px}
+.hint{color:var(--muted);font-size:.78rem}
+.stack{display:flex;flex-direction:column;gap:8px}
+.w-full{width:100%}
+.mt6{margin-top:6px}.mt8{margin-top:8px}.mt10{margin-top:10px}
+.gap6{gap:6px}
+.side-card{margin-top:16px}
+.plan-group{display:flex;align-items:center;gap:8px;margin:14px 0 2px;font-size:.8rem;font-weight:650;color:var(--muted)}
+.plan-group:first-of-type{margin-top:10px}
+.plan-group .idx{width:20px;height:20px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-family:var(--mono);flex:none}
+.plan-group.cur{color:var(--accent)}
+.plan-group.cur .idx{background:var(--accent);color:var(--accent-ink)}
+.plan-item{display:flex;gap:9px;align-items:flex-start;padding:6px 9px;border-radius:7px;transition:background .13s}
+.plan-item:hover{background:var(--panel2)}
+.plan-item input{margin-top:3px}
+.plan-item .t{font-size:.87rem}
+.plan-item.done .t{text-decoration:line-through;color:var(--muted)}
+.plan-item .d{color:var(--muted);font-size:.76rem;margin-top:1px}
+.diff{border:1px solid var(--border);border-radius:9px;background:var(--panel);margin-top:8px;overflow:hidden}
+.diff-h{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:.87rem;font-weight:600}
+.diff-b{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.diff-row{display:flex;gap:10px;font-size:.82rem;align-items:baseline;flex-wrap:wrap}
+.diff-row .k{flex:none;min-width:52px;color:var(--faint);font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.05em}
+.diff-row .old{color:var(--muted)}
+.diff-row .new{color:var(--fg);font-weight:600}
 pre{background:var(--code);padding:10px;border-radius:7px;overflow:auto;font-size:.78rem;border:1px solid var(--border);font-family:var(--mono)}
 code{font-family:var(--mono);font-size:.82em;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
@@ -1244,7 +1572,7 @@ code{font-family:var(--mono);font-size:.82em;background:var(--panel2);border:1px
 .kpi .k{color:var(--faint);font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono)}
 .kpi .v{font-size:1.35rem;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
 .tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);overflow-x:auto}
-.tab{padding:8px 13px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-size:.88rem;white-space:nowrap;transition:color .13s}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 13px;cursor:pointer;color:var(--muted);font-size:.88rem;white-space:nowrap;transition:color .13s;font-family:inherit;font-weight:500}
 .tab:hover{color:var(--fg)}
 .tab.active{color:var(--accent);border-color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:.84rem}
@@ -1261,7 +1589,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:.85rem;padding:6px 
 .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);vertical-align:1px}
 .d-ok{background:var(--good)}
 .d-bad{background:var(--bad)}
-#toast-host{position:fixed;right:18px;bottom:18px;z-index:1000;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+#toast-host{position:fixed;right:18px;bottom:18px;z-index:var(--z-toast);display:flex;flex-direction:column;gap:8px;align-items:flex-end}
 .toast{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border-strong);border-radius:9px;padding:9px 14px;font-size:.85rem;max-width:min(420px,86vw);box-shadow:0 12px 32px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .16s ease,transform .16s ease}
 .toast.on{opacity:1;transform:none}
 .toast .ic{color:var(--accent)}
@@ -1305,18 +1633,20 @@ __ICON_SPRITE__
     </nav>
     <h2>Engagements</h2>
     <div id="eng-list"></div>
-    <div class="card" style="margin-top:16px">
+    <div class="card side-card">
       <h2>新建 Engagement</h2>
       <div class="row"><label>客户</label><input id="new-customer" placeholder="BMW Spartanburg"></div>
       <div class="row"><label>Profile</label>
         <select id="new-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select>
       </div>
-      <button onclick="createEng()" style="width:100%">+ 创建</button>
+      <button class="w-full" onclick="createEng()">+ 创建</button>
     </div>
     <div class="card">
       <h2>工具</h2>
-      <a class="btn ghost" style="display:flex;width:100%;margin-bottom:6px" href="/reports/" target="_blank"><svg class="ic"><use href="#i-folder"/></svg>报告归档</a>
-      <button class="ghost" style="width:100%" onclick="loadProfiles()"><svg class="ic"><use href="#i-layers"/></svg>查看 Profiles &amp; Phases</button>
+      <div class="stack">
+        <a class="btn ghost w-full" href="/reports/" target="_blank"><svg class="ic"><use href="#i-folder"/></svg>报告归档</a>
+        <button class="ghost w-full" onclick="loadProfiles()"><svg class="ic"><use href="#i-layers"/></svg>查看 Profiles &amp; Phases</button>
+      </div>
     </div>
   </aside>
   <main class="main" id="main">
@@ -1686,7 +2016,7 @@ async function api(path, opts={}) {
 async function refreshList() {
   const list = await api('/api/engagements');
   const el = document.getElementById('eng-list');
-  if (!list.length) { el.innerHTML = '<div class="empty" style="padding:14px">暂无</div>'; return; }
+  if (!list.length) { el.innerHTML = `<div class="empty">${icon('i-map')}还没有 engagement<div class="hint">在左侧「新建 Engagement」填写客户名与 profile，开始你的第一条 SOP。</div></div>`; return; }
   el.innerHTML = list.map(s => `
     <div class="card eng" onclick="selectEng('${escapeHtml(s.engagement_id)}')">
       <div class="id">${escapeHtml(s.customer)}</div>
@@ -1717,12 +2047,14 @@ async function selectEng(eid) {
   const s = await api(`/api/engagements/${eid}`);
   const phases = await api(`/api/phases?profile=${s.profile}`);
   const gates = await api(`/api/engagements/${eid}/gates`);
-  renderDetail(s, phases, gates);
+  let guided = null;
+  try { guided = await api(`/api/engagements/${eid}/guided`); } catch(e) {}
+  renderDetail(s, phases, gates, guided);
 }
 
 function zoneLabel(z){return {pre_engagement:'A·Pre',build:'B·Build',operationalization:'C·Ops',handoff:'D·Handoff'}[z]||z}
 
-function renderDetail(s, phases, gates) {
+function renderDetail(s, phases, gates, guided) {
   let curIdx = 0;
   phases.phases.forEach((p,i)=>{if(p.slug===s.current_phase) curIdx=i});
   const phaseHtml = phases.phases.map((p,i) => {
@@ -1760,14 +2092,15 @@ function renderDetail(s, phases, gates) {
     </tr>`;}).join('')}</tbody></table></div></div>`:'';
 
   const html = `
-    <div class="tabs">
-      <div class="tab active" onclick="tab('overview',this)">概览</div>
-      <div class="tab" onclick="tab('sop',this)">SOP 阶段</div>
-      <div class="tab" onclick="tab('gates',this)">Gates</div>
-      <div class="tab" onclick="tab('context',this)">Context</div>
-      <div class="tab" onclick="tab('forge',this)">Corpus Forge</div>
-      <div class="tab" onclick="tab('kpi',this)">KPI</div>
-      <div class="tab" onclick="tab('journal',this)">现场记录</div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" role="tab" aria-selected="true" onclick="tab('overview',this)">概览</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('guided',this)">引导</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('sop',this)">SOP 阶段</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('gates',this)">Gates</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('context',this)">Context</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('forge',this)">Corpus Forge</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('kpi',this)">KPI</button>
+      <button class="tab" role="tab" aria-selected="false" onclick="tab('journal',this)">现场记录</button>
     </div>
     <div id="t-overview">
       <div class="card">
@@ -1793,6 +2126,7 @@ function renderDetail(s, phases, gates) {
         </div>
       </div>
     </div>
+    <div id="t-guided" class="hidden">${guidedHtml(guided, phases)}</div>
     <div id="t-sop" class="hidden"><div class="card"><div class="phases">${phaseHtml}</div></div></div>
     <div id="t-gates" class="hidden">${ledgerHtml}${gateHtml}</div>
     <div id="t-context" class="hidden">${contextHtml(s.context)}</div>
@@ -1820,11 +2154,15 @@ function renderDetail(s, phases, gates) {
 }
 
 function tab(name, el) {
-  ['overview','sop','gates','context','forge','kpi','journal'].forEach(t=>{
+  ['overview','guided','sop','gates','context','forge','kpi','journal'].forEach(t=>{
     const e=document.getElementById('t-'+t); if(e) e.classList.toggle('hidden', t!==name);
   });
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.classList.remove('active');
+    t.setAttribute('aria-selected','false');
+  });
   el.classList.add('active');
+  el.setAttribute('aria-selected','true');
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -1896,6 +2234,244 @@ function contextHtml(ctx) {
       ${monRows}
     </div>`;
 }
+
+let gdDraftRes = null;
+let gdPhaseNames = {};
+let gdPhaseIdx = {};
+let gdCurSlug = '';
+let gdPlanData = null;
+let gdSaveTimer = null;
+
+function guidedHtml(g, phases) {
+  if (!g) return '<div class="empty">' + icon('i-alert') + '引导数据不可用<div class="hint">可能是接口瞬时失败，重新进入该 engagement 详情会重试。</div></div>';
+  const esc = escapeHtml;
+  const p = g.phase||{};
+  gdPhaseNames = {}; gdPhaseIdx = {};
+  (phases&&phases.phases||[]).forEach(x=>{gdPhaseNames[x.slug]=x.name; gdPhaseIdx[x.slug]=x.index;});
+  gdCurSlug = p.slug||'';
+  const deliv = (g.deliverables||[]).map(d=>`<li>${esc(d)}</li>`).join('')||'<li class="hint">—</li>';
+  const gatesHtml = Object.entries(g.gates||{}).map(([slug,gt])=>{
+    const steps = (gt.next_steps||[]).map((st,i)=>`<li value="${i+1}"><b>${esc(st.issue)}</b><div class="adv">${esc(st.advice)}</div></li>`).join('');
+    return `<div class="gate ${gt.passed?'pass':'fail'}"><div class="h"><b>${esc(gt.name)}</b>
+      <span>${gt.passed?dot(true)+' PASS':dot(false)+' BLOCKED'}</span></div>
+      ${steps?`<div class="hint">下一步做什么</div><ol class="steps">${steps}</ol>`
+        :(gt.passed?'<div class="hint">门禁已通过，可推进下一阶段。</div>':'')}
+    </div>`;
+  }).join('') || '<div class="empty">本阶段无门禁——完成产出清单后即可推进</div>';
+  const isEn = document.documentElement.lang==='en';
+  const pages = (g.catalog_pages||[]).map(pg=>{
+    const url = (isEn && pg.url_en) ? pg.url_en : pg.url;
+    return `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">${icon('i-book')} ${esc(pg.title)}</a>`;
+  }).join(' ');
+  const aiBtn = g.llm_available ? '✨ AI 起草' : '✍️ 手动填写指引';
+  const aiNote = g.llm_available
+    ? '用自然语言描述业务，AI 起草 现场/干系人/成功标准/SLO 草稿。写入前逐项确认，门禁通过才算数。'
+    : '未配置 AI key（FDE_SCOPE_MIMO_API_KEY），可打开手动填写指引，按字段说明逐项录入。';
+  return `
+    ${gdGoalCard(g)}
+    <div class="card"><h2>当前阶段：${esc(p.name||'')} <span class="pill">${esc(p.progress||'')}</span></h2>
+      <div class="row"><label>Zone</label>${esc(zoneLabel(p.zone))}</div>
+      <p class="hint mt6">${esc(p.description||'')}</p></div>
+    <div class="card"><h2>本阶段要产出什么</h2><ul class="list-plain">${deliv}</ul>
+      <div class="hint mt8">产出写入 Context / assets 后，门禁会自动重评——引导不代替验收。</div></div>
+    ${gatesHtml}
+    <div class="card"><h2>AI 起草 Context</h2>
+      <div class="hint">${esc(aiNote)}</div>
+      <textarea id="gd-desc" rows="3" class="mt10" placeholder="例：我们是一家茶饮连锁，国内 2000 家门店，客服团队每天处理大量加盟咨询与客诉，希望用工单 AI 缩短首响时间…">${escapeHtml(window.gdLastDesc||'')}</textarea>
+      <div class="row mt10"><button onclick="gdDraftCtx()">${aiBtn}</button></div>
+      <div id="gd-out" class="mt10"></div></div>
+    <div class="card"><h2>相关阅读（技能手册库）</h2><div class="row gap6">${pages||'<span class="hint">—</span>'}</div></div>`;
+}
+
+function gdGoalCard(g) {
+  const plan = g.plan;
+  let inner;
+  if (plan && Array.isArray(plan.items)) {
+    inner = gdPlanHtml(plan);
+  } else {
+    inner = `<div class="row"><input id="gd-goal" placeholder="输入项目目标（例：把客服首响缩到 8s 内，坏例率降到 5% 以下）">
+      <button onclick="gdPlan()">生成任务清单</button></div>
+      <div class="hint">目标会被拆解到 SOP 各阶段，勾选状态自动保存。${g.llm_available?'':'（规则版：未配置 AI key）'}</div>`;
+  }
+  return `<div class="card"><h2>项目目标与任务清单</h2>${inner}</div>`;
+}
+
+function gdPlanHtml(plan) {
+  const esc = escapeHtml;
+  gdPlanData = plan;
+  let html = `<div class="row"><label>目标</label><b>${esc(plan.goal||'')}</b>
+    <span class="pill">${plan.used_llm?'AI 生成':'规则生成'}</span>
+    <button class="ghost" onclick="gdReplan()">重新生成</button></div>`;
+  let lastSlug = null;
+  (plan.items||[]).forEach(it=>{
+    if (it.phase_slug!==lastSlug) {
+      lastSlug = it.phase_slug;
+      const isCur = it.phase_slug===gdCurSlug;
+      html += `<div class="plan-group${isCur?' cur':''}"><span class="idx">${gdPhaseIdx[it.phase_slug]||''}</span>${esc(gdPhaseNames[it.phase_slug]||it.phase_slug)}${isCur?'<span class="pill">当前阶段</span>':''}</div>`;
+    }
+    html += `<label class="plan-item${it.done?' done':''}"><input type="checkbox" ${it.done?'checked':''} onchange="gdToggle('${esc(it.id)}',this.checked)">
+      <span><span class="t">${esc(it.title)}</span>${it.detail?`<div class="d">${esc(it.detail)}</div>`:''}</span></label>`;
+  });
+  return html;
+}
+
+async function gdPlan() {
+  const goal = (document.getElementById('gd-goal')||{}).value?.trim()||'';
+  if (!goal) return toast('请先输入项目目标','warn');
+  try {
+    const r = await api(`/api/engagements/${current}/guided/plan`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({goal})});
+    toast(r.used_llm?'任务清单已生成（AI）':'任务清单已生成（规则版）','ok');
+    selectEng(current);
+  } catch(e){ toast('生成失败：'+e.message,'bad',7000); }
+}
+
+async function gdReplan() {
+  if (!gdPlanData) return;
+  if (!confirm('覆盖现有任务清单？勾选状态会丢失。')) return;
+  try {
+    await api(`/api/engagements/${current}/guided/plan`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({goal: gdPlanData.goal||''})});
+    toast('已重新生成','ok');
+    selectEng(current);
+  } catch(e){ toast('生成失败：'+e.message,'bad',7000); }
+}
+
+function gdToggle(id, done) {
+  if (!gdPlanData) return;
+  const it = (gdPlanData.items||[]).find(x=>x.id===id);
+  if (it) it.done = done;
+  clearTimeout(gdSaveTimer);
+  gdSaveTimer = setTimeout(()=>{
+    api(`/api/engagements/${current}/context`, {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({assets:{guided_plan:gdPlanData}})})
+      .then(()=>toast('任务状态已保存','ok'))
+      .catch(()=>toast('任务状态保存失败','bad'));
+  }, 400);
+}
+
+async function gdDraftCtx() {
+  const desc = (document.getElementById('gd-desc')||{}).value?.trim()||'';
+  if (!desc) return toast('请先描述你的业务','warn');
+  window.gdLastDesc = desc;
+  const out = document.getElementById('gd-out');
+  out.innerHTML = '<div class="hint">起草中（最长约 1 分钟）…</div>';
+  try {
+    const r = await api(`/api/engagements/${current}/guided/draft-context`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({description:desc})});
+    gdDraftRes = r;
+    if (r.draft) gdRenderDiff(r);
+    else {
+      toast(r.used_llm?'AI 输出无法解析，已切换手动模式':'AI 不可用，已切换手动模式','warn',6000);
+      gdRenderGuide(r.field_guide, '按下面的字段说明手动录入，每块单独保存（同样要过门禁才算数）。');
+    }
+  } catch(e){
+    out.innerHTML = '<div class="empty">' + icon('i-alert') + '起草请求失败<div class="hint">' + escapeHtml(e.message) + ' —— 可重试，或改用手动填写。</div></div>';
+  }
+}
+
+function gdBrief(block, v) {
+  if (v==null) return '—';
+  if (block==='site') return v.location ? `地点 ${v.location} · 班次 ${v.shift_count||1} · 气隙 ${v.air_gapped?'是':'否'}` : '未填写';
+  if (Array.isArray(v)) return v.length ? v.length+' 条：'+v.slice(0,3).map(x=>typeof x==='string'?x:(x.name||JSON.stringify(x))).join('，') : '空';
+  return JSON.stringify(v);
+}
+
+function gdRenderDiff(res) {
+  const esc = escapeHtml;
+  const labels = {site:'现场 / Site', stakeholders:'干系人', success_criteria:'成功标准', slos:'SLO'};
+  const cur = res.current||{};
+  let html = '<div class="hint">由 MiMo 起草，待你确认。勾选要采纳的块后写入；写入后门禁会实时重评。</div>';
+  Object.entries(res.draft||{}).forEach(([block,val])=>{
+    html += `<div class="diff"><div class="diff-h">
+      <input type="checkbox" class="gd-adopt" data-block="${esc(block)}" checked aria-label="${esc(labels[block]||block)}">
+      <span>${esc(labels[block]||block)}</span></div>
+      <div class="diff-b">
+        <div class="diff-row"><span class="k">当前值</span><span class="old">${esc(gdBrief(block,cur[block]))}</span></div>
+        <div class="diff-row"><span class="k">起草值</span><span class="new">${esc(gdBrief(block,val))}</span></div>
+        <details><summary>JSON 微调</summary><textarea id="gd-json-${esc(block)}" rows="4">${esc(JSON.stringify(val,null,2))}</textarea></details>
+      </div></div>`;
+  });
+  html += `<div class="row mt10"><button onclick="gdApply()">确认写入勾选项</button>
+    <button class="ghost" onclick="gdRenderGuide(gdDraftRes.field_guide,'也可完全手动录入：')">手动填写表单</button></div>`;
+  document.getElementById('gd-out').innerHTML = html;
+}
+
+async function gdApply() {
+  const body = {};
+  for (const cb of document.querySelectorAll('.gd-adopt:checked')) {
+    const block = cb.dataset.block;
+    const ta = document.getElementById('gd-json-'+block);
+    try { body[block] = JSON.parse(ta.value); }
+    catch(e){ return toast(`${block} 的 JSON 不合法：`+e.message,'bad',7000); }
+  }
+  if (!Object.keys(body).length) return toast('没有勾选任何块','warn');
+  await gdPostContext(body);
+}
+
+function gdRenderGuide(guide, note) {
+  const esc = escapeHtml;
+  window._gdGuide = guide||[];
+  let html = note ? `<div class="hint">${esc(note)}</div>` : '';
+  (guide||[]).forEach(b=>{
+    html += `<div class="diff"><div class="diff-h"><span>${esc(b.label)}</span></div><div class="diff-b">`;
+    if (b.kind==='fields') {
+      (b.fields||[]).forEach(f=>{
+        const id = 'gd-f-'+f.field;
+        if (f.type==='bool') html += `<div class="row"><label>${esc(f.field)}</label><input type="checkbox" id="${id}"><span class="hint">${esc(f.hint||'')}</span></div>`;
+        else if (f.type==='lines') html += `<div class="stack"><label class="hint" for="${id}">${esc(f.field)} · ${esc(f.hint||'')}</label><textarea id="${id}" rows="2"></textarea></div>`;
+        else html += `<div class="row"><label>${esc(f.field)}</label><input id="${id}" placeholder="${esc(f.example||f.hint||'')}"></div>`;
+      });
+    } else {
+      html += `<div class="hint">${esc(b.hint||'')} 格式：${esc(b.line_format||'')}${b.example?`（例：${esc(b.example)}）`:''}</div>
+        <textarea id="gd-l-${esc(b.block)}" rows="3"></textarea>`;
+    }
+    html += `<div class="row"><button class="ghost" onclick="gdSubmitBlock('${esc(b.block)}')">保存${esc(b.label)}</button></div></div></div>`;
+  });
+  document.getElementById('gd-out').innerHTML = html;
+}
+
+function gdAssemble(b) {
+  const lines = id => (((document.getElementById(id)||{}).value||'').split('\\n').map(s=>s.trim()).filter(Boolean));
+  if (b.kind==='fields') {
+    const site = {}; let any = false;
+    (b.fields||[]).forEach(f=>{
+      const el = document.getElementById('gd-f-'+f.field); if (!el) return;
+      if (f.type==='bool') { site[f.field] = el.checked; if (el.checked) any = true; }
+      else if (f.type==='int') { const n = parseInt(el.value,10); if (!isNaN(n)) { site[f.field] = n; any = true; } }
+      else if (f.type==='lines') { const v = lines('gd-f-'+f.field); if (v.length) { site[f.field] = v; any = true; } }
+      else if (el.value.trim()) { site[f.field] = el.value.trim(); any = true; }
+    });
+    return any ? site : null;
+  }
+  const rows = lines('gd-l-'+b.block);
+  if (!rows.length) return null;
+  const cells = r => r.split('|').map(s=>(s||'').trim());
+  if (b.block==='stakeholders') return rows.map(r=>{const [name,role,sp,metric]=cells(r); return {name:name||'',role:role||'',is_sponsor:/^(y|yes|是)$/i.test(sp||''),success_metric:metric||''};}).filter(x=>x.name);
+  if (b.block==='success_criteria') return rows;
+  if (b.block==='slos') return rows.map(r=>{const [name,target,eb,route,win]=cells(r); return {name:name||'',target:target||'',error_budget:eb||'',alert_route:route||'',window:win||'14d'};}).filter(x=>x.name&&x.target);
+  return null;
+}
+
+function gdSubmitBlock(block) {
+  const b = (window._gdGuide||[]).find(x=>x.block===block);
+  if (!b) return;
+  let val;
+  try { val = gdAssemble(b); } catch(e){ return toast('格式错误：'+e.message,'bad',6000); }
+  if (val===null || (Array.isArray(val)&&!val.length)) return toast('没有可写入的内容','warn');
+  gdPostContext({[block]: val});
+}
+
+async function gdPostContext(body) {
+  try {
+    await api(`/api/engagements/${current}/context`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    toast('已保存，门禁已重评','ok');
+    selectEng(current);
+  } catch(e){ toast('保存失败：'+e.message,'bad',7000); }
+}
+
 
 async function advance(force) {
   const r = await api(`/api/engagements/${current}/advance?force=${force}`,{method:'POST'});

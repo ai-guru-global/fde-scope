@@ -17,8 +17,11 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+from ..logutil import get_logger
 from .base import Batch, DataConnector, register
 from .schema import Schema, SchemaField
+
+logger = get_logger("connectors.csv")
 
 # Heuristic: field names that suggest personally identifiable information.
 _PII_NAME_HINTS = {"name", "customer_name", "email", "phone", "mobile", "address", "id_card"}
@@ -72,6 +75,7 @@ class CSVConnector(DataConnector):
         elif self._path.is_file():
             yield self._path
         else:
+            logger.warning("CSV source not found: %s", self.source)
             raise FileNotFoundError(f"CSV source not found: {self.source}")
 
     def _iter_rows(self) -> Iterator[dict[str, Any]]:

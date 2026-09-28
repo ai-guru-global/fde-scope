@@ -31,8 +31,11 @@ from collections.abc import Iterator
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from ..logutil import get_logger
 from .base import Batch, DataConnector, register
 from .schema import Schema, SchemaField
+
+logger = get_logger("connectors.mysql")
 
 # Heuristic: column names that suggest personally identifiable information.
 # Mirrors the CSV connector's table so the corpus engine treats them uniformly.
@@ -200,6 +203,7 @@ class MySQLConnector(DataConnector):
             cursor.execute(f"SELECT COUNT(*) AS n FROM `{table}`")
             return int(cursor.fetchone()["n"])
         except Exception:
+            logger.debug("row count failed for table %r; continuing without it", table, exc_info=True)
             return None
 
     def _row_to_dict(self, cursor_description: list, row: tuple) -> dict[str, Any]:

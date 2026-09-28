@@ -25,6 +25,33 @@ def test_health(client) -> None:
     assert r.json()["status"] == "ok"
 
 
+def test_health_reports_real_checks(client, monkeypatch) -> None:
+    monkeypatch.delenv("FDE_SCOPE_MIMO_API_KEY", raising=False)
+    monkeypatch.delenv("FDE_SCOPE_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("FDE_SCOPE_LLM_API_KEY", raising=False)
+    body = client.get("/api/health").json()
+    checks = body["checks"]
+    assert checks["data_root"]["ok"] is True
+    assert "path" in checks["data_root"]
+    assert checks["reports_dir"]["ok"] is True
+    assert checks["llm"] == {"ok": True, "configured": False}
+    assert checks["engagements_count"] == {"ok": True, "count": 0}
+
+
+def test_health_counts_engagements(client) -> None:
+    client.post("/api/engagements", data={"customer": "HealthCo", "profile": "ticket"})
+    body = client.get("/api/health").json()
+    assert body["checks"]["engagements_count"]["count"] == 1
+    assert body["status"] == "ok"
+
+
+def test_health_llm_configured_via_env(client, monkeypatch) -> None:
+    monkeypatch.setenv("FDE_SCOPE_MIMO_API_KEY", "tp-health")
+    resp = client.get("/api/health")
+    assert resp.json()["checks"]["llm"]["configured"] is True
+    assert "tp-health" not in resp.text  # the key itself never leaves the env
+
+
 def test_overview_html(client) -> None:
     """The landing page at / shows the feature overview."""
     r = client.get("/")
@@ -147,7 +174,7 @@ def test_advance_blocked_returns_result(client) -> None:
     client.post(f"/api/engagements/{eid}/context", json={"success_criteria": [], "stakeholders": []})
     # manually move context forward to success_criteria
     from fde_scope.engagement import Engagement, EngagementContext
-    from fde_scope.web.app import _eng_path
+    from fde_scope.web.deps import _eng_path
 
     eng = Engagement(EngagementContext.load(_eng_path(eid)))
     eng.ctx.current_phase = "success_criteria"
@@ -235,7 +262,7 @@ def test_eng_path_rejects_traversal_eid(client) -> None:
     """_eng_path refuses ids that resolve outside the engagements dir."""
     from fastapi import HTTPException
 
-    from fde_scope.web.app import _eng_path
+    from fde_scope.web.deps import _eng_path
 
     with pytest.raises(HTTPException) as exc_info:
         _eng_path("../../outside")
@@ -282,7 +309,7 @@ def test_advance_completed_engagement_returns_reason(client) -> None:
     r = client.post("/api/engagements", data={"customer": "DoneCo", "profile": "ticket"})
     eid = r.json()["engagement_id"]
     from fde_scope.engagement import Engagement, EngagementContext
-    from fde_scope.web.app import _eng_path
+    from fde_scope.web.deps import _eng_path
 
     eng = Engagement(EngagementContext.load(_eng_path(eid)))
     eng.ctx.current_phase = "disengage"
@@ -642,3 +669,287 @@ def test_overview_has_ontology_section(client) -> None:
     html = client.get("/").text
     assert "Ontology 语义层" in html
     assert 'href="/console#ontology"' in html
+
+
+# ---------------------------------------------------------------------------
+# guided mode（引导模式：只读引导 + catalog 本地 serve）
+# ---------------------------------------------------------------------------
+def test_guided_endpoint_structure(client) -> None:
+    r = client.post("/api/engagements", data={"customer": "GuidedCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.get(f"/api/engagements/{eid}/guided")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["phase"]["slug"] == "qualification"
+    assert body["deliverables"]
+    assert isinstance(body["llm_available"], bool)
+    assert body["catalog_pages"] and all("url" in p and "route" in p for p in body["catalog_pages"])
+
+
+def test_guided_endpoint_404(client) -> None:
+    assert client.get("/api/engagements/nope/guided").status_code == 404
+
+
+def test_guided_translates_blockers_into_next_steps(client) -> None:
+    r = client.post("/api/engagements", data={"customer": "StepCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    # walk to success_criteria (qualification/stakeholder_map have no gates for ticket)
+    for _ in range(2):
+        client.post(f"/api/engagements/{eid}/advance")
+    body = client.get(f"/api/engagements/{eid}/guided").json()
+    assert body["phase"]["slug"] == "success_criteria"
+    gate = body["gates"]["success_criteria"]
+    assert gate["passed"] is False
+    assert gate["next_steps"] and all(s["advice"] for s in gate["next_steps"])
+
+
+def test_guided_does_not_record_gates(client) -> None:
+    """Guidance is read-only: no gate_records are written by /guided."""
+    r = client.post("/api/engagements", data={"customer": "ROCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    before = client.get(f"/api/engagements/{eid}").json()["context"]["gate_records"]
+    client.get(f"/api/engagements/{eid}/guided")
+    after = client.get(f"/api/engagements/{eid}").json()["context"]["gate_records"]
+    assert before == after
+
+
+def test_existing_routes_survive_guided_router(client) -> None:
+    """Route-snapshot guard: the guided router must not shadow existing API."""
+    from fde_scope.web.app import app
+
+    paths = set(app.openapi()["paths"])
+    for expected in (
+        "/api/health",
+        "/api/profiles",
+        "/api/phases",
+        "/api/engagements",
+        "/api/engagements/{eid}",
+        "/api/engagements/{eid}/gates",
+        "/api/engagements/{eid}/advance",
+        "/api/engagements/{eid}/gate/{slug}",
+        "/api/engagements/{eid}/journal",
+        "/api/engagements/{eid}/context",
+        "/api/forge",
+        "/api/kpi",
+        "/api/deploy/plan",
+        "/api/workbench",
+        "/api/skills",
+        "/api/engagements/{eid}/guided",
+    ):
+        assert expected in paths, f"missing route: {expected}"
+
+
+def test_console_has_guided_tab(client) -> None:
+    html = client.get("/console").text
+    assert """tab('guided',this)""" in html
+    assert "guidedHtml" in html
+    # the original 7 tabs are untouched
+    for name in ("overview", "sop", "gates", "context", "forge", "kpi", "journal"):
+        assert f"""tab('{name}',this)""" in html
+
+
+def test_en_console_translates_guided_tab(client) -> None:
+    html = client.get("/en/console").text
+    assert """tab('guided',this)">Guided</button>""" in html
+    assert "What to deliver in this phase" in html
+
+
+def test_catalog_portal_served_locally(client) -> None:
+    from fde_scope.web.deps import catalog_site_dir
+
+    if catalog_site_dir() is None:
+        import pytest
+
+        pytest.skip("catalog portal not built in this checkout")
+    r = client.get("/catalog/index.html")
+    assert r.status_code == 200
+    assert "firecrawl-search" in r.text
+
+
+def test_guided_catalog_urls_are_local_when_mounted(client) -> None:
+    from fde_scope.web.deps import catalog_site_dir
+
+    r = client.post("/api/engagements", data={"customer": "CatCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    body = client.get(f"/api/engagements/{eid}/guided").json()
+    if catalog_site_dir() is None:
+        assert body["catalog_local"] is False
+        assert all(p["url"].startswith("https://github.com/") for p in body["catalog_pages"])
+    else:
+        assert body["catalog_local"] is True
+        assert all(p["url"].startswith("/catalog/index.html#/") for p in body["catalog_pages"])
+
+
+# ---------------------------------------------------------------------------
+# guided mode: AI draft-context + goal plan（迭代 3/4）
+# ---------------------------------------------------------------------------
+_GOOD_DRAFT_JSON = (
+    '{"stakeholders": [{"name": "张三", "role": "CTO", "is_sponsor": true, "success_metric": "首响<8s"},'
+    '{"name": "李四", "role": "COO", "is_sponsor": true}],'
+    ' "success_criteria": ["首响 <8s"]}'
+)
+
+
+def _fake_mimo(monkeypatch, reply=None, error=False):
+    from fde_scope import llm as llm_mod
+
+    monkeypatch.setattr(llm_mod.MiMoClient, "available", property(lambda self: True))
+
+    def complete(self, prompt, **kwargs):
+        if error:
+            raise RuntimeError("boom")
+        return reply
+
+    monkeypatch.setattr(llm_mod.MiMoClient, "complete", complete)
+
+
+def _mk(client, customer="DraftCo", profile="ticket"):
+    return client.post("/api/engagements", data={"customer": customer, "profile": profile}).json()[
+        "engagement_id"
+    ]
+
+
+def test_draft_context_endpoint(client, monkeypatch) -> None:
+    _fake_mimo(monkeypatch, reply=_GOOD_DRAFT_JSON)
+    eid = _mk(client)
+    r = client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "我们是茶饮连锁…"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["used_llm"] is True
+    assert len(body["draft"]["stakeholders"]) == 2
+    assert body["current"]["stakeholders"] == []
+    assert body["field_guide"]
+
+
+def test_draft_context_never_persists(client, monkeypatch) -> None:
+    _fake_mimo(monkeypatch, reply=_GOOD_DRAFT_JSON)
+    eid = _mk(client)
+    before = client.get(f"/api/engagements/{eid}").json()["context"]
+    client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "描述"})
+    after = client.get(f"/api/engagements/{eid}").json()["context"]
+    assert before == after
+
+
+def test_draft_context_garbage_llm_output_is_200_null(client, monkeypatch) -> None:
+    _fake_mimo(monkeypatch, reply="完全不是 JSON")
+    eid = _mk(client)
+    r = client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "描述"})
+    assert r.status_code == 200
+    assert r.json()["draft"] is None
+    assert r.json()["used_llm"] is False
+
+
+def test_draft_context_llm_error_is_200_null(client, monkeypatch) -> None:
+    _fake_mimo(monkeypatch, error=True)
+    eid = _mk(client)
+    r = client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "描述"})
+    assert r.status_code == 200
+    assert r.json()["draft"] is None
+
+
+def test_draft_context_rejects_blank_and_oversize(client) -> None:
+    eid = _mk(client)
+    assert (
+        client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "   "}).status_code
+        == 422
+    )
+    assert (
+        client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": ""}).status_code
+        == 422
+    )
+    big = "x" * 8001
+    assert (
+        client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": big}).status_code
+        == 422
+    )
+
+
+def test_draft_apply_flows_through_context_and_gate(client, monkeypatch) -> None:
+    """End-to-end: draft → apply via POST /context → success_criteria gate flips to pass.
+
+    Proves AI prefill goes through the front door and gates remain the sole
+    acceptance channel (invariant 1)."""
+    _fake_mimo(monkeypatch, reply=_GOOD_DRAFT_JSON)
+    eid = _mk(client)
+    for _ in range(2):  # qualification → stakeholder_map → success_criteria
+        client.post(f"/api/engagements/{eid}/advance")
+    guided = client.get(f"/api/engagements/{eid}/guided").json()
+    assert guided["phase"]["slug"] == "success_criteria"
+    assert guided["gates"]["success_criteria"]["passed"] is False
+
+    draft = client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "描述"}).json()[
+        "draft"
+    ]
+    r = client.post(f"/api/engagements/{eid}/context", json=draft)
+    assert r.status_code == 200
+
+    guided = client.get(f"/api/engagements/{eid}/guided").json()
+    assert guided["gates"]["success_criteria"]["passed"] is True
+    assert guided["gates"]["success_criteria"]["next_steps"] == []
+
+
+def test_draft_context_without_key_falls_back(client, monkeypatch) -> None:
+    monkeypatch.delenv("FDE_SCOPE_MIMO_API_KEY", raising=False)
+    eid = _mk(client)
+    r = client.post(f"/api/engagements/{eid}/guided/draft-context", json={"description": "描述"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["draft"] is None and body["used_llm"] is False
+    assert body["field_guide"]  # manual fallback still served
+
+
+def test_goal_plan_rule_version_persists(client, monkeypatch) -> None:
+    monkeypatch.delenv("FDE_SCOPE_MIMO_API_KEY", raising=False)
+    eid = _mk(client)
+    gates_before = client.get(f"/api/engagements/{eid}/gates").json()
+    r = client.post(f"/api/engagements/{eid}/guided/plan", json={"goal": "把首响缩到 8s 内"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["saved"] is True and body["used_llm"] is False
+    plan = body["plan"]
+    assert plan["goal"] == "把首响缩到 8s 内"
+    assert {i["phase_slug"] for i in plan["items"]} >= {"qualification", "disengage"}
+    # persisted into assets and echoed by GET /guided
+    ctx = client.get(f"/api/engagements/{eid}").json()["context"]
+    assert ctx["assets"]["guided_plan"]["goal"] == plan["goal"]
+    assert client.get(f"/api/engagements/{eid}/guided").json()["plan"]["goal"] == plan["goal"]
+    # planning never touches the state machine
+    assert client.get(f"/api/engagements/{eid}/gates").json() == gates_before
+
+
+def test_goal_plan_llm_enhanced(client, monkeypatch) -> None:
+    _fake_mimo(monkeypatch, reply='{"qualification": ["定制任务A"]}')
+    eid = _mk(client)
+    r = client.post(f"/api/engagements/{eid}/guided/plan", json={"goal": "目标"})
+    body = r.json()
+    assert body["used_llm"] is True
+    assert any(i["title"] == "定制任务A" for i in body["plan"]["items"])
+
+
+def test_goal_plan_rejects_blank(client) -> None:
+    eid = _mk(client)
+    assert client.post(f"/api/engagements/{eid}/guided/plan", json={"goal": "  "}).status_code == 422
+
+
+def test_plan_checkbox_roundtrip_via_context(client, monkeypatch) -> None:
+    monkeypatch.delenv("FDE_SCOPE_MIMO_API_KEY", raising=False)
+    eid = _mk(client)
+    plan = client.post(f"/api/engagements/{eid}/guided/plan", json={"goal": "目标"}).json()["plan"]
+    plan["items"][0]["done"] = True
+    r = client.post(f"/api/engagements/{eid}/context", json={"assets": {"guided_plan": plan}})
+    assert r.status_code == 200
+    echoed = client.get(f"/api/engagements/{eid}/guided").json()["plan"]
+    assert echoed["items"][0]["done"] is True
+    assert echoed["items"][0]["id"] == plan["items"][0]["id"]  # ids stable across save
+
+
+def test_console_ships_guided_ai_and_plan_ui(client) -> None:
+    html = client.get("/console").text
+    for needle in ("gdDraftCtx", "gdPlan", "gdRenderGuide", "AI 起草 Context", "项目目标与任务清单"):
+        assert needle in html
+
+
+def test_en_console_translates_guided_ai_card(client) -> None:
+    html = client.get("/en/console").text
+    assert "Draft context with AI" in html
+    assert "Project goal & task plan" in html

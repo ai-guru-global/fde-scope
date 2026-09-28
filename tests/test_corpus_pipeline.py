@@ -36,6 +36,41 @@ def test_pii_scrub_masks_phone_and_email() -> None:
     assert scrub.masked_count == 2
 
 
+def test_pii_scrub_masks_ip_and_honorific_name() -> None:
+    scrub = PIIScrub(CorpusConfig().pii_rules.patterns)
+    item = CorpusItem(
+        id="x",
+        content="服务器 10.0.3.17 无法访问，联系 Mr. John Smith 处理",
+        category="故障",
+    )
+    out = scrub([item])
+    assert "10.0.3.17" not in out[0].content
+    assert "[REDACTED]([IP])" in out[0].content
+    assert "Mr. John Smith" not in out[0].content
+    assert "[REDACTED]([NAME])" in out[0].content
+    assert scrub.masked_count == 2
+
+
+def test_pii_scrub_no_false_positives_on_normal_english() -> None:
+    """Plain English prose (no honorific, no IP-shaped token) survives intact."""
+    scrub = PIIScrub(CorpusConfig().pii_rules.patterns)
+    text = (
+        "John Smith reported that the packaging was damaged on arrival. "
+        "Please check order status and arrange a replacement."
+    )
+    out = scrub([CorpusItem(id="x", content=text, category="物流")])
+    assert out[0].content == text
+    assert scrub.masked_count == 0
+
+
+def test_pii_scrub_chinese_prose_untouched() -> None:
+    scrub = PIIScrub(CorpusConfig().pii_rules.patterns)
+    text = "客户反馈收到的商品有质量问题，希望尽快退款处理，谢谢。"
+    out = scrub([CorpusItem(id="x", content=text, category="退款")])
+    assert out[0].content == text
+    assert scrub.masked_count == 0
+
+
 def test_dedup_removes_near_duplicates() -> None:
     dedup = Deduplication(threshold=0.92)
     items = [

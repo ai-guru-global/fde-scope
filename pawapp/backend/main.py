@@ -224,7 +224,7 @@ async def forge_corpus(
     from fde_scope.config import CorpusConfig
     from fde_scope.connectors.csv_fallback import CSVConnector
     from fde_scope.corpus import CorpusForge, save_html
-    from fde_scope.llm import MiMoClient
+    from fde_scope.llm import get_llm_client
 
     content = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
@@ -239,7 +239,7 @@ async def forge_corpus(
 
     rows = CSVConnector(str(tmp)).extract_sample(100000)
     cfg = CorpusConfig(min_samples_per_category=min_samples, synth_per_gap=synth_per_gap)
-    report = await run_in_threadpool(CorpusForge(cfg, llm=MiMoClient()).forge_rows, rows)
+    report = await run_in_threadpool(CorpusForge(cfg, llm=get_llm_client()).forge_rows, rows)
     report_id = uuid.uuid4().hex[:8]
     report_dir = paths.reports_dir(create=True)
     out_html = report_dir / f"corpus_report_{report_id}.html"

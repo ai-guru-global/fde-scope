@@ -12,9 +12,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from ..logutil import get_logger
 from .context import EngagementContext, GateRecord
 from .gates.base import Gate, GateResult
 from .phases import Phase, next_phase, phase_by_slug, phases_for_profile
+
+logger = get_logger("engagement")
 
 
 class AdvanceBlocked(Exception):
@@ -91,10 +94,23 @@ class Engagement:
             raise StopIteration("Engagement already at terminal phase (disengage).")
         failed = [r for r in self.evaluate_phase_gates() if not r.passed]
         if failed and not force:
+            logger.debug(
+                "advance blocked: engagement=%s phase=%s gates=%s",
+                self.ctx.id,
+                self.ctx.current_phase,
+                [r.slug for r in failed],
+            )
             raise AdvanceBlocked(_merge_results(failed))
         nxt = next_phase(self.ctx.current_phase, self.ctx.is_industrial)
         if nxt is None:
             raise StopIteration("No next phase.")
+        logger.debug(
+            "advance: engagement=%s %s → %s (force=%s)",
+            self.ctx.id,
+            self.ctx.current_phase,
+            nxt.slug,
+            force,
+        )
         self.ctx.current_phase = nxt.slug
         return nxt
 
@@ -116,6 +132,7 @@ class Engagement:
         if target.index > current_index:
             raise ValueError(f"Cannot rollback forward: {to_slug} is after {self.ctx.current_phase}.")
         self.ctx.current_phase = to_slug
+        logger.debug("rollback: engagement=%s → %s", self.ctx.id, to_slug)
         return target
 
     # -- snapshots --------------------------------------------------------------

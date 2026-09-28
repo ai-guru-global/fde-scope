@@ -68,6 +68,7 @@ Legacy aliases kept for GTM Shift-Board-era rules: `--steel-0` → `--bg`, `--st
 - Console: zero external fonts (`-apple-system` stack; mono `ui-monospace` stack).
 - Display (GTM hero): `clamp(2.4rem, 5vw, 4.6rem)`, weight 800, letter-spacing -0.02em, roman (never italic).
 - Section h2: 19–22px / 650–700. Body: 14–16px. Mono UI labels: 11px uppercase where semantically a key.
+- Console card titles (`h2`): normal-case 14–15px / 650, `--fg`. Uppercase tracked mono is reserved for semantic keys (table `th`, KPI `.k`) — never for CJK card titles.
 
 ## Spacing, radius, borders
 
@@ -81,6 +82,16 @@ Legacy aliases kept for GTM Shift-Board-era rules: `--steel-0` → `--bg`, `--st
 - Entrance reveals: GTM keeps its mechanical slot-in (`slot-in`, `thud` — opacity + slight translate/rotate, both from `prefers-reduced-motion: reduce` kills all).
 - Reduced-motion fallback: opacity-only crossfade ≤ 150ms; `scroll-behavior:auto`.
 - Console: entrance animations none.
+
+## Console component vocabulary (added with guided mode)
+
+- Tabs are `<button role="tab">` with `aria-selected` managed by `tab()`; the tablist is `role="tablist"`.
+- Named component classes, no inline layout styles: `.plan-group` / `.plan-item` (goal→task plan),
+  `.diff` / `.diff-h` / `.diff-b` / `.diff-row` (AI draft review + manual field guide blocks),
+  `.steps` (ordered next-step list under a blocked gate), `.hint` (secondary prose),
+  `.stack` / `.w-full` / `.mt6|.mt8|.mt10` / `.gap6` (layout utilities), `.side-card` (sidebar spacing).
+- Empty states teach: icon + what happened + the next action (`.empty > .hint`), never a bare "暂无".
+- Secondary/external actions (catalog links, per-block saves) are `button.ghost`; accent fill stays on the single primary action per card.
 
 ## Microinteractions stance
 
@@ -99,6 +110,7 @@ Legacy aliases kept for GTM Shift-Board-era rules: `--steel-0` → `--bg`, `--st
 
 - `--good/--warn/--bad` appear only as status dots (7–10px), state lamps, or text on gate/phase states. Never as large fills or banners.
 - Status pill text stays `--muted`/`--fg`; the dot carries semantics.
+- Gate/phase state surfaces use a 4–6% `color-mix` tint of the semantic hue on `--panel2` plus the status dot; side-stripe borders (`border-left` > 1px) are banned on every surface.
 
 ## Iconography
 

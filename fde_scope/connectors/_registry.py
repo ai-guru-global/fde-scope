@@ -10,8 +10,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..logutil import get_logger
+
 if TYPE_CHECKING:
     from .base import DataConnector
+
+logger = get_logger("connectors.registry")
 
 _REGISTRY: dict[str, type[DataConnector]] = {}
 
@@ -54,6 +58,7 @@ def load_all() -> None:
             except Exception:  # noqa: BLE001 — optional deps may be missing
                 # A connector that can't import (e.g. missing mysql driver)
                 # must not poison the whole registry.
+                logger.debug("connector %r failed to import; skipping", slug, exc_info=True)
                 continue
 
 

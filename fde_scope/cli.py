@@ -40,19 +40,20 @@ def _banner(title: str) -> None:
 # LLM wiring (Xiaomi MiMo Token Plan — optional, env-configured)
 # ---------------------------------------------------------------------------
 def _maybe_llm(require: bool = False):
-    """Build the MiMo client from env vars; exit cleanly when a key is missing."""
-    from .llm import MiMoClient
+    """Build the env-selected LLM client; exit cleanly when no key is configured."""
+    from .llm import get_llm_client
 
-    client = MiMoClient()
+    client = get_llm_client()
     if not client.available:
         if require:
             console.print(
                 "[red]LLM not configured:[/red] set FDE_SCOPE_MIMO_API_KEY "
-                "(Xiaomi MiMo Token Plan, tp-… format) to enable LLM mode."
+                "(Xiaomi MiMo Token Plan, tp-… format) or FDE_SCOPE_LLM_BASE_URL+"
+                "FDE_SCOPE_LLM_API_KEY (OpenAI-compatible) to enable LLM mode."
             )
             raise typer.Exit(2)
         console.print(
-            "[yellow]LLM disabled (FDE_SCOPE_MIMO_API_KEY not set)[/yellow] — "
+            "[yellow]LLM disabled (FDE_SCOPE_MIMO_API_KEY / FDE_SCOPE_LLM_* not set)[/yellow] — "
             "falling back to rule-based mode.\n"
         )
     return client
@@ -258,9 +259,9 @@ def deploy(
     console.print(f"🔄 Corpus collection: [bold]{deployed.corpus_collection}[/bold]")
     console.print(f"🔄 Model: [bold]{deployed.manifest['model']}[/bold]")
     if client.available:
-        console.print(f"🔄 LLM: [bold]{client.model}[/bold] @ {client.base_url} (MiMo)")
+        console.print(f"🔄 LLM: [bold]{client.model}[/bold] @ {client.base_url}")
     else:
-        console.print("🔄 LLM: [yellow]未配置（设 FDE_SCOPE_MIMO_API_KEY 启用 MiMo）[/yellow]")
+        console.print("🔄 LLM: [yellow]未配置（设 FDE_SCOPE_MIMO_API_KEY 或 FDE_SCOPE_LLM_* 启用）[/yellow]")
     console.print("🔄 Permissions:")
     console.print(f"   allow={deployed.manifest['permissions']['allow']}")
     console.print(f"   deny={deployed.manifest['permissions']['deny']}")
@@ -777,6 +778,9 @@ def web(
 
 def main() -> None:
     """Entry point for ``python -m fde_scope.cli``."""
+    from .logutil import configure_logging
+
+    configure_logging()
     app()
 
 

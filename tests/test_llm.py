@@ -19,7 +19,7 @@ from fde_scope.cli import app
 from fde_scope.corpus import CorpusSynthesizer, QualityGate
 from fde_scope.corpus.types import CategoryGap, CorpusItem, Provenance
 from fde_scope.eval import MiMoReplyFn
-from fde_scope.llm import LLMError, MiMoClient
+from fde_scope.llm import LLMError, MiMoClient, OpenAICompatClient, get_llm_client
 
 runner = CliRunner()
 
@@ -133,6 +133,86 @@ def test_chat_bad_response_shape_raises(monkeypatch) -> None:
     )
     with pytest.raises(LLMError, match="unexpected MiMo response"):
         MiMoClient(api_key="tp-test").chat([{"role": "user", "content": "hi"}])
+
+
+# ---------------------------------------------------------------------------
+# OpenAICompatClient + get_llm_client factory (P2: provider abstraction)
+# ---------------------------------------------------------------------------
+@pytest.fixture(autouse=False)
+def clean_llm_env(monkeypatch):
+    for var in (
+        "FDE_SCOPE_MIMO_API_KEY",
+        "FDE_SCOPE_MIMO_BASE_URL",
+        "FDE_SCOPE_MIMO_MODEL",
+        "FDE_SCOPE_LLM_BASE_URL",
+        "FDE_SCOPE_LLM_API_KEY",
+        "FDE_SCOPE_LLM_MODEL",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    return monkeypatch
+
+
+def test_factory_defaults_to_mimo(clean_llm_env) -> None:
+    client = get_llm_client()
+    assert isinstance(client, MiMoClient)
+    assert not client.available
+
+
+def test_factory_selects_openai_compat_when_env_set(clean_llm_env) -> None:
+    clean_llm_env.setenv("FDE_SCOPE_LLM_BASE_URL", "http://localhost:11434/v1")
+    clean_llm_env.setenv("FDE_SCOPE_LLM_API_KEY", "sk-test")
+    clean_llm_env.setenv("FDE_SCOPE_LLM_MODEL", "qwen3:14b")
+    client = get_llm_client()
+    assert isinstance(client, OpenAICompatClient)
+    assert client.available
+    assert client.model == "qwen3:14b"
+    assert client.base_url == "http://localhost:11434/v1"
+
+
+def test_factory_openai_requires_both_base_url_and_key(clean_llm_env) -> None:
+    # Only the key: ambiguous (no endpoint) → fall back to the MiMo default.
+    clean_llm_env.setenv("FDE_SCOPE_LLM_API_KEY", "sk-test")
+    assert isinstance(get_llm_client(), MiMoClient)
+
+
+def test_factory_openai_wins_over_mimo(clean_llm_env) -> None:
+    clean_llm_env.setenv("FDE_SCOPE_MIMO_API_KEY", "tp-test")
+    clean_llm_env.setenv("FDE_SCOPE_LLM_BASE_URL", "http://x/v1")
+    clean_llm_env.setenv("FDE_SCOPE_LLM_API_KEY", "sk-test")
+    assert isinstance(get_llm_client(), OpenAICompatClient)
+
+
+def test_openai_compat_sends_bearer_and_parses_response(clean_llm_env) -> None:
+    captured: dict = {}
+    body = json.dumps({"choices": [{"message": {"content": "pong"}}]}).encode("utf-8")
+
+    def fake_urlopen(request, timeout):  # noqa: ARG001
+        captured["headers"] = {k.lower(): v for k, v in request.header_items()}
+        captured["payload"] = json.loads(request.data)
+        return _FakeResp(body)
+
+    clean_llm_env.setattr("fde_scope.llm.urllib.request.urlopen", fake_urlopen)
+    clean_llm_env.setenv("FDE_SCOPE_LLM_BASE_URL", "http://x/v1")
+    client = OpenAICompatClient(api_key="sk-test", model="m1")
+    assert client.chat([{"role": "user", "content": "ping"}]) == "pong"
+    assert captured["headers"]["authorization"] == "Bearer sk-test"
+    assert "api-key" not in captured["headers"]
+    assert captured["payload"]["model"] == "m1"
+
+
+def test_openai_compat_http_error_raises(clean_llm_env) -> None:
+    def fail(request, timeout):  # noqa: ARG001
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many", {}, io.BytesIO(b"quota"))
+
+    clean_llm_env.setattr("fde_scope.llm.urllib.request.urlopen", fail)
+    with pytest.raises(LLMError, match="429"):
+        OpenAICompatClient(api_key="sk-test").chat([{"role": "user", "content": "hi"}])
+
+
+def test_openai_compat_describe_never_leaks_key() -> None:
+    desc = OpenAICompatClient(api_key="sk-secret", base_url="http://x/v1").describe()
+    assert desc["provider"] == "openai-compatible"
+    assert "sk-secret" not in json.dumps(desc)
 
 
 # ---------------------------------------------------------------------------

@@ -102,10 +102,11 @@ def _done_keyword(item: str) -> str | None:
 def test_web_route_count_claim_is_honest() -> None:
     """Both feature lists advertise the web console's route count in two
     places (intro aggregate + delivery-surface table). The advertised number
-    must equal the actual route decorators in web/app.py — the count drifted
-    once already (docs said 32 while the app served 33)."""
-    app = _read("fde_scope/web/app.py")
-    actual = len(re.findall(r"@app\.(?:get|post|put|delete|websocket)\(", app))
+    must equal the actual route decorators in web/app.py plus the guided-mode
+    router in web/guided_api.py — the count drifted once already (docs said
+    32 while the app served 33)."""
+    app = _read("fde_scope/web/app.py") + _read("fde_scope/web/guided_api.py")
+    actual = len(re.findall(r"@(?:app|router)\.(?:get|post|put|delete|websocket)\(", app))
     zh = _read("docs/features.md")
     en = _read("docs/features-en.md")
     claimed: list[int] = [

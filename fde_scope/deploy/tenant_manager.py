@@ -31,11 +31,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fde_scope.config import AgentSpec, TenantConfig
+from fde_scope.logutil import get_logger
 
 from .permission_builder import build_context, default_blueprint
 from .roles import connectors_for_role
 from .sandbox_config import SandboxSpec, build_workspace
 from .toolkit import ToolBinding, build_toolkit, describe_bindings, plan_bindings
+
+logger = get_logger("deploy.tenant_manager")
 
 if TYPE_CHECKING:
     from fde_scope.corpus import CorpusReport
@@ -148,6 +151,7 @@ class TenantDeployer:
         """
         spec = SandboxSpec.from_quota_string(tenant.id, tenant.resource_quota)
         specs = tenant.agents or [AgentSpec(name=f"{tenant.name}_agent", role=tenant.name)]
+        logger.info("deploy plan: tenant=%s agents=%d dry_run=%s", tenant.id, len(specs), dry_run)
         # One tool plan per agent; the permission policy is derived from what the
         # agents can actually call, so capability and approval stay coherent.
         plans = {s.name: plan_bindings(tenant, s, corpus_report) for s in specs}

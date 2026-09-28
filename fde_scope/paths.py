@@ -86,3 +86,13 @@ def reports_dir(create: bool = False) -> Path:
     if create:
         path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def evidence_dir(eid: str, create: bool = False) -> Path:
+    """``<root>/.fde_scope/evidence/<eid>`` — attached acceptance evidence."""
+    return _under_root("evidence", eid, create=create)
+
+
+def archive_dir(create: bool = False) -> Path:
+    """``<root>/.fde_scope/archive`` — archived engagement JSON."""
+    return _under_root("archive", create=create)

@@ -9,6 +9,9 @@ pii_rules:
     "[\\w.+-]+@[\\w-]+\\.[\\w.-]+": EMAIL
     "\\b\\d{17}[\\dXx]\\b": IDCARD # CN ID card
     "\\b\\d{16,19}\\b": BANKCARD
+    "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b": IP  # IPv4
+    # Western name, honorific-led only — bare name patterns false-positive on prose
+    "\\b(?:Mr|Ms|Mrs|Dr)\\.\\s+[A-Z][a-z]+(?:\\s+[A-Z][a-z]+){0,2}\\b": NAME
   placeholder: "[REDACTED]"
 
 # Semantic-ish deduplication

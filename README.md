@@ -163,6 +163,11 @@ A single-page engagement console — no build step, backed by JSON APIs:
   18-phase SOP (gates block in red when unmet), roll back, inspect blockers.
 - **Gate inspector** — evaluate any gate live against an engagement
   (`/api/engagements/{eid}/gates`) with blocker/warning breakdown.
+- **Guided mode（引导）** — engagement 详情页「引导」tab，让没有 FDE 驻场的客户
+  自己走完 SOP：当前阶段白话说明 + 产出清单；gate blocker 翻译成「下一步做
+  什么」；技能手册库本地深链（`/catalog/`）。AI 起草 context（现场/干系人/
+  成功标准/SLO，diff 预览后确认写入）与目标→阶段任务清单（勾选自动保存）；
+  一切产出仍须过 gate 才算数。无 AI key 时回退手动填写表单。
 - **Context tab** — six structured cards per engagement: site survey, stakeholder
   map (with SPONSOR badges), success criteria, SLOs, functional-safety posture,
   and artifacts (runbook / corpus report / eval metrics / drift monitoring).
@@ -229,7 +234,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 **Surfaces**
 
 - [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web)
-- [x] Web console — FastAPI, 32 routes: workbench + engagement dashboard + journal + skills + corpus forge + KPI explorer + ontology 本体库
+- [x] Web console — FastAPI, 36 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
 - [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 2 agent tools, skill provider
 - [x] macOS app — double-click DMG (universal2, signed/notarized release path, same console as `fde-scope web`)
 
@@ -243,7 +248,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 - [x] Ontology 语义层 — TBox schemas (fde-core + mfg-overlay ISA-95) + SKOS concept scheme + SHACL-lite validation (ONTO-* codes) + JSON-LD 1.1 export; wired into corpus coverage and skill search
 - [x] Deploy — three-pillar runtime assembly on real AgentScope 2.0 (multi-agent, subagent templates, permission context, honest manifest)
 - [x] Handoff — runbook + eval report + SLO + training material, customer sign-off package
-- [x] Optional LLM — MiMo Token Plan via env var only; every entry point falls back to deterministic rules
+- [x] Optional LLM — MiMo Token Plan or any OpenAI-compatible endpoint, via env var only (`get_llm_client()` factory); every entry point falls back to deterministic rules
 
 ---
 
@@ -253,7 +258,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 flowchart TB
     subgraph surfaces["Surfaces · 四个入口,同一引擎同一数据根"]
         CLI["fde-scope CLI<br/>13 组命令"]
-        WEB["web/ FastAPI 控制台<br/>32 路由 · 单页"]
+        WEB["web/ FastAPI 控制台<br/>36 路由 · 单页"]
         PAW["pawapp/ QwenPaw 插件<br/>/api/fde-scope · 18 路由"]
         MAC["macOS App<br/>universal2 DMG"]
     end
@@ -319,7 +324,7 @@ flowchart TB
 | 6 | `skills/` | Methodology capture (draft → published → archived, dual-format export) | ❌ |
 | 7 | `integrations/` | QwenPaw bundle export + ACP adapter + manifest validator | ❌ |
 | 8 | `ontology/` | Semantic layer: TBox schemas + SKOS concepts + ABox stores, SHACL-lite validation, JSON-LD 1.1 export | ❌ |
-| **Web** | `web/` | FastAPI engagement console (32 routes, single-page, JSON APIs) | ❌ |
+| **Web** | `web/` | FastAPI engagement console (36 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
 
@@ -338,7 +343,7 @@ fde-scope/
 │   ├── skills/           # methodology capture (draft → published → archived)
 │   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
 │   ├── ontology/         # TBox schemas + SKOS concepts + ABox stores + JSON-LD export (data/*.yaml built-ins)
-│   └── web/              # FastAPI engagement console (32 routes)
+│   └── web/              # FastAPI engagement console (36 routes)
 ├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
 ├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
 ├── GTM/                  # product / GTM landing page (single-file HTML)
@@ -609,6 +614,25 @@ export FDE_SCOPE_MIMO_API_KEY="tp-..."
 # 可选：默认已是 https://token-plan-cn.xiaomimimo.com/v1 与 mimo-v2.5-pro
 export FDE_SCOPE_MIMO_BASE_URL="https://token-plan-cn.xiaomimimo.com/v1"
 export FDE_SCOPE_MIMO_MODEL="mimo-v2.5-pro"
+
+# 或：任意 OpenAI 兼容端点（vLLM / OpenAI / DeepSeek …，标准 Bearer 头）。
+# 两个变量都设置时优先于 MiMo；模型缺省 gpt-4o-mini
+export FDE_SCOPE_LLM_BASE_URL="http://localhost:11434/v1"
+export FDE_SCOPE_LLM_API_KEY="sk-..."
+export FDE_SCOPE_LLM_MODEL="qwen3:14b"
+
+# 日志级别（默认 WARNING）：DEBUG 可看到 gate 评估/forge 细节
+export FDE_SCOPE_LOG_LEVEL="INFO"
+
+# Zammad 连接器（ticket profile）：两个都设置才启用真实 HTTP API
+# （/api/v1/tickets 分页拉取）；只设一个或都不设时回退本地 .jsonl source
+export FDE_SCOPE_ZAMMAD_BASE_URL="https://support.example.com"
+export FDE_SCOPE_ZAMMAD_API_TOKEN="..."
+
+# Salesforce 连接器（ticket profile）：SOQL 只读查询 Case 对象；
+# access token 直配（在进程外获取），两个都设置才启用真实 REST API
+export FDE_SCOPE_SF_INSTANCE_URL="https://acme.my.salesforce.com"
+export FDE_SCOPE_SF_ACCESS_TOKEN="..."
 ```
 
 所有 LLM 入口都是**失败自动回退规则路径**——网络错误、坏 JSON、无 key 都不会中断流水线：
@@ -742,7 +766,9 @@ Ground rules — [AGENTS.md](AGENTS.md) is the machine-readable source:
 - [x] 多 Agent 生产（真实 Agent 装配 + 模型 wiring + SubAgentTemplate 蓝图 + FDE 三通道自开 Agent）
 - [x] QwenPaw 集成（qwenpaw export/validate + PawApp 桌面应用，真机验证通过）
 - [ ] `deploy --serve` 端到端实测（Redis 后端 + 可达模型）
-- [ ] Full Zammad / Salesforce / MES / Historian HTTP/SQL implementations
+- [x] Zammad HTTP API 连接器（`/api/v1/tickets` + Token 认证，env 配置，JSONL 回放兜底）
+- [x] Salesforce REST 连接器（SOQL `query` + Bearer 认证，只读，env 配置，JSONL 回放兜底）
+- [ ] Full MES / Historian HTTP/SQL implementations
 - [ ] AgentScope Studio (npm `@agentscope/studio`) integration
 
 ---

@@ -16,11 +16,14 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..logutil import get_logger
 from ..ontology.extract import ConceptExtractor
 from .agents import QualityGate, SchemaNormalizer, build_stages
 from .coverage_analyzer import CoverageAnalyzer
 from .synthesizer import CorpusSynthesizer
 from .types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Provenance
+
+logger = get_logger("corpus.pipeline")
 
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
@@ -66,6 +69,7 @@ class CorpusForge:
         return self._forge(rows)
 
     def _forge(self, rows: list[dict]) -> CorpusReport:
+        logger.info("forge start: %d raw rows", len(rows))
         # Stages are long-lived; zero their counters so a reused forge reports
         # per-run numbers instead of accumulating across forge calls.
         self.scrubber.masked_count = 0
@@ -106,6 +110,14 @@ class CorpusForge:
         train, eval_split, test = self._split(full, self.config.split_ratios)
 
         dropped = self.deduper.dropped_count + self.gate.dropped_count
+        logger.info(
+            "forge done: %d items (%d real / %d synthetic), %d dropped, %d PII masked",
+            len(full),
+            sum(1 for i in full if i.provenance == Provenance.REAL),
+            sum(1 for i in full if i.provenance == Provenance.SYNTHETIC),
+            dropped,
+            self.scrubber.masked_count,
+        )
         return CorpusReport(
             total=len(full),
             real=sum(1 for i in full if i.provenance == Provenance.REAL),

@@ -29,6 +29,9 @@ changing engagement, deploy or persistence code. Full context:
    must quote the same specifier verbatim
    (`tests/test_architecture_guard.py` enforces this). Re-measure before
    widening.
+7. **Web mutating 路由必须过认证依赖。** 新增 `fde_scope/web/` 路由时确认未被
+   auth 白名单（`fde_scope/web/auth.py` 的 `PUBLIC_PATHS`）误放；token 只从
+   `FDE_SCOPE_API_TOKEN` env 读，绝不进文件/日志/响应。
 
 ## Dangerous operations (ask first / require a test)
 

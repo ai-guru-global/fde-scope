@@ -32,6 +32,12 @@ class PIIRules(BaseModel):
             r"\b\d{17}[\dXx]\b": "[IDCARD]",
             # Bank card (16-19 digits)
             r"\b\d{16,19}\b": "[BANKCARD]",
+            # IPv4 address
+            r"\b(?:\d{1,3}\.){3}\d{1,3}\b": "[IP]",
+            # Western name with an explicit honorific only (Mr./Ms./Mrs./Dr.
+            # + capitalized words) — bare "John Smith" patterns would
+            # false-positive all over normal English prose.
+            r"\b(?:Mr|Ms|Mrs|Dr)\.\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b": "[NAME]",
         }
     )
     placeholder: str = "[REDACTED]"
