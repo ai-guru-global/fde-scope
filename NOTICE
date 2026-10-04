@@ -42,6 +42,8 @@ Optional extras:
 - fastapi (`web`/`dev` extra) — MIT — Web console HTTP layer.
 - uvicorn (`web`/`dev` extra) — BSD-3-Clause — ASGI server.
 - python-multipart (`web`/`dev` extra) — Apache-2.0 — form parsing for FastAPI.
+- markdown-it-py (`web`/`dev` extra) — MIT — Markdown rendering for the
+  `/course` learning pages (`fde_scope/web/course.py`).
 
 Development-only (never shipped in the runtime install):
 

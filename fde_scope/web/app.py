@@ -23,7 +23,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import TypeAdapter, ValidationError
 
 from .. import audit, fsutil, paths
@@ -31,7 +31,8 @@ from ..engagement import Engagement, EngagementContext
 from ..engagement.engagement import AdvanceBlocked, _default_gate_registry
 from ..logutil import configure_logging, get_logger
 from ..profiles import all_profiles, get_profile
-from .i18n import GLOSSARY_EN, to_en
+from .i18n import to_en
+from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
 
 configure_logging()
 logger = get_logger("web.app")
@@ -70,12 +71,20 @@ from .deps import (  # noqa: E402
     _slugify,
     catalog_site_dir,
     engagement_lock,
+    gtm_site_dir,
 )
 from .guided_api import router as _guided_router  # noqa: E402
 
 app.include_router(_guided_router)
 
 from .auth import ApiTokenAuthMiddleware  # noqa: E402
+from .certification import render as _render_certification  # noqa: E402
+from .course import render as _render_course  # noqa: E402
+from .docs_reader import SLUGS as _DOC_SLUGS  # noqa: E402
+from .docs_reader import image_path as _doc_image_path  # noqa: E402
+from .docs_reader import render as _render_doc  # noqa: E402
+from .glossary import render as _render_glossary  # noqa: E402
+from .sop import render as _render_sop  # noqa: E402
 
 app.add_middleware(ApiTokenAuthMiddleware)
 
@@ -869,190 +878,180 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 app.mount("/reports", StaticFiles(directory=str(_REPORTS_DIR)), name="reports")
 
 # Skills-catalog portal (generated site/, self-contained). Read-only repo
-# asset; conditional so installed wheels without docs/ degrade to GitHub
-# links instead of failing at import.
+# asset; the mount is conditional because the wheel packages ``fde_scope``
+# only, and without ``docs/`` there is nothing to mount. The rail links to
+# /catalog on every install, so the else-branch answers that path with an
+# in-app notice — the reader learns where the portal lives instead of
+# landing on a 404 or being thrown off-site.
 _CATALOG_DIR = catalog_site_dir()
 if _CATALOG_DIR is not None:
     app.mount("/catalog", StaticFiles(directory=str(_CATALOG_DIR), html=True), name="catalog")
+else:
+    _CATALOG_NOTICE = f"""<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技能手册库 · FDE Scope</title>
+<link rel="icon" href="/static/favicon.svg">
+<script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
+<style>{BASE_CSS}
+.main{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px}}
+.card{{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px 28px;
+max-width:600px;line-height:1.75}}
+.card .brand{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}}
+.card h1{{margin:0 0 12px;font-size:1.25rem;font-weight:680;letter-spacing:-.015em}}
+.card p{{margin:0 0 12px;color:var(--muted);font-size:.9rem}}
+.card code{{font:500 .85em var(--mono);background:var(--code);border:1px solid var(--border);
+border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}}
+.card .cta{{margin:20px 0 0;display:flex;gap:10px;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main class="main">
+<div class="card">
+<div class="brand"><div class="logo">FDE <span>Scope</span></div><span class="tag">技能手册库</span></div>
+<h1>技能手册库不在这次安装里</h1>
+<p>这个地址渲染的是技能手册门户 <code>docs/skills-catalog/site/</code> ——
+由 <code>scripts/build_catalog_site.py</code> 生成的单文件站点。当前安装里没有
+<code>docs/</code> 目录（从 wheel 安装时就是这样），所以这里没有内容可读。</p>
+<p>门户全文在仓库的 <code>docs/skills-catalog/site/index.html</code>。克隆仓库后重启服务，
+这个地址就会直接渲染它。</p>
+<p class="cta"><a class="btn ghost" href="/">返回功能总览</a></p>
+</div>
+</main>
+</body>
+</html>"""
+    _CATALOG_NOTICE_EN = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skills handbook · FDE Scope</title>
+<link rel="icon" href="/static/favicon.svg">
+<script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
+<style>{BASE_CSS}
+.main{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px}}
+.card{{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px 28px;
+max-width:600px;line-height:1.75}}
+.card .brand{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}}
+.card h1{{margin:0 0 12px;font-size:1.25rem;font-weight:680;letter-spacing:-.015em}}
+.card p{{margin:0 0 12px;color:var(--muted);font-size:.9rem}}
+.card code{{font:500 .85em var(--mono);background:var(--code);border:1px solid var(--border);
+border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}}
+.card .cta{{margin:20px 0 0;display:flex;gap:10px;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main class="main">
+<div class="card">
+<div class="brand"><div class="logo">FDE <span>Scope</span></div><span class="tag">skills handbook</span></div>
+<h1>The skills handbook is not in this install</h1>
+<p>This address renders the skills-catalog portal <code>docs/skills-catalog/site/</code> —
+a self-contained site generated by <code>scripts/build_catalog_site.py</code>. This
+install has no <code>docs/</code> directory (a wheel install never ships one), so there
+is nothing to read here.</p>
+<p>The portal lives in the repository at <code>docs/skills-catalog/site/index.html</code>.
+Clone the repository and restart the server and this address renders it directly.</p>
+<p class="cta"><a class="btn ghost" href="/en/">Back to the overview</a></p>
+</div>
+</main>
+</body>
+</html>"""
+
+    @app.get("/catalog/{rest:path}", response_class=HTMLResponse)
+    def catalog_notice(rest: str) -> str:
+        """The portal mount's absence notice (see the comment above).
+
+        Read-only and carries no engagement data, so it is reachable
+        without a token (see ``auth.PUBLIC_PATHS``)."""
+        return _CATALOG_NOTICE_EN if rest.startswith("en/") else _CATALOG_NOTICE
 
 
-# ---------------------------------------------------------------------------
-# glossary tooltips（术语小问号标注：术语后跟 ?，悬停/聚焦弹出解释气泡）
-# ---------------------------------------------------------------------------
-_GLOSSARY: list[tuple[str, str]] = [
-    (
-        "Gemba walk",
-        "源自日语「現場」：到价值创造的第一线（车间/工位）实地走查，"
-        "观察真实作业、与一线员工交谈，而不是隔着报表判断。精益/丰田生产方式的核心实践。",
-    ),
-    ("Gemba", "现场走查：工程师驻车间实地观察真实流程、设备与痛点（对应 site_survey 阶段）。"),
-    ("FDE", "Forward Deployed Engineer，前置部署工程师：带产品驻客户现场、快速交付解决方案的工程师角色。"),
-    ("Engagements", "Engagement 列表：本项目所有驻场项目的入口。"),
-    ("Engagement", "一次完整的驻场客户项目：从问题框定、构建、运营化到交接退场的全过程推进单位。"),
-    ("SOP", "Standard Operating Procedure，标准作业程序；这里指覆盖项目全生命周期的 18 阶段流程。"),
-    ("zones", "阶段分组（Zone）：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
-    ("Zone", "SOP 阶段分组：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
-    ("Gates", "Gate 列表：当前项目适用的所有门禁及其状态。"),
-    (
-        "Gate",
-        "谓词式门禁：每次推进阶段都重新评估的条件（如双 sponsor、FAT/SAT 签字），"
-        "不通过即拦截，过期结果不作数。",
-    ),
-    ("overlay", "叠加层：仅工业 profile 才额外生效的 gate 集合（工厂小图标标记）。"),
-    (
-        "FAT/SAT",
-        "FAT = Factory Acceptance Test 出厂验收测试；SAT = Site Acceptance Test 现场验收测试，均需客户签字。",
-    ),
-    ("sponsor", "项目拍板人/出资方干系人；本 SOP 要求业务与工业双 sponsor 共同确认成功标准。"),
-    ("works_council", "德国《企业组织法》BetrVG §87 工会共决：涉及员工监控/绩效的部署须工会同意。"),
-    ("air-gapped", "气隙部署：与外部网络物理隔离的封闭环境，安装与更新需走离线清单。"),
-    ("气隙", "air-gapped：与外部网络物理隔离的封闭网络环境。"),
-    ("OT/IT 隔离", "运营技术（OT）车间网与企业 IT 网隔离，是工业现场安全的常见要求。"),
-    ("班次", "轮班制度（如 3 班倒）；24/7 产线的部署需集成班次交接（shift_handover gate）。"),
-    ("工会", "员工代表机构；涉及员工监控/绩效的部署在德国需其共决（见 works_council gate）。"),
-    ("SLO", "Service Level Objective，服务等级目标：内部可度量的质量承诺，如「99% 工单 5 分钟内首次响应」。"),
-    ("SLA", "Service Level Agreement，服务等级协议：对外的合同性承诺，通常由多个 SLO 支撑。"),
-    ("on-call", "轮班值班响应机制：告警路由到当班人，保证 7×24 有人处置。"),
-    ("告警路由", "SLO 违约时告警送达的渠道/值班组（alert_route）。"),
-    ("runbook", "运维/应急手册：故障处置步骤、回滚方案与升级路径的文档。"),
-    ("移交包", "项目结束时交付客户的完整产物集合：runbook、模型、监控配置、已知局限等。"),
-    ("OEE", "Overall Equipment Effectiveness，设备综合效率 = 可用率 × 性能率 × 良品率；世界级水平 ≥ 0.85。"),
-    ("MTBF", "Mean Time Between Failures，平均无故障时间（小时），越高越可靠。"),
-    ("pick success", "机械臂抓取成功率；参照 DexNet 基准约 0.80。"),
-    ("DexNet", "UC Berkeley 的抓取规划神经网络及基准数据集，抓取成功率的常用参照。"),
-    ("KPI", "Key Performance Indicator，关键绩效指标；ticket 与 manufacturing 场景使用不同目录。"),
-    ("Profile", "场景档案：定义可用连接器、KPI 目录与适用 gate（ticket 客服 / manufacturing 制造业）。"),
-    ("ticket", "客服工单场景：CSV/Zammad/Salesforce/MySQL 数据接入，无工业 gate。"),
-    ("manufacturing", "制造业/具身机器人场景：OPC UA、MQTT、ROS2 等工业接入 + 6 个工业合规 gate。"),
-    ("Context", "项目上下文：现场、干系人、成功标准、SLO、功能安全与产物的结构化集合。"),
-    ("success_criteria", "成功标准：契约化、可度量的验收条件，由双 sponsor 签字确认。"),
-    ("干系人", "Stakeholder：与项目相关的角色（拍板人、使用者、运维、工会…）及其成功指标。"),
-    ("成功标准", "契约化、可度量的验收条件（success_criteria），双 sponsor 确认。"),
-    ("功能安全", "Functional Safety：机械/控制系统在故障时仍保持安全的标准体系（PL/SIL 等级）。"),
-    ("ISO 13849", "机械安全功能安全标准，定义性能等级 PL / PLr。"),
-    ("IEC 61508", "电气/电子/可编程电子安全系统的功能安全标准，定义 SIL 等级。"),
-    ("ISO 10218", "工业机器人安全标准：协作与常规机器人的风险评估要求。"),
-    ("CE", "欧盟合规标志：产品符合相关欧盟指令方可进入欧洲市场。"),
-    ("EU AI Act", "欧盟人工智能法案：按风险分级监管 AI，高风险用途需合规评估与文档。"),
-    ("PLr", "Required Performance Level，要求性能等级（ISO 13849）；PL 为实际达到的等级。"),
-    ("SIL", "Safety Integrity Level，安全完整性等级（IEC 61508）。"),
-    ("Corpus", "语料：训练/评估模型的样本集合；锻造（forge）即清洗、脱敏、补盲、合成的流水线。"),
-    ("语料锻造", "CSV 等原始数据 → 脱敏 → 去重 → 质量门 → 覆盖度分析 → 针对性合成 → 报告的流水线。"),
-    ("Flywheel", "飞轮：现场事件回流为语料、周度增量重训，让系统越用越准的闭环。"),
-    ("飞轮", "数据回流 → 语料增量 → 再训练的闭环：项目用得越久，模型越贴合该客户。"),
-    ("ISA-95", "企业系统与车间系统集成的国际标准，MES 数据模型的依据。"),
-    ("MES", "Manufacturing Execution System，制造执行系统：工单、质量、停机等车间数据源。"),
-    ("OPC UA", "工业自动化统一通信协议，可直接读取 PLC tag 数据。"),
-    ("PLC", "Programmable Logic Controller，可编程逻辑控制器：产线设备的控制单元。"),
-    ("MQTT-Sparkplug", "MQTT：轻量发布/订阅协议；Sparkplug B：规范其工业载荷语义。"),
-    ("ROS2 Bag", "Robot Operating System 2 的录制回放格式，常用于机器人轨迹/传感数据。"),
-    ("Historian", "时序历史数据库：存储生产过程历史数据（温度、节拍、报警等）。"),
-    ("Zammad", "开源客服工单系统。"),
-    ("Salesforce", "CRM 平台；此处为客户/工单相关数据源。"),
-    ("stub", "占位实现：接口与数据模型就绪，但尚未接通真实系统。"),
-    ("PII", "Personally Identifiable Information，个人身份信息（姓名/邮箱/电话）；锻造时自动脱敏。"),
-    ("min_samples", "每个类别最少真实样本数，低于即判定为缺口并触发合成。"),
-    ("synth_per_gap", "每个缺口类别补充合成的样本数量。"),
-    ("JSONL", "每行一个 JSON 对象的文本格式，样本与评估数据常用。"),
-    ("drift", "漂移：数据分布或质量随时间偏移，可能让模型失效；需持续检测并触发再训练。"),
-    ("漂移", "数据分布/质量随时间偏移，模型效果随之衰减；监控项之一。"),
-    ("bad case", "失败/低质样本挖掘：从评估结果中找出表现差的样本，归类归因。"),
-    ("force", "强制推进：豁免拦截，但 gate 照常评估并留痕，例外进入审计日志。"),
-    ("qualification", "问题框定：确认问题真实、客户有预算与意愿的阶段。"),
-    ("stakeholder_map", "干系人地图：识别拍板人、使用者、反对者等角色及其诉求。"),
-    ("prototype", "真实数据原型：用客户真实数据（非演示数据）搭建可验证原型。"),
-    ("AgentState", "AgentScope 的智能体状态对象；权限上下文经其注入运行时。"),
-    ("Toolkit", "AgentScope 的工具集合对象：把连接器/函数绑定为智能体可调用的工具。"),
-    ("SubAgentTemplate", "AgentScope 的子智能体蓝图：预置角色、工具与提示词的模板。"),
-    (
-        "技能库",
-        "沉淀的可复用方法论/经验文档，分 research / implementation / optimization / methodology 四类。",
-    ),
-    ("工作台", "跨项目总览：全局统计、项目矩阵与最近沉淀。"),
-    ("现场记录", "Journal：research / implementation / optimization 三类现场笔记，可一键沉淀为技能草稿。"),
-    ("沉淀", "把现场经验固化成可复用技能/文档，供后续项目检索复用。"),
-    ("门禁", "当前阶段适用的 gate 校验结果（通过/拦截）。"),
-]
+# GTM one-page portal (hand-authored static site at repo-root GTM/). Mounted
+# when present; otherwise the rail's /GTM links land on an in-app notice for
+# the same reason as /catalog above.
+_GTM_DIR = gtm_site_dir()
+if _GTM_DIR is not None:
+    app.mount("/GTM", StaticFiles(directory=str(_GTM_DIR), html=True), name="gtm")
+else:
+    _GTM_NOTICE = f"""<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GTM 官网 · FDE Scope</title>
+<link rel="icon" href="/static/favicon.svg">
+<script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
+<style>{BASE_CSS}
+.main{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px}}
+.card{{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px 28px;
+max-width:600px;line-height:1.75}}
+.card .brand{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}}
+.card h1{{margin:0 0 12px;font-size:1.25rem;font-weight:680;letter-spacing:-.015em}}
+.card p{{margin:0 0 12px;color:var(--muted);font-size:.9rem}}
+.card code{{font:500 .85em var(--mono);background:var(--code);border:1px solid var(--border);
+border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}}
+.card .cta{{margin:20px 0 0;display:flex;gap:10px;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main class="main">
+<div class="card">
+<div class="brand"><div class="logo">FDE <span>Scope</span></div><span class="tag">GTM 官网</span></div>
+<h1>GTM 官网不在这次安装里</h1>
+<p>这个地址渲染的是仓库根目录 <code>GTM/</code> 下的单页官网（含 <code>GTM/index.html</code>
+与其英版 <code>GTM/en/index.html</code>）。当前安装里没有这个目录（从 wheel 安装时就是这样），
+所以这里没有内容可读。</p>
+<p>克隆仓库后重启服务，这个地址就会直接渲染它。</p>
+<p class="cta"><a class="btn ghost" href="/">返回功能总览</a></p>
+</div>
+</main>
+</body>
+</html>"""
+    _GTM_NOTICE_EN = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GTM site · FDE Scope</title>
+<link rel="icon" href="/static/favicon.svg">
+<script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
+<style>{BASE_CSS}
+.main{{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px}}
+.card{{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:26px 28px;
+max-width:600px;line-height:1.75}}
+.card .brand{{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}}
+.card h1{{margin:0 0 12px;font-size:1.25rem;font-weight:680;letter-spacing:-.015em}}
+.card p{{margin:0 0 12px;color:var(--muted);font-size:.9rem}}
+.card code{{font:500 .85em var(--mono);background:var(--code);border:1px solid var(--border);
+border-radius:5px;padding:1px 5px;overflow-wrap:anywhere}}
+.card .cta{{margin:20px 0 0;display:flex;gap:10px;flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<main class="main">
+<div class="card">
+<div class="brand"><div class="logo">FDE <span>Scope</span></div><span class="tag">GTM site</span></div>
+<h1>The GTM site is not in this install</h1>
+<p>This address renders the one-page site at repo-root <code>GTM/</code> (with
+<code>GTM/index.html</code> and its English variant <code>GTM/en/index.html</code>).
+This install has no such directory (a wheel install never ships one), so there is
+nothing to read here.</p>
+<p>Clone the repository and restart the server and this address renders it directly.</p>
+<p class="cta"><a class="btn ghost" href="/en/">Back to the overview</a></p>
+</div>
+</main>
+</body>
+</html>"""
 
-_GLOSSARY_CSS = """
-.term{position:relative;cursor:help;border-bottom:1px dashed var(--border-strong);outline:none}
-.term:hover,.term:focus{border-bottom-color:var(--accent)}
-.term .q{display:inline-block;width:13px;height:13px;margin-left:3px;border:1px solid var(--muted);
-border-radius:50%;color:var(--muted);font-size:9px;line-height:12px;text-align:center;font-weight:700;
-vertical-align:1px;transition:color .12s,border-color .12s}
-.term:hover .q,.term:focus .q{color:var(--accent);border-color:var(--accent)}
-.term .tip{position:absolute;left:0;bottom:calc(100% + 9px);z-index:999;width:max-content;
-max-width:min(300px,78vw);padding:9px 12px;border-radius:9px;background:var(--panel2);
-border:1px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.3);color:var(--fg);
-font-size:.76rem;line-height:1.6;font-weight:400;letter-spacing:normal;text-transform:none;
-white-space:normal;text-align:left;opacity:0;visibility:hidden;pointer-events:none;
-transform:translateY(5px);transition:opacity .13s ease,transform .13s ease,visibility .13s}
-.term:hover .tip,.term:focus .tip{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
-.term.tip-flip .tip{left:auto;right:0}
-.term.tip-below .tip{bottom:auto;top:calc(100% + 9px)}
-"""
+    @app.get("/GTM/{rest:path}", response_class=HTMLResponse)
+    def gtm_notice(rest: str) -> str:
+        """The GTM mount's absence notice (see the comment above).
 
-_GLOSSARY_JS = r"""(() => {
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const escapeRe = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const ASCII_TERM = /^[A-Za-z0-9][A-Za-z0-9 /+.-]*$/;
-// don't annotate substrings inside ids/slugs (e.g. ticket in eng-swift-ticket-seed05, prototype in prototype_real_data)
-const ADJACENT = /[-_A-Za-z0-9]/;
-const GLOSSARY = __GLOSSARY_DATA__.slice().sort((a, b) => b[0].length - a[0].length)
-  .map(([term, tip]) => ({ term, tip, ascii: ASCII_TERM.test(term),
-    pat: ASCII_TERM.test(term) ? '\\b' + escapeRe(term) : escapeRe(term) }));
-
-function glossify(root) {
-  if (!root) return;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode(n) {
-      const p = n.parentElement;
-      return (p && n.nodeValue.trim() && !p.closest('.term,.tip,script,style,textarea,option,.cli,pre,code')) ? 1 : 2;
-    }
-  });
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  for (const node of nodes) {
-    let text = node.nodeValue;
-    const marks = [];
-    for (const g of GLOSSARY) {
-      if (!new RegExp(g.pat, 'i').test(text)) continue;
-      text = text.replace(new RegExp(g.pat, 'gi'), (m, off, full) => {
-        if (g.ascii && (ADJACENT.test(full[off - 1] || '') || ADJACENT.test(full[off + m.length] || ''))) return m;
-        marks.push([m, g.tip]);
-        return '\u0001' + marks.length + '\u0001';
-      });
-    }
-    if (!marks.length) continue;
-    const html = esc(text).replace(/\u0001(\d+)\u0001/g, (_, i) => {
-      const [m, tip] = marks[i - 1];
-      return '<span class="term" tabindex="0">' + esc(m) +
-        '<span class="tip">' + esc(tip) + '</span><span class="q">?</span></span>';
-    });
-    const wrap = document.createElement('span');
-    wrap.innerHTML = html;
-    node.parentNode.replaceChild(wrap, node);
-    wrap.querySelectorAll('.term').forEach(t => {
-      const r = t.getBoundingClientRect();
-      if (r.top < 130) t.classList.add('tip-below');
-      else if (r.left > window.innerWidth * 0.62) t.classList.add('tip-flip');
-    });
-  }
-}
-window.glossify = glossify;
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => glossify(document.body));
-} else {
-  glossify(document.body);
-}
-})();
-"""
-
-
-def _glossary_snippet(lang: str = "zh") -> str:
-    data = json.dumps(_GLOSSARY if lang == "zh" else GLOSSARY_EN, ensure_ascii=False)
-    js = _GLOSSARY_JS.replace("__GLOSSARY_DATA__", data)
-    return f"<style>{_GLOSSARY_CSS}</style><script>{js}</script>"
+        Read-only and carries no engagement data, so it is reachable
+        without a token (see ``auth.PUBLIC_PATHS``)."""
+        return _GTM_NOTICE_EN if rest.startswith("en/") else _GTM_NOTICE
 
 
 # ---------------------------------------------------------------------------
@@ -1080,6 +1079,93 @@ def overview_en() -> str:
 def dashboard_en() -> str:
     """English variant of the engagement console."""
     return _DASHBOARD_HTML_EN
+
+
+@app.get("/certification", response_class=HTMLResponse)
+def certification() -> str:
+    """The FDE certification centre: vendor exam specs, the public outline,
+    sourced practice items and the channel due-diligence checklist."""
+    return _CERTIFICATION_HTML
+
+
+@app.get("/en/certification", response_class=HTMLResponse)
+def certification_en() -> str:
+    """English variant of the certification centre."""
+    return _CERTIFICATION_HTML_EN
+
+
+@app.get("/glossary", response_class=HTMLResponse)
+def glossary() -> str:
+    """The field vocabulary shared by the SOP, the outline and the console.
+
+    Read-only and carries no engagement data, so it is reachable without a
+    token (see ``auth.PUBLIC_PATHS``)."""
+    return _GLOSSARY_HTML
+
+
+@app.get("/en/glossary", response_class=HTMLResponse)
+def glossary_en() -> str:
+    """English variant of the glossary."""
+    return _GLOSSARY_HTML_EN
+
+
+@app.get("/course", response_class=HTMLResponse)
+def course() -> str:
+    """The Level-1 beginner course, rendered from ``course-level-1/``.
+
+    Static reading material with no engagement data, so it is reachable
+    without a token (see ``auth.PUBLIC_PATHS``)."""
+    return _COURSE_HTML
+
+
+@app.get("/en/course", response_class=HTMLResponse)
+def course_en() -> str:
+    """English variant of the course page (chrome translated, lessons are
+    served as the Chinese authors wrote them)."""
+    return _COURSE_HTML_EN
+
+
+@app.get("/sop", response_class=HTMLResponse)
+def sop() -> str:
+    """The full FDE SOP, rendered from ``docs/fde_sop_full.md``.
+
+    Static reading material with no engagement data, so it is reachable
+    without a token (see ``auth.PUBLIC_PATHS``)."""
+    return _SOP_HTML
+
+
+@app.get("/en/sop", response_class=HTMLResponse)
+def sop_en() -> str:
+    """English variant of the SOP page (chrome translated, the document is
+    served as the Chinese authors wrote it)."""
+    return _SOP_HTML_EN
+
+
+# Repository documents rendered locally (fde_scope/web/docs_reader.py). The
+# images route is registered first so its literal two-segment path can never
+# be shadowed; both are read-only with no engagement data (auth.PUBLIC_PATHS).
+@app.get("/docs/images/{name}")
+def repo_doc_image(name: str) -> FileResponse:
+    path = _doc_image_path(name)
+    if path is None:
+        raise HTTPException(status_code=404, detail=f"unknown image: {name!r}")
+    return FileResponse(path)
+
+
+@app.get("/docs/{slug}", response_class=HTMLResponse)
+def doc_page(slug: str) -> str:
+    """Render one repository document (README, docs/*.md, LICENSE, NOTICE)."""
+    if slug not in _DOC_SLUGS:
+        raise HTTPException(status_code=404, detail=f"unknown document: {slug!r}")
+    return _DOC_PAGES[slug]
+
+
+@app.get("/en/docs/{slug}", response_class=HTMLResponse)
+def doc_page_en(slug: str) -> str:
+    """English chrome over the same document corpus (bodies stay as authored)."""
+    if slug not in _DOC_SLUGS:
+        raise HTTPException(status_code=404, detail=f"unknown document: {slug!r}")
+    return _DOC_PAGES_EN[slug]
 
 
 _OVERVIEW_HTML = """<!DOCTYPE html>
@@ -1112,16 +1198,9 @@ a{color:var(--accent);text-decoration:none}
 .ic,.ic-xs{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .ic{width:16px;height:16px}.ic-xs{width:13px;height:13px}
 .mk-g{color:var(--accent)}.mk-w{color:var(--warn)}
-.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-padding:11px 24px;border-bottom:1px solid var(--border);background:var(--bg);
-background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .logo{font-size:1.08rem;font-weight:700;letter-spacing:-.01em}
 .logo span{color:var(--accent)}
 .tag{font:600 11px/1 var(--mono);color:var(--accent);background:var(--accent-dim);padding:5px 10px;border-radius:999px;white-space:nowrap}
-.nav{margin-left:auto;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.nav a{color:var(--muted);font-size:.85rem;padding:6px 10px;border-radius:7px;transition:color .15s,background-color .15s}
-.nav a:hover{color:var(--fg);background:var(--panel2)}
-.nav a.active{color:var(--accent);background:var(--accent-dim)}
 .lang{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:7px 11px;transition:color .13s,border-color .13s;white-space:nowrap}
 .lang:hover{color:var(--fg);border-color:var(--border-strong)}
 .tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:7px;
@@ -1130,8 +1209,7 @@ border:1px solid var(--border);background:transparent;color:var(--muted);cursor:
 .when-dark{display:none}
 html[data-theme="dark"] .when-light{display:none}
 html[data-theme="dark"] .when-dark{display:inline}
-.wrap{max-width:1180px;margin:0 auto;padding:0 24px 44px}
-.hero{padding:58px 0 38px;max-width:760px}
+.hero{padding:14px 0 34px;max-width:760px}
 .hero .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 16px}
 .hero h2{font-size:clamp(30px,4.5vw,42px);font-weight:680;letter-spacing:-.022em;line-height:1.12;margin:0 0 14px;overflow-wrap:anywhere;min-width:0}
 .hero p{color:var(--muted);font-size:1.02rem;margin:0;max-width:660px}
@@ -1197,34 +1275,57 @@ font-size:.8rem;display:flex;justify-content:space-between;gap:10px;flex-wrap:wr
 @media(max-width:640px){
 .cols-4,.cols-3,.cols-2,.step-flow{grid-template-columns:1fr}
 .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-.topbar{gap:10px;padding:10px 16px}
-.wrap{padding:0 16px 32px}
-.hero{padding:38px 0 26px}
+.hero{padding:6px 0 24px}
 footer{flex-direction:column}
 }
+__SHELL_CSS__
 </style>
 </head>
 <body>
 __ICON_SPRITE__
-<header class="topbar">
-  <div class="logo">FDE <span>Scope</span></div>
-  <span class="tag">72h · raw data → deployed agent</span>
-  <nav class="nav">
+<div class="shell">
+<aside class="side">
+  <div class="brand">
+    <div class="logo">FDE <span>Scope</span></div>
+    <span class="tag">72h · raw data → deployed agent</span>
+  </div>
+  <nav class="snav">
+    <div class="grp">FDE 学习者</div>
     <a href="/" class="active">功能总览</a>
-    <a href="/console">Engagement 控制台 →</a>
-    <a href="#arch">架构清单</a>
-    <a href="#practices">最佳实践</a>
-    <a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>
-    <a href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
-    <a href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
+    <div class="subnav">
+      <a href="#sop">完整 SOP</a>
+      <a href="#gates">合规 Gate</a>
+      <a href="#connectors">数据连接器</a>
+      <a href="#ontology">Ontology 语义层</a>
+      <a href="#modules">功能模块</a>
+      <a href="#arch">架构清单</a>
+      <a href="#practices">最佳实践</a>
+      <a href="#kpi">制造业 KPI</a>
+      <a href="#quickstart">快速上手</a>
+      <a href="#scenarios">两种场景</a>
+    </div>
+    <a href="/course">入门课程</a>
+    <a href="/glossary">名词解释</a>
+    <a href="/certification">认证中心</a>
+    <div class="grp">FDE 工程师</div>
+    <a href="/sop">SOP 全文</a>
+    <a href="/catalog/index.html">技能手册库</a>
+    <a href="/docs/readme">仓库文档</a>
+    <div class="grp">FDE 工作台</div>
+    <a href="/console">Engagement 控制台</a>
+    <div class="grp">外部</div>
+    <a href="/GTM/index.html">GTM 官网</a>
   </nav>
-  <a class="lang" href="/en/" title="English version" aria-label="Switch to English">EN</a>
-  <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
-    <svg class="ic when-dark"><use href="#i-sun"/></svg>
-    <svg class="ic when-light"><use href="#i-moon"/></svg>
-  </button>
-</header>
+  <div class="side-foot">
+    <a class="lang" href="/en/" title="English version" aria-label="Switch to English">EN</a>
+    <button class="tbtn" onclick="toggleTheme()" title="切换深浅主题" aria-label="切换深浅主题">
+      <svg class="ic when-dark"><use href="#i-sun"/></svg>
+      <svg class="ic when-light"><use href="#i-moon"/></svg>
+    </button>
+  </div>
+</aside>
 
+<main class="main">
 <div class="wrap">
 
 <div class="hero">
@@ -1246,7 +1347,7 @@ __ICON_SPRITE__
   <div class="stat"><div class="num">CI</div><div class="lab">测试全绿</div></div>
 </div>
 
-<section>
+<section id="sop">
 <div class="sec-head"><svg class="ic"><use href="#i-map"/></svg><h2>完整 SOP · 18 阶段 · 4 Zones</h2><span class="n">01</span></div>
 <div class="step-flow">
   <div class="zone">
@@ -1290,7 +1391,7 @@ __ICON_SPRITE__
 </div>
 </section>
 
-<section>
+<section id="gates">
 <div class="sec-head"><svg class="ic"><use href="#i-shield"/></svg><h2>10 个可执行合规 Gate（工业 overlay）</h2><span class="n">02</span></div>
 <p class="sec-note">Gate 是谓词，不是清单：清单记录"曾经查过"，随现实漂移单向腐化；gate 在每次推进时重新评估，过期 passed 不作数。--force 只豁免拦截、照常评估留痕，例外进入审计日志。</p>
 <div class="grid cols-4">
@@ -1307,7 +1408,7 @@ __ICON_SPRITE__
 </div>
 </section>
 
-<section>
+<section id="connectors">
 <div class="sec-head"><svg class="ic"><use href="#i-plug"/></svg><h2>10 个数据连接器</h2><span class="n">03</span></div>
 <div class="grid cols-4">
   <div class="tile"><svg class="ic"><use href="#i-doc"/></svg><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
@@ -1323,7 +1424,7 @@ __ICON_SPRITE__
 </div>
 </section>
 
-<section>
+<section id="ontology">
 <div class="sec-head"><svg class="ic"><use href="#i-globe"/></svg><h2>Ontology 语义层 · TBox + ABox</h2><span class="n">04</span></div>
 <div class="grid cols-4">
   <div class="tile"><svg class="ic"><use href="#i-layers"/></svg><div class="name">TBox 双 Schema</div><div class="desc">fde-core（Skill/Connector/Engagement 等核心概念）+ mfg-overlay（ISA-95 制造业 overlay，imports 复用）</div><span class="status s-ok">内置</span></div>
@@ -1333,7 +1434,7 @@ __ICON_SPRITE__
 </div>
 </section>
 
-<section>
+<section id="modules">
 <div class="sec-head"><svg class="ic"><use href="#i-gears"/></svg><h2>6 大功能模块</h2><span class="n">05</span></div>
 <div class="grid cols-3">
   <div class="tile"><svg class="ic"><use href="#i-flask"/></svg><div class="name">Corpus Engine</div><div class="desc">脱敏→去重→质量门→覆盖度分析→缺口检测→针对性合成→报告。<b>核心差异化</b>：合成是补盲区不是凑数量。</div></div>
@@ -1373,7 +1474,7 @@ __ICON_SPRITE__
 <p class="sec-note">验证锚点：make test · pytest tests/test_architecture_guard.py（6 项契约）· pytest -m agentscope（真库运行时）· ruff check + format --check · 架构证据模型 docs/architecture-model/architecture-map.md</p>
 </section>
 
-<section>
+<section id="kpi">
 <div class="sec-head"><svg class="ic"><use href="#i-trend"/></svg><h2>制造业 KPI（虚构演示数据）</h2><span class="n">08</span></div>
 <div class="grid cols-4">
   <div class="tile"><div class="name">OEE</div><div class="kpi-row"><span>设备综合效率</span><span class="v">0.724</span></div><div class="desc">世界级 ≥0.85</div></div>
@@ -1422,7 +1523,7 @@ __ICON_SPRITE__
 </div>
 </section>
 
-<section>
+<section id="scenarios">
 <div class="sec-head"><svg class="ic"><use href="#i-box"/></svg><h2>两种场景</h2><span class="n">10</span></div>
 <div class="grid cols-2">
   <div class="tile">
@@ -1446,6 +1547,8 @@ __ICON_SPRITE__
 </footer>
 
 </div>
+</main>
+</div>
 <script>
 function toggleTheme(){
   var h = document.documentElement;
@@ -1454,7 +1557,7 @@ function toggleTheme(){
   try { localStorage.setItem('fde-theme', n); } catch(e) {}
 }
 </script>
-__GLOSSARY__
+<script>__SHELL_JS__</script>
 </body>
 </html>
 """
@@ -1469,61 +1572,30 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 <script>(function(){var t=null,q=null;try{t=localStorage.getItem('fde-theme')}catch(e){}try{q=new URLSearchParams(location.search).get('theme')}catch(e){}if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}document.documentElement.dataset.theme=t})();</script>
 <style>
 /* Hallmark · genre: modern-minimal · macrostructure: workbench · design-system: design.md (Graphite) · designed-as-app */
-:root{
---bg:oklch(0.973 0.003 255);--bg2:oklch(1 0 0);--panel:oklch(1 0 0);
---panel2:oklch(0.945 0.005 255);--fg:oklch(0.225 0.014 255);--muted:oklch(0.47 0.016 255);
---faint:oklch(0.52 0.014 255);--border:oklch(0.9 0.006 255);--border-strong:oklch(0.8 0.01 255);
---accent:oklch(0.5 0.095 235);--accent-2:oklch(0.44 0.095 235);--accent-ink:oklch(0.99 0.002 255);
---accent-dim:oklch(0.5 0.095 235/0.09);--good:oklch(0.51 0.12 152);--warn:oklch(0.53 0.11 75);
---bad:oklch(0.55 0.17 25);--code:oklch(0.955 0.004 255);
---font:-apple-system,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
---mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
-color-scheme:light}
-html[data-theme="dark"]{
---bg:oklch(0.165 0.012 255);--bg2:oklch(0.2 0.013 255);--panel:oklch(0.2 0.013 255);
---panel2:oklch(0.22 0.015 255);--fg:oklch(0.93 0.006 255);--muted:oklch(0.68 0.014 255);
---faint:oklch(0.61 0.013 255);--border:oklch(0.3 0.014 255);--border-strong:oklch(0.4 0.016 255);
---accent:oklch(0.74 0.085 232);--accent-2:oklch(0.79 0.07 232);--accent-ink:oklch(0.2 0.04 232);
---accent-dim:oklch(0.74 0.085 232/0.13);--good:oklch(0.76 0.13 152);--warn:oklch(0.8 0.13 85);
---bad:oklch(0.7 0.16 25);--code:oklch(0.14 0.012 255);
-color-scheme:dark}
+/* Tokens, base and the app shell come from layout.py (see its docstring for
+   the contract); everything below the two placeholders is console-only CSS. */
+__BASE_CSS__
+__SHELL_CSS__
 :root{--z-sticky:60;--z-toast:70}
-*{box-sizing:border-box}
-html,body{overflow-x:clip}
-body{margin:0;font-family:var(--font);background:var(--bg);color:var(--fg);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-::selection{background:var(--accent);color:var(--accent-ink)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0.01ms!important;scroll-behavior:auto!important}}
-::-webkit-scrollbar{width:12px;height:12px}
-::-webkit-scrollbar-track{background:var(--bg)}
-::-webkit-scrollbar-thumb{background:var(--border-strong);border:3px solid var(--bg);border-radius:8px}
-::-webkit-scrollbar-thumb:hover{background:var(--faint)}
-.ic{width:14px;height:14px;flex:none;display:inline-block;vertical-align:-2px}
-.when-dark{display:none}
-html[data-theme="dark"] .when-light{display:none}
-html[data-theme="dark"] .when-dark{display:inline-block}
-header{position:sticky;top:0;z-index:var(--z-sticky);display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
-@supports not (backdrop-filter:blur(1px)){header{background:var(--bg)}}
-.logo{font-weight:800;letter-spacing:-.01em;font-size:1.02rem}
-.v{font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:var(--accent-dim);border:1px solid color-mix(in oklab,var(--accent) 28%,transparent);padding:3px 9px;border-radius:999px;white-space:nowrap}
-.sub{color:var(--faint);font-size:.8rem;margin-left:6px}
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.back{color:var(--muted);font-size:.85rem;transition:color .13s}
-.back:hover{color:var(--fg)}
-.lang{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:7px 11px;transition:color .13s,border-color .13s;white-space:nowrap}
-.lang:hover{color:var(--fg);border-color:var(--border-strong)}
-.tbtn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);cursor:pointer;transition:color .13s,border-color .13s}
-.tbtn:hover{color:var(--fg);border-color:var(--border-strong)}
-.layout{display:grid;grid-template-columns:300px minmax(0,1fr);min-height:calc(100vh - 57px)}
-.sidebar{border-right:1px solid var(--border);padding:16px 14px;overflow-y:auto;background:var(--bg2)}
-.main{padding:20px 22px;overflow-x:clip}
+/* the console keeps an app-width main column: its workbench views are
+   master-detail layouts, not long documents */
+.main{padding:22px 24px 40px;overflow-x:clip;max-width:1240px;margin:0 auto}
 h2{font-size:.92rem;margin:0 0 10px;color:var(--fg);font-weight:650;letter-spacing:0;text-wrap:balance}
-.nav{display:flex;flex-direction:column;gap:4px;margin-bottom:18px}
-.navbtn{display:flex;align-items:center;gap:9px;width:100%;background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 11px;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;font-family:inherit;transition:background .13s,color .13s;text-align:left}
+/* the four view buttons reuse the shell subnav metrics; active is tone plus
+   rail, no fill — a filled child pill under the already-active parent link
+   read as two stacked pills (the "incompatible menu" report) */
+/* justify-content is not optional here: the global button rule centres its
+   content, which ragged-edges this full-width column of labels */
+.navbtn{display:flex;align-items:center;justify-content:flex-start;width:100%;background:transparent;border:0;
+color:var(--faint);padding:5px 10px;border-left:2px solid transparent;border-radius:0 7px 7px 0;
+font-size:.79rem;font-weight:500;cursor:pointer;font-family:inherit;text-align:left;
+transition:background .13s,color .13s,border-color .13s}
 .navbtn:hover{background:var(--panel2);color:var(--fg)}
-.navbtn.active{background:var(--accent-dim);color:var(--accent);border-color:color-mix(in oklab,var(--accent) 30%,transparent)}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.navbtn.active{color:var(--accent);border-left-color:var(--accent)}
+/* the global button rule pads every button; without this the fixed-size
+   theme toggle crushes its 16px icon */
+.tbtn{padding:0}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px 16px;margin-bottom:12px}
 .eng{cursor:pointer;transition:border-color .13s}
 .eng:hover{border-color:var(--accent)}
 .eng .id{font-weight:600}
@@ -1569,7 +1641,6 @@ textarea{resize:vertical;line-height:1.5}
 .w-full{width:100%}
 .mt6{margin-top:6px}.mt8{margin-top:8px}.mt10{margin-top:10px}
 .gap6{gap:6px}
-.side-card{margin-top:16px}
 .plan-group{display:flex;align-items:center;gap:8px;margin:14px 0 2px;font-size:.8rem;font-weight:650;color:var(--muted)}
 .plan-group:first-of-type{margin-top:10px}
 .plan-group .idx{width:20px;height:20px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-family:var(--mono);flex:none}
@@ -1585,21 +1656,49 @@ textarea{resize:vertical;line-height:1.5}
 .diff-h{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);font-size:.87rem;font-weight:600}
 .diff-b{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .diff-row{display:flex;gap:10px;font-size:.82rem;align-items:baseline;flex-wrap:wrap}
-.diff-row .k{flex:none;min-width:52px;color:var(--faint);font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.05em}
+/* these micro-labels carry Chinese: mono/uppercase/tracking are no-ops for CJK,
+   so size and tone carry the hierarchy instead (same call as .grp). */
+.diff-row .k{flex:none;min-width:52px;color:var(--muted);font-size:.78rem}
 .diff-row .old{color:var(--muted)}
 .diff-row .new{color:var(--fg);font-weight:600}
 pre{background:var(--code);padding:10px;border-radius:7px;overflow:auto;font-size:.78rem;border:1px solid var(--border);font-family:var(--mono)}
 code{font-family:var(--mono);font-size:.82em;background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
-.kpi{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:11px 12px}
-.kpi .k{color:var(--faint);font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono)}
-.kpi .v{font-size:1.35rem;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:12px 14px}
+.kpi .k{color:var(--muted);font-size:.78rem;font-weight:600}
+/* accent digits, same signature as the overview's .stat .num */
+.kpi .v{font-size:1.7rem;font-weight:700;margin-top:4px;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--accent)}
+/* -- workbench: page head + master-detail --------------------------------- */
+.wbh{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;
+margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.wbh h1{margin:0;font-size:1.35rem;font-weight:680;letter-spacing:-.02em}
+.wbh-sub{color:var(--muted);font-size:.82rem;margin:5px 0 0}
+.wbh-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* page-head CTAs use the site .btn metrics; form/card buttons stay compact */
+.wbh-act button,.wbh-act .btn{padding:9px 16px;font-size:.9rem}
+.phasebar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+.phasebar .lab{font-size:.78rem;font-weight:600;color:var(--muted);margin-right:2px}
+.md{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:14px;align-items:start}
+.md-list{position:sticky;top:20px;max-height:calc(100vh - 44px);overflow-y:auto}
+.md-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.md-head h2{margin:0}
+.md-head .n{font:600 .68rem/1 var(--mono);color:var(--faint);letter-spacing:.08em}
+.md-empty{color:var(--faint);font-size:.8rem;line-height:1.6;padding:2px 2px 6px}
+.eng.sel{border-color:var(--accent);background:var(--accent-dim)}
+.checklist{display:flex;flex-direction:column;margin:2px 0 0}
+.chk{display:grid;grid-template-columns:24px minmax(0,1fr);gap:3px 12px;padding:12px 2px;border-bottom:1px solid var(--border)}
+.chk:last-child{border-bottom:0;padding-bottom:4px}
+.chk .n{grid-row:span 2;width:24px;height:24px;border-radius:999px;background:var(--accent-dim);color:var(--accent);
+display:flex;align-items:center;justify-content:center;font:600 .72rem/1 var(--mono)}
+.chk .t{font-weight:600;font-size:.92rem}
+.chk .d{color:var(--muted);font-size:.82rem;line-height:1.6}
+.chk .d .btn,.chk .d button{margin-top:8px}
 .tabs{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);overflow-x:auto}
 .tab{background:none;border:0;border-bottom:2px solid transparent;padding:8px 13px;cursor:pointer;color:var(--muted);font-size:.88rem;white-space:nowrap;transition:color .13s;font-family:inherit;font-weight:500}
 .tab:hover{color:var(--fg)}
 .tab.active{color:var(--accent);border-color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:.84rem}
-th{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-weight:600}
+th{font-size:.78rem;letter-spacing:0;color:var(--muted);text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-weight:600}
 td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 tbody tr:last-child td{border-bottom:0}
 tbody tr{transition:background .13s}
@@ -1625,51 +1724,48 @@ dialog{background:var(--panel);color:var(--fg);border:1px solid var(--border-str
 dialog::backdrop{background:color-mix(in oklab,var(--bg) 60%,transparent);backdrop-filter:blur(2px)}
 .dlg-h{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--border);font-size:.95rem}
 .dlg-b{padding:16px}
-@media(max-width:960px){.layout{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid var(--border)}}
-@media(max-width:640px){.sub{display:none}.main{padding:14px}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hdr-right .back{display:none}}
+@media(max-width:1100px){.md{grid-template-columns:1fr}.md-list{position:static;max-height:none}}
+/* the rail collapse itself is SHELL_CSS's 960 block; only the button variant
+   of the subnav needs console-side handling */
+@media(max-width:960px){.navbtn{width:auto;border-left:0;border-radius:7px;padding:5px 9px}.navbtn.active{background:var(--accent-dim)}}
+@media(max-width:640px){.main{padding:16px 14px 32px}.kpi-grid{grid-template-columns:1fr}.wbh-act .btn,.wbh-act button{flex:1 1 auto}}
 </style>
 </head>
 <body>
 __ICON_SPRITE__
-<header>
-  <span class="logo">FDE Scope</span>
-  <span class="v">Engagement Console</span>
-  <span class="sub">72h from raw data to a deployed agent · 全 SOP 工作台</span>
-  <div class="hdr-right">
-    <a class="back" href="/">&#8592; 功能总览</a>
-    <a class="back" href="https://npwgp04gxyp1.meoo.fun" target="_blank">GTM 官网 ↗</a>
-    <a class="back" href="https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog/site/index.html" target="_blank">技能手册库 ↗</a>
-    <a class="lang" href="/en/console" title="English version" aria-label="Switch to English">EN</a>
-    <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
-      <svg class="ic when-dark"><use href="#i-sun"/></svg>
-      <svg class="ic when-light"><use href="#i-moon"/></svg>
-    </button>
-  </div>
-</header>
-<div class="layout">
-  <aside class="sidebar">
-    <nav class="nav">
-      <button class="navbtn active" data-view="workbench" onclick="go('workbench')"><svg class="ic"><use href="#i-gauge"/></svg>工作台</button>
-      <button class="navbtn" data-view="skills" onclick="go('skills')"><svg class="ic"><use href="#i-library"/></svg>技能库</button>
-      <button class="navbtn" data-view="deploy" onclick="go('deploy')"><svg class="ic"><use href="#i-bot"/></svg>Agent 部署</button>
-      <button class="navbtn" data-view="ontology" onclick="go('ontology')"><svg class="ic"><use href="#i-globe"/></svg>本体库</button>
-    </nav>
-    <h2>Engagements</h2>
-    <div id="eng-list"></div>
-    <div class="card side-card">
-      <h2>新建 Engagement</h2>
-      <div class="row"><label>客户</label><input id="new-customer" placeholder="Aurora Motors"></div>
-      <div class="row"><label>Profile</label>
-        <select id="new-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select>
-      </div>
-      <button class="w-full" onclick="createEng()">+ 创建</button>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">FDE <span>Scope</span></div>
+      <span class="tag">Engagement Console</span>
     </div>
-    <div class="card">
-      <h2>工具</h2>
-      <div class="stack">
-        <a class="btn ghost w-full" href="/reports/" target="_blank"><svg class="ic"><use href="#i-folder"/></svg>报告归档</a>
-        <button class="ghost w-full" onclick="loadProfiles()"><svg class="ic"><use href="#i-layers"/></svg>查看 Profiles &amp; Phases</button>
+    <nav class="snav">
+      <div class="grp">FDE 学习者</div>
+      <a href="/">功能总览</a>
+      <a href="/course">入门课程</a>
+      <a href="/glossary">名词解释</a>
+      <a href="/certification">认证中心</a>
+      <div class="grp">FDE 工程师</div>
+      <a href="/sop">SOP 全文</a>
+      <a href="/catalog/index.html">技能手册库</a>
+      <a href="/docs/readme">仓库文档</a>
+      <div class="grp">FDE 工作台</div>
+      <a href="/console" class="active">Engagement 控制台</a>
+      <div class="subnav">
+        <button class="navbtn active" data-view="workbench" onclick="go('workbench')">工作台</button>
+        <button class="navbtn" data-view="skills" onclick="go('skills')">技能库</button>
+        <button class="navbtn" data-view="deploy" onclick="go('deploy')">Agent 部署</button>
+        <button class="navbtn" data-view="ontology" onclick="go('ontology')">本体库</button>
       </div>
+      <div class="grp">外部</div>
+      <a href="/GTM/index.html">GTM 官网</a>
+    </nav>
+    <div class="side-foot">
+      <a class="lang" href="/en/console" title="English version" aria-label="Switch to English">EN</a>
+      <button class="tbtn" onclick="toggleTheme()" aria-label="切换深浅主题" title="切换深浅主题">
+        <svg class="ic when-dark"><use href="#i-sun"/></svg>
+        <svg class="ic when-light"><use href="#i-moon"/></svg>
+      </button>
     </div>
   </aside>
   <main class="main" id="main">
@@ -1677,7 +1773,6 @@ __ICON_SPRITE__
     <div id="view-skills" class="hidden"></div>
     <div id="view-deploy" class="hidden"></div>
     <div id="view-ontology" class="hidden"></div>
-    <div id="view-detail" class="hidden"><div class="empty"><svg class="ic"><use href="#i-map"/></svg>选择或创建一个 engagement 开始</div></div>
   </main>
 </div>
 
@@ -1709,7 +1804,7 @@ function toggleTheme(){
 }
 
 function showView(name) {
-  ['workbench','skills','deploy','ontology','detail'].forEach(v=>{
+  ['workbench','skills','deploy','ontology'].forEach(v=>{
     const e=document.getElementById('view-'+v); if(e) e.classList.toggle('hidden', v!==name);
   });
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
@@ -1731,34 +1826,85 @@ function go(name) {
 async function loadWorkbench() {
   const w = await api('/api/workbench');
   const st = w.stats;
+  const empty = !w.matrix.length;
   const phaseChips = Object.entries(st.phase_distribution).map(([p,n])=>
     `<span class="pill">${escapeHtml(p)}: ${n}</span>`).join('') || '<span class="meta">—</span>';
-  document.getElementById('view-workbench').innerHTML = `
-    <div class="kpi-grid" style="margin-bottom:14px">
+  const head = `<header class="wbh">
+    <div><h1>工作台</h1><p class="wbh-sub">跨项目总览 · 阶段推进、门禁状态与最近沉淀</p></div>
+    <div class="wbh-act">
+      <a class="btn ghost" href="/reports/" target="_blank">${icon('i-folder')}报告归档</a>
+      <button class="ghost" onclick="loadProfiles()">${icon('i-layers')}查看 Profiles &amp; Phases</button>
+      <button onclick="focusCreate()">+ 新建 Engagement</button>
+    </div></header>`;
+  const strips = empty ? '' : `
+    <div class="kpi-grid" style="margin-bottom:12px">
       <div class="kpi"><div class="k">进行中项目</div><div class="v">${st.active_projects}</div></div>
       <div class="kpi"><div class="k">技能总数</div><div class="v">${st.total_skills}</div></div>
       <div class="kpi"><div class="k">待审草稿</div><div class="v" style="color:${st.draft_skills?'var(--warn)':'var(--fg)'}">${st.draft_skills}</div></div>
-      <div class="kpi"><div class="k">阶段分布</div><div class="v" style="font-size:.85rem;line-height:1.5">${phaseChips}</div></div>
     </div>
-    <div class="card"><h2>跨项目矩阵</h2>${matrixHtml(w.matrix)}</div>
-    <div class="card"><h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go('skills')">去沉淀 →</button></h2>${recentHtml(w.recent_skills)}</div>`;
-  if (window.glossify) glossify(document.getElementById('view-workbench'));
+    <div class="phasebar"><span class="lab">阶段分布</span>${phaseChips}</div>`;
+  const master = `<section class="md-list">
+    <div class="md-head"><h2>Engagements</h2><span class="n">${w.matrix.length}</span></div>
+    ${createBoxHtml(empty)}
+    ${engCardsHtml(w.matrix)}
+  </section>`;
+  const detail = empty ? gettingStartedHtml()
+    : `<div class="card"><div class="empty">${icon('i-map')}选择左侧的 engagement，查看阶段、门禁与 KPI</div></div>`;
+  const recent = empty ? ''
+    : `<div class="card"><h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go('skills')">去沉淀 →</button></h2>${recentHtml(w.recent_skills)}</div>`;
+  document.getElementById('view-workbench').innerHTML =
+    head + strips + `<div class="md">${master}<section id="md-detail">${detail}</section></div>` + recent;
+  if (current && w.matrix.some(s=>s.engagement_id===current)) selectEng(current).catch(()=>{});
 }
 
-function matrixHtml(matrix) {
-  if (!matrix.length) return '<div class="empty">暂无项目 — 左侧创建第一个 engagement</div>';
-  const rows = matrix.map(s => {
+function createBoxHtml(openIt) {
+  return `<details class="card" id="create-box"${openIt?' open':''}>
+    <summary>+ 新建 Engagement</summary>
+    <div class="row"><label>客户</label><input id="new-customer" placeholder="Aurora Motors"></div>
+    <div class="row"><label>Profile</label>
+      <select id="new-profile"><option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option></select>
+    </div>
+    <button class="w-full" onclick="createEng()">+ 创建</button>
+  </details>`;
+}
+
+function focusCreate() {
+  const box = document.getElementById('create-box');
+  const el = document.getElementById('new-customer');
+  if (!box || !el) return;
+  box.open = true;
+  box.scrollIntoView({block:'nearest',behavior:'smooth'});
+  el.focus({preventScroll:true});
+}
+
+function gettingStartedHtml() {
+  return `<div class="card">
+    <h2>三步跑通第一条 SOP</h2>
+    <div class="checklist">
+      <div class="chk"><span class="n">1</span><span class="t">创建第一个 Engagement</span>
+        <div class="d">在左侧填写客户名，选择 profile（ticket 客服 / manufacturing 制造业）。
+        <div><button class="ghost" onclick="focusCreate()">开始填写</button></div></div></div>
+      <div class="chk"><span class="n">2</span><span class="t">推进 SOP 阶段，让门禁说话</span>
+        <div class="d">18 个阶段、10 道门禁：每次推进都会重新校验当前阶段的 gate，通过才放行，force 推进也会留档。</div></div>
+      <div class="chk"><span class="n">3</span><span class="t">沉淀第一条可复用技能</span>
+        <div class="d">把现场经验写成技能草稿，评审通过后发布，进入技能库供下一个项目复用。
+        <div><button class="ghost" onclick="go('skills')">去技能库</button></div></div></div>
+    </div>
+  </div>`;
+}
+
+function engCardsHtml(matrix) {
+  if (!matrix.length) return '<div class="md-empty">还没有 engagement —— 用上面的表单创建第一条。</div>';
+  return matrix.map(s => {
     const ts = Object.values(s.gate_records||{}).map(g=>g.checked_at).filter(Boolean).sort().pop() || '';
-    return `<tr onclick="selectEng('${escapeHtml(s.engagement_id)}')" style="cursor:pointer">
-      <td><b>${escapeHtml(s.customer)}</b><div class="meta">${escapeHtml(s.engagement_id)}</div></td>
-      <td><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span></td>
-      <td>${escapeHtml(s.current_phase)}<div class="meta">${escapeHtml(zoneLabel(s.current_zone))}</div></td>
-      <td>${s.gate?escapeHtml(s.gate)+' '+dot(s.gate_passed):'—'}</td>
-      <td class="meta">${ts?escapeHtml(String(ts).slice(0,16).replace('T',' ')):'—'}</td>
-      ${s.is_complete?'<td>'+dot(true)+' 完成</td>':''}
-    </tr>`;
+    return `<div class="card eng${current===s.engagement_id?' sel':''}" data-eid="${escapeHtml(s.engagement_id)}" onclick="selectEng('${escapeHtml(s.engagement_id)}')">
+      <div class="id">${escapeHtml(s.customer)}</div>
+      <div class="meta"><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span>
+        ${s.gate?escapeHtml(s.gate)+' '+dot(s.gate_passed):'—'}</div>
+      <div class="meta">${zoneLabel(escapeHtml(s.current_zone))} · ${escapeHtml(s.current_phase)}${s.is_complete?' · '+dot(true)+' 完成':''}</div>
+      <div class="meta">${ts?escapeHtml(String(ts).slice(0,16).replace('T',' ')):'—'}</div>
+    </div>`;
   }).join('');
-  return `<div class="tablewrap"><table><thead><tr><th>客户</th><th>Profile</th><th>阶段</th><th>门禁</th><th>最近更新</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function recentHtml(skills) {
@@ -1803,7 +1949,6 @@ async function loadSkills() {
       <div class="row"><label>正文</label><textarea id="sk-body" rows="4" style="width:100%;background:var(--code);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:.85rem;padding:6px 9px"></textarea></div>
       <button onclick="submitSkill()">+ 沉淀技能</button>
     </div>`;
-  if (window.glossify) glossify(document.getElementById('view-skills'));
 }
 
 function skillCard(r) {
@@ -2036,37 +2181,22 @@ async function api(path, opts={}) {
   return r.json();
 }
 
-async function refreshList() {
-  const list = await api('/api/engagements');
-  const el = document.getElementById('eng-list');
-  if (!list.length) { el.innerHTML = `<div class="empty">${icon('i-map')}还没有 engagement<div class="hint">在左侧「新建 Engagement」填写客户名与 profile，开始你的第一条 SOP。</div></div>`; return; }
-  el.innerHTML = list.map(s => `
-    <div class="card eng" onclick="selectEng('${escapeHtml(s.engagement_id)}')">
-      <div class="id">${escapeHtml(s.customer)}</div>
-      <div class="meta">
-        <span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span>
-        ${escapeHtml(s.current_phase)} · ${escapeHtml(s.current_zone)}
-        ${s.is_complete?' '+dot(true):''}
-      </div>
-      <div class="meta">id: ${escapeHtml(s.engagement_id)}</div>
-    </div>`).join('');
-  if (window.glossify) glossify(el);
-}
-
 async function createEng() {
   const customer = document.getElementById('new-customer').value.trim();
   if (!customer) return toast('请填写客户名','warn');
   const profile = document.getElementById('new-profile').value;
-  await api('/api/engagements', {method:'POST',
+  const created = await api('/api/engagements', {method:'POST',
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({customer, profile})});
   document.getElementById('new-customer').value = '';
   toast('已创建 engagement','ok');
-  refreshList();
+  await loadWorkbench();
+  selectEng(created.engagement_id);
 }
 
 async function selectEng(eid) {
   current = eid;
+  document.querySelectorAll('.eng').forEach(el=>el.classList.toggle('sel', el.dataset.eid===eid));
   const s = await api(`/api/engagements/${eid}`);
   const phases = await api(`/api/phases?profile=${s.profile}`);
   const gates = await api(`/api/engagements/${eid}/gates`);
@@ -2171,9 +2301,7 @@ function renderDetail(s, phases, gates, guided) {
       <div id="kpi-out" style="margin-top:10px"></div>
     </div></div>
   `;
-  document.getElementById('view-detail').innerHTML = html;
-  showView('detail');
-  if (window.glossify) glossify(document.getElementById('view-detail'));
+  document.getElementById('md-detail').innerHTML = html;
 }
 
 function tab(name, el) {
@@ -2284,7 +2412,7 @@ function guidedHtml(g, phases) {
   const isEn = document.documentElement.lang==='en';
   const pages = (g.catalog_pages||[]).map(pg=>{
     const url = (isEn && pg.url_en) ? pg.url_en : pg.url;
-    return `<a class="btn ghost" href="${esc(url)}" target="_blank" rel="noopener">${icon('i-book')} ${esc(pg.title)}</a>`;
+    return `<a class="btn ghost" href="${esc(url)}">${icon('i-book')} ${esc(pg.title)}</a>`;
   }).join(' ');
   const aiBtn = g.llm_available ? '✨ AI 起草' : '✍️ 手动填写指引';
   const aiNote = g.llm_available
@@ -2471,7 +2599,8 @@ function gdAssemble(b) {
   const rows = lines('gd-l-'+b.block);
   if (!rows.length) return null;
   const cells = r => r.split('|').map(s=>(s||'').trim());
-  if (b.block==='stakeholders') return rows.map(r=>{const [name,role,sp,metric]=cells(r); return {name:name||'',role:role||'',is_sponsor:/^(y|yes|是)$/i.test(sp||''),success_metric:metric||''};}).filter(x=>x.name);
+  // \\u662f is the zh "yes" accepted in pasted CSV; escaped so the EN page stays CJK-free
+  if (b.block==='stakeholders') return rows.map(r=>{const [name,role,sp,metric]=cells(r); return {name:name||'',role:role||'',is_sponsor:/^(y|yes|\\u662f)$/i.test(sp||''),success_metric:metric||''};}).filter(x=>x.name);
   if (b.block==='success_criteria') return rows;
   if (b.block==='slos') return rows.map(r=>{const [name,target,eb,route,win]=cells(r); return {name:name||'',target:target||'',error_budget:eb||'',alert_route:route||'',window:win||'14d'};}).filter(x=>x.name&&x.target);
   return null;
@@ -2578,7 +2707,6 @@ async function loadOntology() {
     <div class="card"><h2>Schema（TBox）</h2>${sCards}</div>
     <div class="card" style="margin-top:12px"><h2>实例库（ABox）</h2>
       <p class="meta">ontology_ref 指向 schema@version；导出时自动并入其 TBox 上下文（JSON-LD 1.1）。</p>${stCards}</div>`;
-  if (window.glossify) glossify(document.getElementById('view-ontology'));
 }
 
 async function showSchema(sid) {
@@ -2612,7 +2740,6 @@ async function showSchema(sid) {
     <div class="card" style="margin-top:8px"><h2>对象属性（${(s.object_properties||[]).length}）</h2>${objRows}</div>
     <div class="card" style="margin-top:8px"><h2>数据属性（${(s.data_properties||[]).length}）</h2>${dataRows}</div>
     <div class="card" style="margin-top:8px"><h2>概念体系（SKOS）</h2>${schemeBlocks}</div>`;
-  if (window.glossify) glossify(document.getElementById('view-ontology'));
 }
 
 function conceptTree(scheme) {
@@ -2653,10 +2780,8 @@ async function showJsonld(target, backSid) {
     <div class="sec-head"><svg class="ic"><use href="#i-doc"/></svg><h2>JSON-LD · ${esc(target)}</h2>${back}</div>
     <p class="meta">与 CLI <code>fde-scope ontology export ${esc(target)}</code> 同一实现；store 导出自动并入其 TBox。</p>
     <div class="card" style="margin-top:8px"><pre style="max-height:60vh;overflow:auto">${esc(JSON.stringify(doc, null, 2))}</pre></div>`;
-  if (window.glossify) glossify(document.getElementById('view-ontology'));
 }
 
-refreshList();
 if (location.hash === '#skills') go('skills');
 else if (location.hash === '#deploy') go('deploy');
 else if (location.hash === '#ontology') go('ontology');
@@ -2665,7 +2790,7 @@ window.addEventListener('hashchange', () => {
   if (location.hash === '#skills') go('skills');
   else if (location.hash === '#deploy') go('deploy');
   else if (location.hash === '#ontology') go('ontology');
-  else if (location.hash) go('workbench');
+  else go('workbench');
 });
 </script>
 <dialog id="dlg-edit" aria-labelledby="dlg-edit-title">
@@ -2683,7 +2808,6 @@ window.addEventListener('hashchange', () => {
   <div class="dlg-b" id="dlg-profiles-body"></div>
 </dialog>
 <div id="toast-host" aria-live="polite"></div>
-__GLOSSARY__
 </body>
 </html>
 """
@@ -2732,17 +2856,46 @@ _ICON_SPRITE = """<svg width="0" height="0" style="position:absolute" aria-hidde
 
 _OVERVIEW_HTML_EN = (
     to_en(_OVERVIEW_HTML)
-    .replace("__GLOSSARY__", _glossary_snippet("en"))
+    .replace("__SHELL_CSS__", SHELL_CSS)
+    .replace("__SHELL_JS__", SHELL_JS)
     .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )
 _DASHBOARD_HTML_EN = (
     to_en(_DASHBOARD_HTML)
-    .replace("__GLOSSARY__", _glossary_snippet("en"))
+    .replace("__BASE_CSS__", BASE_CSS)
+    .replace("__SHELL_CSS__", SHELL_CSS)
     .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )
-_OVERVIEW_HTML = _OVERVIEW_HTML.replace("__GLOSSARY__", _glossary_snippet()).replace(
-    "__ICON_SPRITE__", _ICON_SPRITE
+_OVERVIEW_HTML = (
+    _OVERVIEW_HTML.replace("__SHELL_CSS__", SHELL_CSS)
+    .replace("__SHELL_JS__", SHELL_JS)
+    .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )
-_DASHBOARD_HTML = _DASHBOARD_HTML.replace("__GLOSSARY__", _glossary_snippet()).replace(
-    "__ICON_SPRITE__", _ICON_SPRITE
+_DASHBOARD_HTML = (
+    _DASHBOARD_HTML.replace("__BASE_CSS__", BASE_CSS)
+    .replace("__SHELL_CSS__", SHELL_CSS)
+    .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )
+# certification.py and glossary.py render both locales from paired literals (no
+# to_en pass: see their module docstrings), so each variant is rendered, not
+# translated.
+_CERTIFICATION_HTML_EN = _render_certification("en").replace("__ICON_SPRITE__", _ICON_SPRITE)
+_CERTIFICATION_HTML = _render_certification("zh").replace("__ICON_SPRITE__", _ICON_SPRITE)
+_GLOSSARY_HTML_EN = _render_glossary("en").replace("__ICON_SPRITE__", _ICON_SPRITE)
+_GLOSSARY_HTML = _render_glossary("zh").replace("__ICON_SPRITE__", _ICON_SPRITE)
+# course.py renders the whole Level-1 course from course-level-1/*.md, again
+# from paired literals; a missing directory degrades to a notice, not a crash.
+_COURSE_HTML_EN = _render_course("en").replace("__ICON_SPRITE__", _ICON_SPRITE)
+_COURSE_HTML = _render_course("zh").replace("__ICON_SPRITE__", _ICON_SPRITE)
+# sop.py renders docs/fde_sop_full.md the same way; wheel installs have no
+# docs/ and get the in-page notice instead.
+_SOP_HTML_EN = _render_sop("en").replace("__ICON_SPRITE__", _ICON_SPRITE)
+_SOP_HTML = _render_sop("zh").replace("__ICON_SPRITE__", _ICON_SPRITE)
+# docs_reader.py renders the repository's own documents (README, docs/*.md,
+# LICENSE, NOTICE, the examples and course quickstart READMEs) from paired
+# literals; a missing file degrades to the in-page notice. Pre-rendered once
+# at import: the corpus is static within a process.
+_DOC_PAGES_EN = {
+    _slug: _render_doc(_slug, "en").replace("__ICON_SPRITE__", _ICON_SPRITE) for _slug in _DOC_SLUGS
+}
+_DOC_PAGES = {_slug: _render_doc(_slug).replace("__ICON_SPRITE__", _ICON_SPRITE) for _slug in _DOC_SLUGS}

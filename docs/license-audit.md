@@ -20,13 +20,14 @@
 | fastapi | 0.141.1 | MIT | 低 | Web 层 |
 | uvicorn | 0.53.0 | BSD-3-Clause | 低 | ASGI server |
 | python-multipart | 0.0.32 | Apache-2.0 | 低 | 表单解析 |
+| markdown-it-py | 4.2.0 | MIT | 低 | `/course` 课程页渲染（2026-09-30 补审计，依赖 mdurl，同为 MIT） |
 | pytest | 9.1.1 | MIT | 低 | 仅 dev，不随产品分发 |
 | pytest-cov | 7.1.0 | MIT | 低 | 仅 dev |
 | httpx | 0.28.1 | BSD-3-Clause | 低 | 仅 dev |
 
 ## 结论
 
-1. **与 MIT 主许可兼容**：全部 17 个直接依赖均与 MIT 兼容。其中 11 个为
+1. **与 MIT 主许可兼容**：全部 18 个直接依赖均与 MIT 兼容。其中 12 个为
    permissive（MIT/BSD/Apache），不存在许可冲突。
 2. **三个 copyleft 包全部是 optional extra**（`mysql` / `opcua` / `mqtt`），
    核心安装（`pip install fde-scope`）只含 MIT/BSD 依赖，核心分发无 copyleft 暴露。

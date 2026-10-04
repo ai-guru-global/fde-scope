@@ -1,0 +1,386 @@
+"""The standalone glossary page (``/glossary``, ``/en/glossary``).
+
+Rendered from paired literals rather than through :func:`fde_scope.web.i18n.to_en`
+because the whole page *is* vocabulary: a single missing pair would ship
+Chinese terms onto ``/en/glossary`` with no error. The two lists live in
+``i18n.GLOSSARY_ZH`` / ``i18n.GLOSSARY_EN`` under identical keys, so a term
+cannot exist in only one language; ``render`` picks the list and the group
+labels by locale.
+
+Every term belongs to exactly one group in :data:`_GROUPS`. Terms that are
+not listed there fall into a trailing catch-all group, and
+``tests/test_web.py`` asserts that catch-all is empty — adding a glossary
+entry without filing it is a test failure, not a silently unlisted word.
+
+The tips are this site's own one-line glosses, written to make the SOP and
+the certification material readable. They are not vendor documentation and
+carry no provenance claim.
+"""
+
+from .i18n import GLOSSARY_EN, GLOSSARY_ZH
+from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+
+#: (icon id, zh label, en label, zh blurb, en blurb, terms) — order is page order.
+_GROUPS: list[tuple[str, str, str, str, str, list[str]]] = [
+    (
+        "i-compass",
+        "驻场方法论",
+        "Field method",
+        "从第一次现场走查到原型验证：这套 SOP 里的角色、阶段与推进动词。",
+        "From the first shop-floor walk to a working prototype: the roles, phases "
+        "and verbs this SOP runs on.",
+        [
+            "Gemba walk",
+            "Gemba",
+            "FDE",
+            "Engagements",
+            "Engagement",
+            "SOP",
+            "zones",
+            "Zone",
+            "qualification",
+            "stakeholder_map",
+            "prototype",
+            "force",
+        ],
+    ),
+    (
+        "i-shield",
+        "门禁与合规",
+        "Gates & compliance",
+        "推进阶段时每次重新评估的谓词，以及签约侧必须落实的硬条件。",
+        "The predicates re-evaluated on every phase advance, plus the hard conditions "
+        "the contract side has to meet.",
+        [
+            "Gates",
+            "Gate",
+            "门禁",
+            "overlay",
+            "FAT/SAT",
+            "sponsor",
+            "success_criteria",
+            "成功标准",
+        ],
+    ),
+    (
+        "i-db",
+        "数据与语料",
+        "Data & corpus",
+        "场景配置与数据本身：接入什么、怎么锻造、什么算够。",
+        "Scenario configuration and the data itself: what to ingest, how to forge it, "
+        "and what counts as enough.",
+        [
+            "Context",
+            "干系人",
+            "Profile",
+            "ticket",
+            "manufacturing",
+            "KPI",
+            "Corpus",
+            "语料锻造",
+            "PII",
+            "min_samples",
+            "synth_per_gap",
+            "JSONL",
+            "stub",
+        ],
+    ),
+    (
+        "i-factory",
+        "工业与机器人",
+        "Industrial & robotics",
+        "车间侧的数据源、协议与产线指标。",
+        "Shop-floor data sources, protocols and production-line metrics.",
+        [
+            "ISA-95",
+            "MES",
+            "OPC UA",
+            "OPC",
+            "PLC",
+            "MQTT-Sparkplug",
+            "ROS2 Bag",
+            "Historian",
+            "OEE",
+            "MTBF",
+            "pick success",
+            "DexNet",
+        ],
+    ),
+    (
+        "i-alert",
+        "安全与法规",
+        "Safety & regulation",
+        "功能安全等级、部署形态与劳动法共决——写进 gate 的那部分合规。",
+        "Functional-safety levels, deployment shapes and labour co-determination — "
+        "the compliance that becomes gates.",
+        [
+            "功能安全",
+            "ISO 13849",
+            "IEC 61508",
+            "ISO 10218",
+            "CE",
+            "EU AI Act",
+            "PLr",
+            "SIL",
+            "works_council",
+            "工会",
+            "air-gapped",
+            "气隙",
+            "OT/IT 隔离",
+            "班次",
+        ],
+    ),
+    (
+        "i-gauge",
+        "运营与退场",
+        "Operations & exit",
+        "上线之后：服务承诺、漂移监测、回流飞轮与交接退场。",
+        "After go-live: service commitments, drift monitoring, the backflow flywheel, and the exit.",
+        [
+            "SLO",
+            "SLA",
+            "on-call",
+            "告警路由",
+            "runbook",
+            "移交包",
+            "drift",
+            "漂移",
+            "Flywheel",
+            "飞轮",
+            "bad case",
+        ],
+    ),
+    (
+        "i-cpu",
+        "平台与工具",
+        "Platform & tooling",
+        "AgentScope 运行时概念、外部系统，以及工作台里的功能名。",
+        "AgentScope runtime concepts, external systems, and the feature names inside the workbench.",
+        [
+            "Zammad",
+            "Salesforce",
+            "RAG",
+            "ACA",
+            "ACP",
+            "AgentState",
+            "Toolkit",
+            "SubAgentTemplate",
+            "技能库",
+            "工作台",
+            "现场记录",
+            "沉淀",
+        ],
+    ),
+]
+
+#: English labels for the CJK-keyed terms. Each tip in ``GLOSSARY_EN`` opens
+#: with its English term, so these are read off existing content rather than
+#: invented. ``tests/test_web.py`` pins totality over the CJK keys.
+_EN_TERM: dict[str, str] = {
+    "气隙": "Air-gapped",
+    "OT/IT 隔离": "OT/IT separation",
+    "班次": "Shift system",
+    "工会": "Works council",
+    "告警路由": "Alert route",
+    "移交包": "Handoff package",
+    "干系人": "Stakeholder",
+    "成功标准": "Success criteria",
+    "功能安全": "Functional safety",
+    "语料锻造": "Corpus forging",
+    "飞轮": "Flywheel",
+    "漂移": "Drift",
+    "技能库": "Skills library",
+    "工作台": "Workbench",
+    "现场记录": "Journal",
+    "沉淀": "Consolidate",
+    "门禁": "Gates",
+}
+
+_CATCH_ALL = (
+    "i-box",
+    "其他",
+    "Other",
+    "尚未归组的词条。",
+    "Terms not yet filed into a group.",
+)
+
+
+def _is_cjk(term: str) -> bool:
+    return any(ord(c) > 127 for c in term)
+
+
+def _group_terms(terms: list[str]) -> list[list[str]]:
+    """Terms in :data:`_GROUPS` order, then a catch-all for anything unlisted."""
+    listed = {t for *_, group in _GROUPS for t in group}
+    groups = [sorted(group, key=str.casefold) for *_, group in _GROUPS]
+    rest = sorted((t for t in terms if t not in listed), key=str.casefold)
+    if rest:
+        groups.append(rest)
+    return groups
+
+
+def _label(term: str, en: bool) -> str:
+    return _EN_TERM.get(term, term) if en and _is_cjk(term) else term
+
+
+_STYLE = (
+    BASE_CSS
+    + """
+.gl{display:grid;gap:10px;margin:0}
+.gl .card{background:var(--panel);border:1px solid var(--border);border-radius:9px;
+padding:13px 15px;min-width:0;transition:border-color .15s}
+.gl .card:hover{border-color:var(--border-strong)}
+.gl dt{font-weight:600;font-size:.88rem;color:var(--fg);overflow-wrap:anywhere}
+.gl dt .alias{font:400 .78rem/1.5 var(--mono);color:var(--faint);margin-left:7px}
+.gl dd{margin:5px 0 0;color:var(--muted);font-size:.82rem;line-height:1.7}
+@media(max-width:960px){
+.cols-4,.cols-3,.gl{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+.cols-4,.cols-3,.cols-2,.gl{grid-template-columns:1fr}
+.hero{padding:6px 0 24px}footer{flex-direction:column}
+}
+"""
+    + SHELL_CSS
+)
+
+_THEME_SCRIPT = """
+function toggleTheme(){
+  var h = document.documentElement;
+  var n = h.dataset.theme === 'light' ? 'dark' : 'light';
+  h.dataset.theme = n;
+  try { localStorage.setItem('fde-theme', n); } catch(e) {}
+}
+"""
+
+
+def render(locale: str = "zh") -> str:
+    """The glossary as HTML. ``locale`` is ``"zh"`` or ``"en"``."""
+    if locale not in ("zh", "en"):
+        raise ValueError(f"unsupported locale: {locale!r}")
+    en = locale == "en"
+
+    def p(zh: str, eng: str) -> str:
+        return eng if en else zh
+
+    keys = [term for term, _ in (GLOSSARY_EN if en else GLOSSARY_ZH)]
+    tips = dict(GLOSSARY_EN if en else GLOSSARY_ZH)
+    groups = _group_terms(keys)
+
+    heads = [group[:5] for group in _GROUPS]
+    if len(groups) > len(_GROUPS):
+        heads.append(_CATCH_ALL)
+
+    lang = "en" if en else "zh"
+    other = "/glossary" if en else "/en/glossary"
+    lang_label = "中文" if en else "EN"
+    base = "/en" if en else ""
+
+    out: list[str] = []
+    add = out.append
+    add(
+        f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{p("名词解释 · FDE Scope", "Glossary · FDE Scope")}</title>
+<link rel="icon" href="/static/favicon.svg">
+<script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
+<style>{_STYLE}</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">__ICON_SPRITE__</svg>
+<div class="shell">
+<aside class="side">
+<div class="brand">
+<div class="logo">FDE <span>Scope</span></div>
+<span class="tag">{p("现场词汇表", "field vocabulary")}</span>
+</div>
+<nav class="snav">
+<div class="grp">{p("FDE 学习者", "FDE learners")}</div>
+<a href="{base}/">{p("功能总览", "Overview")}</a>
+<a href="{base}/course">{p("入门课程", "Intro course")}</a>
+<a href="{base}/glossary" class="active">{p("名词解释", "Glossary")}</a>
+<div class="subnav">"""
+    )
+    for idx, head in enumerate(heads, 1):
+        add(f'<a href="#g{idx:02d}">{head[2] if en else head[1]}</a>')
+    add(
+        f"""</div>
+<a href="{base}/certification">{p("认证中心", "Certification")}</a>
+<div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
+<a href="{base}/sop">{p("SOP 全文", "SOP full text")}</a>
+<a href="{"/catalog/en/index.html" if en else "/catalog/index.html"}">{p("技能手册库", "Skills handbook")}</a>
+<a href="{base}/docs/readme">{p("仓库文档", "Repo docs")}</a>
+<div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
+<a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
+<div class="grp">{p("外部", "External")}</div>
+<a href="{"/GTM/en/index.html" if en else "/GTM/index.html"}">{p("GTM 官网", "GTM site")}</a>
+</nav>
+<div class="side-foot">
+<a class="lang" href="{other}">{lang_label}</a>
+<button class="tbtn" onclick="toggleTheme()" aria-label="{
+            p("切换深浅主题", "Toggle light/dark theme")
+        }" title="{p("切换深浅主题", "Toggle light/dark theme")}">
+<svg class="ic when-light" aria-hidden="true"><use href="#i-moon"/></svg>
+<svg class="ic when-dark" aria-hidden="true"><use href="#i-sun"/></svg>
+</button>
+</div>
+</aside>
+<main class="main"><div class="wrap">
+<div class="hero">
+<p class="eyebrow">{p("名词解释 · 现场词汇", "Glossary · field vocabulary")}</p>
+<h2>{p("这套材料里的每个词，一行讲清", "Every term in this material, one line each")}</h2>
+<p>{
+            p(
+                "SOP、认证大纲与控制台界面共用的词汇表。原先嵌在正文里的小标签已经移除——"
+                "正文只留完整的句子，术语集中到这里，按主题分组。",
+                "The vocabulary shared by the SOP, the certification outline and the console UI. "
+                "The inline badges that used to sit in the body text are gone: the prose keeps only "
+                "whole sentences, and the terms are collected here, grouped by theme.",
+            )
+        }</p>
+</div>"""
+    )
+    for idx, (head, group) in enumerate(zip(heads, groups), 1):
+        _, zh_label, en_label, zh_blurb, en_blurb = head
+        add(
+            f"""
+<section id="g{idx:02d}">
+<div class="sec-head">
+<svg class="ic" aria-hidden="true"><use href="#{head[0]}"/></svg>
+<h2>{en_label if en else zh_label}</h2>
+<span class="n">{idx:02d}</span>
+</div>
+<p class="sec-note">{en_blurb if en else zh_blurb}</p>
+<dl class="gl cols-2">"""
+        )
+        for term in group:
+            label = _label(term, en)
+            alias = f'<span class="alias">{term}</span>' if label.casefold() != term.casefold() else ""
+            add(
+                f"""<div class="card">
+<dt>{label}{alias}</dt>
+<dd>{tips[term]}</dd>
+</div>"""
+            )
+        add("""</dl>
+</section>""")
+    add(
+        f"""
+<footer>
+<span>{p("FDE Scope · 名词解释", "FDE Scope · Glossary")}</span>
+<span>{p("本站自撰的一行释义，非厂商文档", "One-line glosses written for this site, not vendor documentation")}</span>
+</footer>
+
+</div>
+</main>
+</div>
+<script>{_THEME_SCRIPT}</script>
+<script>{SHELL_JS}</script>
+</body>
+</html>
+"""
+    )
+    return "".join(out)

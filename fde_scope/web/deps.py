@@ -98,7 +98,17 @@ def catalog_site_dir() -> Path | None:
 
     Resolved against the repo layout (read-only asset, absolute path — unlike
     the CWD-relative reports dir). An installed wheel without ``docs/`` gets
-    None and the console degrades to GitHub links.
+    None and /catalog answers with an in-app notice instead.
     """
     d = Path(__file__).resolve().parents[2] / "docs" / "skills-catalog" / "site"
+    return d if d.is_dir() else None
+
+
+def gtm_site_dir() -> Path | None:
+    """The hand-authored GTM portal dir (repo-root ``GTM/``), or None.
+
+    Conditional for the same reason as :func:`catalog_site_dir`: a wheel
+    install ships neither ``GTM/`` nor ``docs/``.
+    """
+    d = Path(__file__).resolve().parents[2] / "GTM"
     return d if d.is_dir() else None

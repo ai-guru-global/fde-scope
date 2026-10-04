@@ -35,7 +35,16 @@ def test_health_never_requires_token(client, monkeypatch) -> None:
 
 def test_static_pages_never_require_token(client, monkeypatch) -> None:
     monkeypatch.setenv("FDE_SCOPE_API_TOKEN", TOKEN)
-    for path in ("/", "/console", "/en/", "/en/console"):
+    for path in (
+        "/",
+        "/console",
+        "/en/",
+        "/en/console",
+        "/certification",
+        "/en/certification",
+        "/course",
+        "/en/course",
+    ):
         assert client.get(path).status_code == 200
 
 

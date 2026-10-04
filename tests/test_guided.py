@@ -51,13 +51,14 @@ def test_blocker_advice_covers_every_gate() -> None:
             assert needle and advice and target
 
 
-def test_pages_for_phase_local_and_github() -> None:
-    gh = pages_for_phase("qualification", local=False)
-    local = pages_for_phase("qualification", local=True)
-    assert gh and len(gh) == len(local)
-    assert all(p["url"].startswith("https://github.com/") and p["url"].endswith(".md") for p in gh)
-    assert all(p["url"].startswith("/catalog/index.html#/") for p in local)
-    assert all(p["url_en"].startswith("/catalog/en/index.html#/") for p in local)
+def test_pages_for_phase_are_always_local() -> None:
+    """The guided cards deep-link the in-app portal; the GitHub variant is
+    gone, so no URL can leave the app."""
+    pages = pages_for_phase("qualification")
+    assert pages
+    assert all(p["url"].startswith("/catalog/index.html#/") for p in pages)
+    assert all(p["url_en"].startswith("/catalog/en/index.html#/") for p in pages)
+    assert all("github.com" not in p["url"] and "github.com" not in p["url_en"] for p in pages)
 
 
 def test_guided_view_empty_ticket_ctx() -> None:

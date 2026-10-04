@@ -182,6 +182,11 @@ A single-page engagement console — no build step, backed by JSON APIs:
   TBox schemas (classes / properties / SKOS concept trees, cycle-safe rendering),
   workspace ABox stores, and preview JSON-LD 1.1 exports via the same
   implementation as `fde-scope ontology export`.
+- **Reading pages, all local** — SOP full text (`/sop`), Level-1 course
+  (`/course`), glossary (`/glossary`), certification centre (`/certification`),
+  repo docs (`/docs/`, README plus 20 docs/ pages rendered locally), the skills
+  handbook portal (`/catalog/`) and the GTM site (`/GTM/`) are all mounted or
+  rendered in-app — the sidebar has no off-site jumps.
 
 **实机截图**（macOS App · universal2 DMG，与 `fde-scope web` 同一控制台）：
 

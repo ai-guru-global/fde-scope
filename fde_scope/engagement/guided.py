@@ -272,7 +272,7 @@ def next_steps_for(slug: str, result: GateResult) -> list[dict]:
     return steps
 
 
-def guided_view(ctx: EngagementContext, registry: dict | None = None, *, catalog_local: bool = False) -> dict:
+def guided_view(ctx: EngagementContext, registry: dict | None = None) -> dict:
     """Assemble the guided-mode payload for one engagement (read-only).
 
     Gates are re-checked live here (``Gate.check``), mirroring
@@ -311,10 +311,9 @@ def guided_view(ctx: EngagementContext, registry: dict | None = None, *, catalog
         },
         "deliverables": PHASE_DELIVERABLES.get(phase.slug, []),
         "gates": gates_out,
-        "catalog_pages": pages_for_phase(phase.slug, local=catalog_local),
+        "catalog_pages": pages_for_phase(phase.slug),
         "plan": ctx.assets.get("guided_plan"),
         "llm_available": _llm_available(),
-        "catalog_local": catalog_local,
     }
 
 

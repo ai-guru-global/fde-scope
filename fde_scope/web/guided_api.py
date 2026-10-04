@@ -30,7 +30,7 @@ from ..engagement.guided import (
     llm_draft_context,
     llm_goal_plan,
 )
-from .deps import _load, _save, catalog_site_dir, engagement_lock
+from .deps import _load, _save, engagement_lock
 
 router = APIRouter()
 
@@ -46,7 +46,7 @@ class PlanRequest(BaseModel):
 @router.get("/api/engagements/{eid}/guided")
 def engagement_guided(eid: str) -> dict:
     eng = _load(eid)
-    return guided_view(eng.ctx, catalog_local=catalog_site_dir() is not None)
+    return guided_view(eng.ctx)
 
 
 @router.post("/api/engagements/{eid}/guided/draft-context")

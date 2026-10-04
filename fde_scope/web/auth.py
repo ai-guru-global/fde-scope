@@ -23,8 +23,87 @@ from starlette.responses import JSONResponse, Response
 
 #: Paths reachable without a token when auth is on. Kept minimal: the health
 #: probe plus the static HTML shells (they carry no engagement data; their
-#: JSON calls still need the token).
-PUBLIC_PATHS = frozenset({"/api/health", "/", "/console", "/en/", "/en/console"})
+#: JSON calls still need the token). The certification, glossary, course, SOP
+#: and repo-docs pages are such shells too: public exam specs, field
+#: vocabulary, the Level-1 course text, the full SOP and the repository's own
+#: documents, no engagement data, no mutating endpoints. The two
+#: skills-handbook portal indexes, the GTM site and the repo screenshot files
+#: are static build output / content under the same rule. Matching is
+#: exact-path (``request.url.path in PUBLIC_PATHS``), so sibling paths such as
+#: ``/catalog/`` or ``/docs/`` itself are still gated.
+public_html = frozenset(
+    {
+        "/api/health",
+        "/",
+        "/en/",
+        "/console",
+        "/en/console",
+        "/certification",
+        "/en/certification",
+        "/glossary",
+        "/en/glossary",
+        "/course",
+        "/en/course",
+        "/sop",
+        "/en/sop",
+        "/catalog/index.html",
+        "/catalog/en/index.html",
+        "/GTM/",
+        "/GTM/index.html",
+        "/GTM/en/",
+        "/GTM/en/index.html",
+        "/docs/images/overview.png",
+        "/docs/images/console.png",
+    }
+)
+_gtm_assets = frozenset(
+    {
+        f"/GTM/fonts/{name}"
+        for name in (
+            "big-shoulders-display-latin-700-normal.woff2",
+            "big-shoulders-display-latin-800-normal.woff2",
+            "big-shoulders-display-latin-900-normal.woff2",
+            "public-sans-latin-400-normal.woff2",
+            "public-sans-latin-600-normal.woff2",
+            "public-sans-latin-700-normal.woff2",
+            "spline-sans-mono-latin-400-normal.woff2",
+            "spline-sans-mono-latin-600-normal.woff2",
+        )
+    }
+)
+#: Local reader routes for the repository's documents — the slug list lives in
+#: ``docs_reader.py``, and the read-only pages it renders carry no engagement
+#: data, so both locales are public alongside the other reading shells.
+doc_slugs = frozenset(
+    {
+        "readme",
+        "fde-research",
+        "fde_playbook",
+        "features",
+        "features-en",
+        "user-guide",
+        "api-reference",
+        "onboarding-customer",
+        "architecture",
+        "ontology",
+        "agentscope_api_mapping",
+        "manufacturing_scenario",
+        "llm_integration",
+        "qwenpaw_integration",
+        "skills",
+        "code_review_checklist",
+        "examples",
+        "course-en",
+        "license",
+        "notice",
+    }
+)
+PUBLIC_PATHS = (
+    public_html
+    | _gtm_assets
+    | {f"/docs/{slug}" for slug in doc_slugs}
+    | {f"/en/docs/{slug}" for slug in doc_slugs}
+)
 
 ENV_VAR = "FDE_SCOPE_API_TOKEN"
 

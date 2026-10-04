@@ -1,0 +1,45 @@
+# Meoo image deploy: source-upload filter (.gitignore-like matching).
+# docs/ is deliberately NOT excluded — fde_scope/web/deps.py mounts
+# docs/skills-catalog/site at /catalog and 404s if it is missing.
+
+.git
+.gitattributes
+.venv
+.venv-build*
+.pydeps
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.ipynb_checkpoints
+__pycache__
+*.py[cod]
+*.egg-info
+.coverage
+.coverage.*
+coverage.xml
+htmlcov
+.tox
+.nox
+.hypothesis
+dist
+build
+outputs
+reports
+corpus_store
+.fde_scope
+.probe
+.mimosa
+.v2c
+.video_agent
+.qoder
+.idea
+.vscode
+.DS_Store
+*.swp
+*.swo
+*~
+vibe_images
+appbuild/build
+appbuild/dist
+.env
+*.env

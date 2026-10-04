@@ -20,10 +20,6 @@ from __future__ import annotations
 
 from .phases import Zone
 
-#: GitHub fallback for environments where the catalog portal is not served
-#: locally (e.g. an installed wheel without the repo docs/ tree).
-_GITHUB_BASE = "https://github.com/ai-guru-global/fde-scope/blob/master/docs/skills-catalog"
-
 #: phase slug → catalog page routes (2-5 pages each, hand-curated).
 CATALOG_BY_PHASE: dict[str, tuple[str, ...]] = {
     "qualification": (
@@ -155,11 +151,11 @@ CATALOG_BY_ZONE: dict[Zone, tuple[str, ...]] = {
 }
 
 
-def pages_for_phase(slug: str, *, local: bool = False) -> list[dict]:
+def pages_for_phase(slug: str) -> list[dict]:
     """Catalog pages for one phase, with ready-to-open URLs.
 
-    ``local=True`` produces console-relative portal deep links
-    (``/catalog/index.html#/<route>``); otherwise GitHub blob URLs.
+    URLs are console-relative portal deep links (``/catalog/index.html#/<route>``);
+    the guided frontend opens them in-app, never off-site.
     """
     from .phases import phase_by_slug
 
@@ -169,11 +165,12 @@ def pages_for_phase(slug: str, *, local: bool = False) -> list[dict]:
     out = []
     for route in routes:
         title = route.rsplit("/", 1)[-1]
-        if local:
-            url = f"/catalog/index.html#/{route}"
-            url_en = f"/catalog/en/index.html#/{route}"
-        else:
-            url = f"{_GITHUB_BASE}/{route}.md"
-            url_en = url
-        out.append({"title": title, "route": route, "url": url, "url_en": url_en})
+        out.append(
+            {
+                "title": title,
+                "route": route,
+                "url": f"/catalog/index.html#/{route}",
+                "url_en": f"/catalog/en/index.html#/{route}",
+            }
+        )
     return out

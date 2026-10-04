@@ -6,7 +6,7 @@
 > 两类场景。构建在 AgentScope 2.0 之上。
 >
 > 本文档是完整功能清单。所有条目均为有测试覆盖的可执行代码;数量类承诺
-> (18 阶段 / 10 门禁 / 43 路由…)由
+> (18 阶段 / 10 门禁 / 56 路由…)由
 > [架构守卫测试](../tests/test_architecture_guard.py) 钉死。
 >
 > English version: [`docs/features-en.md`](features-en.md)
@@ -130,7 +130,7 @@ flowchart TD
 | 表面 | 形态 | 功能 |
 |---|---|---|
 | CLI | `fde-scope` | 13 组命令:connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web 控制台 | FastAPI 单页,43 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图 |
+| Web 控制台 | FastAPI 单页,56 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图、认证中心(三家平台考试细则+考点大纲+样题+渠道尽调清单,逐条标注来源等级)、名词解释(全部术语按主题分组,术语释义独立成页)、入门课程(Level 1 全部 25 篇课程文档按源文件渲染同页,文内引用改写为站内链接)、SOP 全文(源文件本地渲染,小节导航+表格)、技能手册库(生成门户站内挂载)、仓库文档(README 与 docs/ 20 篇本地渲染,GitHub 式锚点与图片全部站内化)、GTM 官网(成品站站内挂载,全部外链改写为站内路由或纯文本)——左栏不再有任何外跳 |
 | QwenPaw PawApp | 桌面插件 | `/api/fde-scope` 下 18 路由 + 2 个 agent 工具 + skill provider,与 Web 同一引擎 |
 | macOS App | universal2 DMG | 双击即用;同一 FastAPI 对象(127.0.0.1:8737),单实例守护 + 健康检查 + 崩溃兜底 |
 
@@ -285,6 +285,8 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 | Ontology 语义层 | 语料/技能/事件各说各话 | TBox+SKOS 统一概念,SHACL-lite 校验,JSON-LD 标准导出 |
 | 零门槛可验证 | "安装五小时,演示两分钟" | 无 key、无 Docker、无 AgentScope 也能跑通核心证据链 |
 | 凭据只在环境变量 | key 泄进 manifest/报告/日志 | 架构不变量 + 守卫测试强制 |
+| 认证中心 | 渠道准入与认证细则散在各厂商站点,口径不一、无法交叉核对 | 三家平台考试规格 + 考点大纲 + 样题 + 尽调清单同页呈现,每个数字标 official/noted/gap,查不到的就写查不到 |
+| 入门课程 | 课程 Markdown 散在仓库里,新人不知道从哪读、读的是不是最新 | `/course` 把 `course-level-1/` 的 25 篇文档按源文件原样渲染(章节锚点 + 文件内链改写 + 任务清单可读化),产物与仓库零复制、零漂移 |
 
 ## 17. 尚未完成(Roadmap)
 

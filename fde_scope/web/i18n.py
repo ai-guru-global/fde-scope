@@ -8,13 +8,118 @@ templates. This module provides:
   ``_DASHBOARD_HTML_EN``. Keys are UI literals (HTML/JS template lines), so a
   key only matches where that literal appears; API-returned domain data
   (phase names, gate blockers ...) stays Chinese on both locales.
-- ``GLOSSARY_EN``: English tips for the same term list as ``app._GLOSSARY``
-  (zh tips live there; terms/keys are shared so glossify matches identically).
+- ``GLOSSARY_ZH``: Chinese glossary tips, rendered by the standalone
+  ``/glossary`` page (``fde_scope.web.glossary``). ``GLOSSARY_EN`` carries the
+  English tips for the same terms.
 
 To keep the locales in sync: any new Chinese UI literal added to app.py needs
-a pair here, and any new ``_GLOSSARY`` entry needs a ``GLOSSARY_EN`` entry.
-``tests/test_web.py`` guards the /en routes.
+a pair here, and any new glossary term needs a tip in both ``GLOSSARY_ZH`` and
+``GLOSSARY_EN``. ``tests/test_web.py`` guards the /en routes.
 """
+
+#: Chinese glossary (term -> zh tip), the source of truth for /glossary.
+#: ``GLOSSARY_EN`` below carries the English tips for the same terms; the page
+#: renders one list per locale from these two, so a term cannot exist in only
+#: one language.
+GLOSSARY_ZH: list[tuple[str, str]] = [
+    (
+        "Gemba walk",
+        "源自日语「現場」：到价值创造的第一线（车间/工位）实地走查，"
+        "观察真实作业、与一线员工交谈，而不是隔着报表判断。精益/丰田生产方式的核心实践。",
+    ),
+    ("Gemba", "现场走查：工程师驻车间实地观察真实流程、设备与痛点（对应 site_survey 阶段）。"),
+    ("FDE", "Forward Deployed Engineer，前置部署工程师：带产品驻客户现场、快速交付解决方案的工程师角色。"),
+    ("Engagements", "Engagement 列表：本项目所有驻场项目的入口。"),
+    ("Engagement", "一次完整的驻场客户项目：从问题框定、构建、运营化到交接退场的全过程推进单位。"),
+    ("SOP", "Standard Operating Procedure，标准作业程序；这里指覆盖项目全生命周期的 18 阶段流程。"),
+    ("zones", "阶段分组（Zone）：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
+    ("Zone", "SOP 阶段分组：A 立项勘察 → B 构建 → C 运营化 → D 交接退场。"),
+    ("Gates", "Gate 列表：当前项目适用的所有门禁及其状态。"),
+    (
+        "Gate",
+        "谓词式门禁：每次推进阶段都重新评估的条件（如双 sponsor、FAT/SAT 签字），"
+        "不通过即拦截，过期结果不作数。",
+    ),
+    ("overlay", "叠加层：仅工业 profile 才额外生效的 gate 集合（工厂小图标标记）。"),
+    (
+        "FAT/SAT",
+        "FAT = Factory Acceptance Test 出厂验收测试；SAT = Site Acceptance Test 现场验收测试，均需客户签字。",
+    ),
+    ("sponsor", "项目拍板人/出资方干系人；本 SOP 要求业务与工业双 sponsor 共同确认成功标准。"),
+    ("works_council", "德国《企业组织法》BetrVG §87 工会共决：涉及员工监控/绩效的部署须工会同意。"),
+    ("air-gapped", "气隙部署：与外部网络物理隔离的封闭环境，安装与更新需走离线清单。"),
+    ("气隙", "air-gapped：与外部网络物理隔离的封闭网络环境。"),
+    ("OT/IT 隔离", "运营技术（OT）车间网与企业 IT 网隔离，是工业现场安全的常见要求。"),
+    ("班次", "轮班制度（如 3 班倒）；24/7 产线的部署需集成班次交接（shift_handover gate）。"),
+    ("工会", "员工代表机构；涉及员工监控/绩效的部署在德国需其共决（见 works_council gate）。"),
+    ("SLO", "Service Level Objective，服务等级目标：内部可度量的质量承诺，如「99% 工单 5 分钟内首次响应」。"),
+    ("SLA", "Service Level Agreement，服务等级协议：对外的合同性承诺，通常由多个 SLO 支撑。"),
+    ("on-call", "轮班值班响应机制：告警路由到当班人，保证 7×24 有人处置。"),
+    ("告警路由", "SLO 违约时告警送达的渠道/值班组（alert_route）。"),
+    ("runbook", "运维/应急手册：故障处置步骤、回滚方案与升级路径的文档。"),
+    ("移交包", "项目结束时交付客户的完整产物集合：runbook、模型、监控配置、已知局限等。"),
+    ("OEE", "Overall Equipment Effectiveness，设备综合效率 = 可用率 × 性能率 × 良品率；世界级水平 ≥ 0.85。"),
+    ("MTBF", "Mean Time Between Failures，平均无故障时间（小时），越高越可靠。"),
+    ("pick success", "机械臂抓取成功率；参照 DexNet 基准约 0.80。"),
+    ("DexNet", "UC Berkeley 的抓取规划神经网络及基准数据集，抓取成功率的常用参照。"),
+    ("KPI", "Key Performance Indicator，关键绩效指标；ticket 与 manufacturing 场景使用不同目录。"),
+    ("Profile", "场景档案：定义可用连接器、KPI 目录与适用 gate（ticket 客服 / manufacturing 制造业）。"),
+    ("ticket", "客服工单场景：CSV/Zammad/Salesforce/MySQL 数据接入，无工业 gate。"),
+    ("manufacturing", "制造业/具身机器人场景：OPC UA、MQTT、ROS2 等工业接入 + 6 个工业合规 gate。"),
+    ("Context", "项目上下文：现场、干系人、成功标准、SLO、功能安全与产物的结构化集合。"),
+    ("success_criteria", "成功标准：契约化、可度量的验收条件，由双 sponsor 签字确认。"),
+    ("干系人", "Stakeholder：与项目相关的角色（拍板人、使用者、运维、工会…）及其成功指标。"),
+    ("成功标准", "契约化、可度量的验收条件（success_criteria），双 sponsor 确认。"),
+    ("功能安全", "Functional Safety：机械/控制系统在故障时仍保持安全的标准体系（PL/SIL 等级）。"),
+    ("ISO 13849", "机械安全功能安全标准，定义性能等级 PL / PLr。"),
+    ("IEC 61508", "电气/电子/可编程电子安全系统的功能安全标准，定义 SIL 等级。"),
+    ("ISO 10218", "工业机器人安全标准：协作与常规机器人的风险评估要求。"),
+    ("CE", "欧盟合规标志：产品符合相关欧盟指令方可进入欧洲市场。"),
+    ("EU AI Act", "欧盟人工智能法案：按风险分级监管 AI，高风险用途需合规评估与文档。"),
+    ("PLr", "Required Performance Level，要求性能等级（ISO 13849）；PL 为实际达到的等级。"),
+    ("SIL", "Safety Integrity Level，安全完整性等级（IEC 61508）。"),
+    ("Corpus", "语料：训练/评估模型的样本集合；锻造（forge）即清洗、脱敏、补盲、合成的流水线。"),
+    ("语料锻造", "CSV 等原始数据 → 脱敏 → 去重 → 质量门 → 覆盖度分析 → 针对性合成 → 报告的流水线。"),
+    ("Flywheel", "飞轮：现场事件回流为语料、周度增量重训，让系统越用越准的闭环。"),
+    ("飞轮", "数据回流 → 语料增量 → 再训练的闭环：项目用得越久，模型越贴合该客户。"),
+    ("ISA-95", "企业系统与车间系统集成的国际标准，MES 数据模型的依据。"),
+    ("MES", "Manufacturing Execution System，制造执行系统：工单、质量、停机等车间数据源。"),
+    ("OPC UA", "工业自动化统一通信协议，可直接读取 PLC tag 数据。"),
+    ("OPC", "腾讯云 OPC 从业者认证（Other Professional Certification）：面向渠道伙伴的产品能力考试。"),
+    ("PLC", "Programmable Logic Controller，可编程逻辑控制器：产线设备的控制单元。"),
+    ("MQTT-Sparkplug", "MQTT：轻量发布/订阅协议；Sparkplug B：规范其工业载荷语义。"),
+    ("ROS2 Bag", "Robot Operating System 2 的录制回放格式，常用于机器人轨迹/传感数据。"),
+    ("Historian", "时序历史数据库：存储生产过程历史数据（温度、节拍、报警等）。"),
+    ("Zammad", "开源客服工单系统。"),
+    ("Salesforce", "CRM 平台；此处为客户/工单相关数据源。"),
+    ("ACA", "Alibaba Cloud Associate：阿里云大模型助理工程师认证（入门级，aca13）。"),
+    ("ACP", "Alibaba Cloud Professional：阿里云大模型专业工程师认证（进阶，acp26）。"),
+    ("RAG", "Retrieval-Augmented Generation，检索增强生成：先检索知识库再生成回答。"),
+    ("stub", "占位实现：接口与数据模型就绪，但尚未接通真实系统。"),
+    ("PII", "Personally Identifiable Information，个人身份信息（姓名/邮箱/电话）；锻造时自动脱敏。"),
+    ("min_samples", "每个类别最少真实样本数，低于即判定为缺口并触发合成。"),
+    ("synth_per_gap", "每个缺口类别补充合成的样本数量。"),
+    ("JSONL", "每行一个 JSON 对象的文本格式，样本与评估数据常用。"),
+    ("drift", "漂移：数据分布或质量随时间偏移，可能让模型失效；需持续检测并触发再训练。"),
+    ("漂移", "数据分布/质量随时间偏移，模型效果随之衰减；监控项之一。"),
+    ("bad case", "失败/低质样本挖掘：从评估结果中找出表现差的样本，归类归因。"),
+    ("force", "强制推进：豁免拦截，但 gate 照常评估并留痕，例外进入审计日志。"),
+    ("qualification", "问题框定：确认问题真实、客户有预算与意愿的阶段。"),
+    ("stakeholder_map", "干系人地图：识别拍板人、使用者、反对者等角色及其诉求。"),
+    ("prototype", "真实数据原型：用客户真实数据（非演示数据）搭建可验证原型。"),
+    ("AgentState", "AgentScope 的智能体状态对象；权限上下文经其注入运行时。"),
+    ("Toolkit", "AgentScope 的工具集合对象：把连接器/函数绑定为智能体可调用的工具。"),
+    ("SubAgentTemplate", "AgentScope 的子智能体蓝图：预置角色、工具与提示词的模板。"),
+    (
+        "技能库",
+        "沉淀的可复用方法论/经验文档，分 research / implementation / optimization / methodology 四类。",
+    ),
+    ("工作台", "跨项目总览：全局统计、项目矩阵与最近沉淀。"),
+    ("现场记录", "Journal：research / implementation / optimization 三类现场笔记，可一键沉淀为技能草稿。"),
+    ("沉淀", "把现场经验固化成可复用技能/文档，供后续项目检索复用。"),
+    ("门禁", "当前阶段适用的 gate 校验结果（通过/拦截）。"),
+]
+
 
 GLOSSARY_EN: list[tuple[str, str]] = [
     (
@@ -214,6 +319,11 @@ GLOSSARY_EN: list[tuple[str, str]] = [
         "OPC UA",
         "Unified industrial-automation communication protocol; reads PLC tag data directly.",
     ),
+    (
+        "OPC",
+        "Tencent Cloud OPC (Other Professional Certification): the product-competency "
+        "exam for channel partners.",
+    ),
     ("PLC", "Programmable Logic Controller: the control unit of production equipment."),
     (
         "MQTT-Sparkplug",
@@ -226,6 +336,12 @@ GLOSSARY_EN: list[tuple[str, str]] = [
     ("Historian", "Time-series historian: stores process history (temperature, takt, alarms…)."),
     ("Zammad", "Open-source helpdesk/ticketing system."),
     ("Salesforce", "CRM platform; here a customer/ticket data source."),
+    ("ACA", "Alibaba Cloud Associate: the entry-level LLM engineer certification (aca13)."),
+    ("ACP", "Alibaba Cloud Professional: the advanced LLM engineer certification (acp26)."),
+    (
+        "RAG",
+        "Retrieval-Augmented Generation: retrieve from a knowledge base first, then generate the answer.",
+    ),
     ("stub", "Stub: interface and data model ready, the real system not yet wired."),
     (
         "PII",
@@ -306,18 +422,37 @@ I18N_PAIRS: list[tuple[str, str]] = [
         '<a class="lang" href="/console" title="中文版" aria-label="切换到中文">中文</a>',
     ),
     # -- shared nav fragments ------------------------------------------------
-    (">GTM 官网 ↗</a>", ">GTM site ↗</a>"),
-    (">技能手册库 ↗</a>", ">Skills handbook ↗</a>"),
+    # Local reading pages — the rail keeps the reader in the app.
+    ('<a href="/sop">SOP 全文</a>', '<a href="/en/sop">SOP full text</a>'),
+    (
+        '<a href="/catalog/index.html">技能手册库</a>',
+        '<a href="/catalog/en/index.html">Skills handbook</a>',
+    ),
+    ('<a href="/docs/readme">仓库文档</a>', '<a href="/en/docs/readme">Repo docs</a>'),
+    ('<a href="/GTM/index.html">GTM 官网</a>', '<a href="/GTM/en/index.html">GTM site</a>'),
     ("切换深浅主题", "Toggle light/dark theme"),
-    # -- overview: topbar + hero --------------------------------------------
+    # -- sidebar tiers (identical markup on the overview and the console) ----
+    ('<div class="grp">FDE 学习者</div>', '<div class="grp">FDE learners</div>'),
+    ('<div class="grp">FDE 工程师</div>', '<div class="grp">FDE engineers</div>'),
+    ('<div class="grp">FDE 工作台</div>', '<div class="grp">FDE workbench</div>'),
+    # -- overview: sidebar nav ----------------------------------------------
     ('<a href="/" class="active">功能总览</a>', '<a href="/en/" class="active">Overview</a>'),
-    ('<a href="/console">Engagement 控制台 →</a>', '<a href="/en/console">Engagement console →</a>'),
+    ('<a href="/console">Engagement 控制台</a>', '<a href="/en/console">Engagement console</a>'),
+    ('<a href="/course">入门课程</a>', '<a href="/en/course">Intro course</a>'),
+    ('<a href="/certification">认证中心</a>', '<a href="/en/certification">Certification</a>'),
+    ('<a href="/glossary">名词解释</a>', '<a href="/en/glossary">Glossary</a>'),
+    ('<div class="grp">外部</div>', '<div class="grp">External</div>'),
+    ('<a href="#sop">完整 SOP</a>', '<a href="#sop">Full SOP</a>'),
+    ('<a href="#gates">合规 Gate</a>', '<a href="#gates">Compliance gates</a>'),
+    ('<a href="#connectors">数据连接器</a>', '<a href="#connectors">Data connectors</a>'),
+    ('<a href="#ontology">Ontology 语义层</a>', '<a href="#ontology">Ontology layer</a>'),
+    ('<a href="#modules">功能模块</a>', '<a href="#modules">Modules</a>'),
     ('<a href="#arch">架构清单</a>', '<a href="#arch">Architecture</a>'),
     ('<a href="#practices">最佳实践</a>', '<a href="#practices">Best practices</a>'),
-    (
-        '<a href="/docs/fde_sop_full.md" target="_blank">SOP 文档</a>',
-        '<a href="/docs/fde_sop_full.md" target="_blank">SOP document</a>',
-    ),
+    ('<a href="#kpi">制造业 KPI</a>', '<a href="#kpi">Manufacturing KPIs</a>'),
+    ('<a href="#quickstart">快速上手</a>', '<a href="#quickstart">Quick start</a>'),
+    ('<a href="#scenarios">两种场景</a>', '<a href="#scenarios">Two scenarios</a>'),
+    # -- overview: hero ------------------------------------------------------
     ("<h2>FDE 的完整现场工作台</h2>", "<h2>The complete field workbench for FDEs</h2>"),
     (
         "从第一次 Gemba walk 到签字移交——覆盖软件/SaaS 与具身机器人/制造业两类场景。",
@@ -563,7 +698,7 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "docs/architecture-model/architecture-map.md",
     ),
     # -- overview: KPI ----------------------------------------------------------
-    ("<h2>制造业 KPI（实测 BMW 数据）</h2>", "<h2>Manufacturing KPIs (measured on BMW data)</h2>"),
+    ("<h2>制造业 KPI（虚构演示数据）</h2>", "<h2>Manufacturing KPIs (fictional demo data)</h2>"),
     ("<span>设备综合效率</span>", "<span>Overall Equipment Effectiveness</span>"),
     ('<div class="desc">世界级 ≥0.85</div>', '<div class="desc">World-class ≥0.85</div>'),
     ('<div class="name">抓取成功率</div>', '<div class="name">Pick success</div>'),
@@ -618,49 +753,76 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "<span>Test suite green in CI (including 6 architecture-guard contracts) · runs with zero config</span>",
     ),
     # -- dashboard: header + sidebar ----------------------------------------------
+    # the console's site menu lives in its sidebar too, but its own home link
+    # carries no class="active" (the console link does), so it needs its own pair
+    ('<a href="/">功能总览</a>', '<a href="/en/">Overview</a>'),
     (
-        "72h from raw data to a deployed agent · 全 SOP 工作台",
-        "72h from raw data to a deployed agent · full-SOP workbench",
+        '<a href="/console" class="active">Engagement 控制台</a>',
+        '<a href="/en/console" class="active">Engagement console</a>',
     ),
-    ('<a class="back" href="/">&#8592; 功能总览</a>', '<a class="back" href="/en/">&#8592; Overview</a>'),
-    ('<use href="#i-gauge"/></svg>工作台</button>', '<use href="#i-gauge"/></svg>Workbench</button>'),
-    ('<use href="#i-library"/></svg>技能库</button>', '<use href="#i-library"/></svg>Skills</button>'),
-    ('<use href="#i-bot"/></svg>Agent 部署</button>', '<use href="#i-bot"/></svg>Agent deploy</button>'),
-    ('<use href="#i-globe"/></svg>本体库</button>', '<use href="#i-globe"/></svg>Ontology</button>'),
+    # keyed on the go('…') call: a bare 技能库</button> key would also match
+    # the ">去技能库</button>" pair further down and corrupt it first
+    ("go('workbench')\">工作台</button>", "go('workbench')\">Workbench</button>"),
+    ("go('skills')\">技能库</button>", "go('skills')\">Skills</button>"),
+    ("go('deploy')\">Agent 部署</button>", "go('deploy')\">Agent deploy</button>"),
+    ("go('ontology')\">本体库</button>", "go('ontology')\">Ontology</button>"),
     # -- dashboard: new engagement form -------------------------------------------
-    ("<h2>新建 Engagement</h2>", "<h2>New engagement</h2>"),
     ("<label>客户</label>", "<label>Customer</label>"),
     (
         '<option value="ticket">ticket / 客服</option><option value="manufacturing">manufacturing / 制造业</option>',
         '<option value="ticket">ticket / support</option><option value="manufacturing">manufacturing / industrial</option>',
     ),
     (">+ 创建</button>", ">+ Create</button>"),
-    # -- dashboard: tools card -----------------------------------------------------
-    ("<h2>工具</h2>", "<h2>Tools</h2>"),
-    (">报告归档</a>", ">Report archive</a>"),
-    (">查看 Profiles &amp; Phases</button>", ">View Profiles &amp; Phases</button>"),
+    ("+ 新建 Engagement", "+ New engagement"),
+    # -- dashboard: workbench header ------------------------------------------------
+    ("<h1>工作台</h1>", "<h1>Workbench</h1>"),
+    (
+        '<p class="wbh-sub">跨项目总览 · 阶段推进、门禁状态与最近沉淀</p>',
+        '<p class="wbh-sub">Cross-project overview · phase progress, gates and recent captures</p>',
+    ),
+    ("报告归档</a>", "Report archive</a>"),
+    ("查看 Profiles &amp; Phases</button>", "View Profiles &amp; Phases</button>"),
+    # -- dashboard: getting-started checklist ----------------------------------------
+    ("<h2>三步跑通第一条 SOP</h2>", "<h2>Three steps to your first SOP run</h2>"),
+    ("创建第一个 Engagement", "Create your first engagement"),
+    (
+        "在左侧填写客户名，选择 profile（ticket 客服 / manufacturing 制造业）。",
+        "Fill in the customer name and pick a profile (ticket/support or manufacturing).",
+    ),
+    (">开始填写</button>", ">Start here</button>"),
+    ("推进 SOP 阶段，让门禁说话", "Advance SOP phases and let the gates decide"),
+    (
+        "18 个阶段、10 道门禁：每次推进都会重新校验当前阶段的 gate，通过才放行，force 推进也会留档。",
+        "18 phases, 10 gates: every advance re-runs the current phase's gates — only a pass lets you "
+        "through, and forced advances are recorded too.",
+    ),
+    ("沉淀第一条可复用技能", "Capture your first reusable skill"),
+    (
+        "把现场经验写成技能草稿，评审通过后发布，进入技能库供下一个项目复用。",
+        "Turn field experience into a skill draft; once reviewed and published it joins the skills "
+        "library for the next project.",
+    ),
+    (">去技能库</button>", ">Go to skills</button>"),
     # -- dashboard: JS workbench ----------------------------------------------------
-    (">选择或创建一个 engagement 开始</div>", ">Select or create an engagement to begin</div>"),
+    (
+        "选择左侧的 engagement，查看阶段、门禁与 KPI",
+        "Select an engagement on the left to inspect phases, gates and KPIs",
+    ),
     ("function yn(ok){return dot(ok)+(ok?'是':'否')}", "function yn(ok){return dot(ok)+(ok?'Yes':'No')}"),
     ("// -- 工作台", "// -- Workbench"),
     ('<div class="k">进行中项目</div>', '<div class="k">Active projects</div>'),
     ('<div class="k">技能总数</div>', '<div class="k">Total skills</div>'),
     ('<div class="k">待审草稿</div>', '<div class="k">Drafts to review</div>'),
-    ('<div class="k">阶段分布</div>', '<div class="k">Phase mix</div>'),
-    ("<h2>跨项目矩阵</h2>", "<h2>Cross-project matrix</h2>"),
+    (">阶段分布</span>", ">Phase mix</span>"),
     (
         '<h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go(\'skills\')">去沉淀 →</button></h2>',
         '<h2>Recent skills <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go(\'skills\')">Add skill →</button></h2>',
     ),
     (
-        "'<div class=\"empty\">暂无项目 — 左侧创建第一个 engagement</div>'",
-        "'<div class=\"empty\">No projects yet — create your first engagement on the left</div>'",
+        "还没有 engagement —— 用上面的表单创建第一条。",
+        "No engagements yet — create your first one with the form above.",
     ),
-    ("' 完成</td>'", "' done</td>'"),
-    (
-        "<tr><th>客户</th><th>Profile</th><th>阶段</th><th>门禁</th><th>最近更新</th></tr>",
-        "<tr><th>Customer</th><th>Profile</th><th>Phase</th><th>Gates</th><th>Updated</th></tr>",
-    ),
+    ("dot(true)+' 完成'", "dot(true)+' done'"),
     (
         "'<div class=\"empty\">还没有沉淀 — 把现场经验变成可复用技能</div>'",
         "'<div class=\"empty\">Nothing yet — turn field experience into reusable skills</div>'",
@@ -691,6 +853,10 @@ I18N_PAIRS: list[tuple[str, str]] = [
     (">编辑</button>", ">Edit</button>"),
     (">归档</button>", ">Archive</button>"),
     ("' · 来自 '", "' · from '"),
+    ("'适用: '", "'Applies to: '"),
+    ("'导出: '", "'Exports: '"),
+    ("` · 来源 ${", "` · source: ${"),
+    (" · 创建于 ", " · created "),
     (
         "'<div class=\"empty\">无待审草稿 — 自动捕获与 gate 提示会出现在这里</div>'",
         "'<div class=\"empty\">No drafts to review — auto-captures and gate prompts will appear here</div>'",
@@ -710,6 +876,13 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("<label>内容</label>", "<label>Note</label>"),
     ('placeholder="记录本次现场发现…"', 'placeholder="note what you found on site…"'),
     (">+ 记录</button>", ">+ Add entry</button>"),
+    ('<div class="k">总条数</div>', '<div class="k">Entries</div>'),
+    ('<div class="k">调研</div>', '<div class="k">Research</div>'),
+    ('<div class="k">实施</div>', '<div class="k">Implementation</div>'),
+    ('<div class="k">调优</div>', '<div class="k">Optimization</div>'),
+    ('<div class="k">已沉淀技能</div>', '<div class="k">Captured skills</div>'),
+    (">现场记录</button>", ">Field journal</button>"),
+    ('<div class="k">现场记录</div>', '<div class="k">Journal</div>'),
     ("toast('请填写记录内容','warn')", "toast('Please enter the note text','warn')"),
     (
         "toast(`已沉淀为技能草稿: ${r.id} (${r.category})`,'ok')",
@@ -821,9 +994,22 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "'<div class=\"empty\">无适用 gate（当前 profile）</div>'",
         "'<div class=\"empty\">No applicable gates (current profile)</div>'",
     ),
-    (">概览</div>", ">Overview</div>"),
-    (">SOP 阶段</div>", ">SOP phases</div>"),
-    (">现场记录</div>", ">Journal</div>"),
+    ("<h2>Gate 台账（历次校验记录）</h2>", "<h2>Gate ledger (every check)</h2>"),
+    (
+        "<thead><tr><th>Gate</th><th>结果</th><th>阻塞项</th><th>警告</th><th>备注</th><th>校验时间</th></tr></thead>",
+        "<thead><tr><th>Gate</th><th>Result</th><th>Blockers</th><th>Warnings</th><th>Notes</th>"
+        "<th>Checked at</th></tr></thead>",
+    ),
+    ("<h2>数据面板</h2>", "<h2>Data panel</h2>"),
+    ('<div class="k">干系人</div>', '<div class="k">Stakeholders</div>'),
+    ('<div class="k">成功标准</div>', '<div class="k">Success criteria</div>'),
+    ('<div class="k">Gates 通过</div>', '<div class="k">Gates passed</div>'),
+    (
+        "<tr><th>资产</th><th>类型</th><th>厂商</th><th>协议</th><th>关键度</th></tr>",
+        "<tr><th>Asset</th><th>Type</th><th>Vendor</th><th>Protocol</th><th>Criticality</th></tr>",
+    ),
+    (">概览</button>", ">Overview</button>"),
+    (">SOP 阶段</button>", ">SOP phases</button>"),
     ("<label>当前阶段</label>", "<label>Current phase</label>"),
     ("<label>下一阶段</label>", "<label>Next phase</label>"),
     ("'— (完成)'", "'— (done)'"),
@@ -862,8 +1048,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("// 成功标准", "// Success criteria"),
     ("'<li class=\"meta\">未定义</li>'", "'<li class=\"meta\">undefined</li>'"),
     (
-        '\'<tr><td colspan="4" class="meta">未定义 SLO</td></tr>\'',
-        '\'<tr><td colspan="4" class="meta">No SLOs defined</td></tr>\'',
+        '\'<tr><td colspan="5" class="meta">未定义 SLO</td></tr>\'',
+        '\'<tr><td colspan="5" class="meta">No SLOs defined</td></tr>\'',
     ),
     ("// 功能安全", "// Functional safety"),
     ("<tr><td>ISO 10218 评估</td>", "<tr><td>ISO 10218 assessed</td>"),
@@ -888,19 +1074,27 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ("<h2>成功标准</h2>", "<h2>Success criteria</h2>"),
     (
-        "<tr><th>名称</th><th>目标</th><th>告警路由</th><th>窗口</th></tr>",
-        "<tr><th>Name</th><th>Target</th><th>Alert route</th><th>Window</th></tr>",
+        "<tr><th>名称</th><th>目标</th><th>错误预算</th><th>告警路由</th><th>窗口</th></tr>",
+        "<tr><th>Name</th><th>Target</th><th>Error budget</th><th>Alert route</th><th>Window</th></tr>",
     ),
     ("<h2>功能安全</h2>", "<h2>Functional safety</h2>"),
     ("<h2>产物与交付</h2>", "<h2>Assets &amp; delivery</h2>"),
     ("<label>语料</label>", "<label>Corpus</label>"),
     ("<tr><th>评估指标</th><th>值</th></tr>", "<tr><th>Eval metric</th><th>Value</th></tr>"),
     ("<label>已知局限</label>", "<label>Known limitations</label>"),
-    ("<label>监控</label>漂移 ", "<label>Monitoring</label>drift "),
-    ("' 每日'", "' daily'"),
-    (" · 质量 ", " · quality "),
-    ("' 每周'", "' weekly'"),
+    ("<label>数据漂移</label>", "<label>Data drift</label>"),
+    ("<label>质量漂移</label>", "<label>Quality drift</label>"),
+    ("' 启用 · 节奏 '", "' enabled · cadence '"),
+    (" · 阈值 ", " · threshold "),
+    ("||'每日'", "||'daily'"),
+    ("||'每周'", "||'weekly'"),
     ("' 未启用'", "' off'"),
+    (
+        "<label>反馈时延</label>目标 ${esc(mon.feedback_latency.target_hours)}h 内闭环</div>",
+        "<label>Feedback latency</label>within ${esc(mon.feedback_latency.target_hours)}h</div>",
+    ),
+    ("<label>看板</label>", "<label>Dashboards</label>"),
+    ("||'看板'", "||'Dashboard'"),
     # -- dashboard: advance + forge output ----------------------------------------------------
     ("toast('推进被拦截：'", "toast('Advance blocked: '"),
     (".join('；')", ".join('; ')"),
@@ -999,6 +1193,13 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("'AI 生成'", "'AI-generated'"),
     ("'规则生成'", "'Rule-based'"),
     ("覆盖现有任务清单？勾选状态会丢失。", "Replace the existing task plan? Checkbox state will be lost."),
+    ("toast('请先输入项目目标','warn')", "toast('Enter a project goal first','warn')"),
+    ("'任务清单已生成（AI）'", "'Task plan generated (AI)'"),
+    ("'任务清单已生成（规则版）'", "'Task plan generated (rule-based)'"),
+    ("toast('已重新生成','ok')", "toast('Regenerated','ok')"),
+    ("toast('任务状态已保存','ok')", "toast('Task state saved','ok')"),
+    ("toast('任务状态保存失败','bad')", "toast('Failed to save task state','bad')"),
+    ("toast('生成失败：'", "toast('Generation failed: '"),
     ("<h2>AI 起草 Context</h2>", "<h2>Draft context with AI</h2>"),
     (
         "用自然语言描述业务，AI 起草 现场/干系人/成功标准/SLO 草稿。写入前逐项确认，门禁通过才算数。",
@@ -1016,9 +1217,41 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("'✨ AI 起草'", "'✨ Draft with AI'"),
     ("'✍️ 手动填写指引'", "'✍️ Manual field guide'"),
     (
-        "'<div class=\"meta\">由 MiMo 起草，待你确认。勾选要采纳的块后写入；写入后门禁会实时重评。</div>'",
-        "'<div class=\"meta\">Drafted by MiMo, pending your review. Tick the blocks to adopt and apply; gates re-evaluate live afterwards.</div>'",
+        "'<div class=\"hint\">由 MiMo 起草，待你确认。勾选要采纳的块后写入；写入后门禁会实时重评。</div>'",
+        '\'<div class="hint">Drafted by MiMo, pending your review. Tick the blocks to adopt and apply; '
+        "gates re-evaluate live afterwards.</div>'",
     ),
+    ("toast('请先描述你的业务','warn')", "toast('Describe your business first','warn')"),
+    (
+        "'<div class=\"hint\">起草中（最长约 1 分钟）…</div>'",
+        "'<div class=\"hint\">Drafting (up to ~1 minute)…</div>'",
+    ),
+    ("'AI 输出无法解析，已切换手动模式'", "'AI output unparsable — switched to manual mode'"),
+    ("'AI 不可用，已切换手动模式'", "'AI unavailable — switched to manual mode'"),
+    (
+        "'按下面的字段说明手动录入，每块单独保存（同样要过门禁才算数）。'",
+        "'Fill in each field below — every block saves separately (and still has to pass the gates).'",
+    ),
+    (
+        "`地点 ${v.location} · 班次 ${v.shift_count||1} · 气隙 ${v.air_gapped?'是':'否'}`",
+        "`Location ${v.location} · shifts ${v.shift_count||1} · air-gapped ${v.air_gapped?'yes':'no'}`",
+    ),
+    ("'未填写'", "'Not filled'"),
+    ("+' 条：'+", "+' entries: '+"),
+    (".join('，')", ".join(', ')"),
+    (": '空';", ": 'empty';"),
+    (
+        "{site:'现场 / Site', stakeholders:'干系人', success_criteria:'成功标准', slos:'SLO'}",
+        "{site:'Site', stakeholders:'Stakeholders', success_criteria:'Success criteria', slos:'SLO'}",
+    ),
+    ("`${block} 的 JSON 不合法：`", "`${block} has invalid JSON: `"),
+    ("toast('没有勾选任何块','warn')", "toast('No blocks selected','warn')"),
+    (" 格式：${esc(b.line_format", " Format: ${esc(b.line_format"),
+    ("`（例：${esc(b.example)}）`", "` (e.g. ${esc(b.example)})`"),
+    ("toast('格式错误：'", "toast('Format error: '"),
+    ("toast('没有可写入的内容','warn')", "toast('Nothing to apply','warn')"),
+    ("toast('已保存，门禁已重评','ok')", "toast('Saved — gates re-evaluated','ok')"),
+    ("toast('保存失败：'", "toast('Save failed: '"),
     ('<span class="k">当前值</span>', '<span class="k">Current</span>'),
     ('<span class="k">起草值</span>', '<span class="k">Drafted</span>'),
     (">JSON 微调</summary>", ">Tweak JSON</summary>"),
@@ -1026,11 +1259,6 @@ I18N_PAIRS: list[tuple[str, str]] = [
     (">手动填写表单</button>", ">Manual entry form</button>"),
     (">保存${esc(b.label)}</button>", ">Save ${esc(b.label)}</button>"),
     ("'也可完全手动录入：'", "'Or enter everything manually:'"),
-    ("还没有 engagement", "No engagements yet"),
-    (
-        "在左侧「新建 Engagement」填写客户名与 profile，开始你的第一条 SOP。",
-        'Create your first SOP run from "New Engagement" in the sidebar (customer + profile).',
-    ),
     ("起草请求失败", "Draft request failed"),
     (" —— 可重试，或改用手动填写。", " — retry, or switch to manual entry."),
     ("<label>目标</label>", "<label>Goal</label>"),
