@@ -159,3 +159,23 @@ jobs:
       # parity and relative links in docs/skills-catalog/.
       - name: Check docs/skills-catalog
         run: python scripts/check_skills_catalog.py
+
+  macos-smoke:
+    # Q6: PR-level packaging smoke for the macOS app — no signing, no DMG
+    # release; just prove the bundle still builds on a real mac.
+    name: macOS app build smoke
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the app bundle (ad-hoc signed, no DMG)
+        run: ./appbuild/build_release.sh --arch arm64 --no-dmg
+
+      - name: Smoke — the bundle exists and its CLI runs
+        run: |
+          ls -la "appbuild/dist/FDE Scope.app/Contents/MacOS/"
+          "appbuild/dist/FDE Scope.app/Contents/MacOS/FDE Scope" --help

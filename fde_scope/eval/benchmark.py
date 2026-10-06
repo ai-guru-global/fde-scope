@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from fde_scope.corpus.types import CorpusReport
-    from fde_scope.llm import MiMoClient
+    from fde_scope.llm import _ChatCompletionsClient
 
 from .bad_case_miner import BadCaseMiner, BadCaseReport
 from .metrics import (
@@ -149,14 +149,16 @@ class MockReplyFn:
 class MiMoReplyFn:
     """A real LLM-backed reply function for :class:`FDEBenchmark`.
 
-    Wraps a :class:`~fde_scope.llm.MiMoClient` behind the same ``str -> str``
-    ``ReplyFn`` protocol as :class:`MockReplyFn`, so ``FDEBenchmark.run``
-    needs no changes. The system prompt casts the model as the deployed
-    tenant support agent. Raises :class:`~fde_scope.llm.LLMError` when the
-    endpoint fails — the benchmark caller decides how to surface it.
+    Wraps any OpenAI-style chat client (:class:`~fde_scope.llm.MiMoClient` or
+    ``OpenAICompatClient`` — the names are historical; only the shared
+    ``complete`` surface is used) behind the same ``str -> str`` ``ReplyFn``
+    protocol as :class:`MockReplyFn`, so ``FDEBenchmark.run`` needs no changes.
+    The system prompt casts the model as the deployed tenant support agent.
+    Raises :class:`~fde_scope.llm.LLMError` when the endpoint fails — the
+    benchmark caller decides how to surface it.
     """
 
-    def __init__(self, llm: MiMoClient, tenant: str = "client") -> None:
+    def __init__(self, llm: _ChatCompletionsClient, tenant: str = "client") -> None:
         self.llm = llm
         self.tenant = tenant
 

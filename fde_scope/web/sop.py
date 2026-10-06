@@ -23,6 +23,10 @@ HTML is escaped. Two deliberate corrections happen after rendering — ``<br>``
 and headings are demoted one level so the outline runs section (h3) → subsection
 (h4). The document's own ``# `` title moves into the page hero, and each ``##``
 section is given an ``id`` (``s01``…) so the rail can anchor into the page.
+
+The rail's section list comes from the markdown token stream (never scraped
+back out of rendered HTML), and the English rail carries paired literals for
+the seven section titles — the document itself stays Chinese on both locales.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ import re
 from pathlib import Path
 
 from markdown_it import MarkdownIt
+from markdown_it.renderer import RendererHTML
 
 from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
 
@@ -41,30 +46,45 @@ _H1 = re.compile(r"^#\s+(.*?)\s*$", re.M)
 #: The capture group is load-bearing: ``re.split`` drops the separators
 #: otherwise, which would silently delete every fenced block.
 _PRE = re.compile(r"(<pre\b.*?</pre>)", re.S)
-#: Section anchors as the rail reads them: the demoted ``##`` headings.
-_H3 = re.compile(r'<h3 id="(s\d{2})">(.*?)</h3>')
 
-_MD = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
-
-
-def _heading_open(tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
-    """Anchor every ``##`` section and demote every heading one level."""
-    token = tokens[idx]
-    if token.tag == "h2":
-        env["h2"] = env.get("h2", 0) + 1
-        token.attrSet("id", f"s{env['h2']:02d}")
-    token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
-    return _MD.renderer.renderToken(tokens, idx, options, env)
-
-
-def _heading_close(tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
-    token = tokens[idx]
-    token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
-    return _MD.renderer.renderToken(tokens, idx, options, env)
+#: English rail labels for the document's ``##`` sections, keyed by the zh
+#: heading as authored. A section the table does not know falls back to its
+#: zh title instead of lying with a wrong translation.
+_RAIL_EN: dict[str, str] = {
+    "为什么不是 5 步": "Why not 5 steps",
+    "4 Zones": "4 Zones",
+    "18 阶段详解": "The 18 phases in detail",
+    "工业 Overlay（manufacturing/robotics profile 启用）": "Industrial overlay (manufacturing/robotics profile)",
+    "12 大反模式（gate 直接守卫）": "The 12 anti-patterns (guarded by gates)",
+    "工程化映射": "Engineering mapping",
+    "来源（真实依据）": "Sources (real provenance)",
+}
 
 
-_MD.renderer.rules["heading_open"] = _heading_open
-_MD.renderer.rules["heading_close"] = _heading_close
+class _SopRenderer(RendererHTML):
+    """Anchor every ``##`` section and demote every heading one level.
+
+    A subclass, not ``renderer.rules[...] = fn``: ``RendererHTML`` builds
+    ``rules`` from the instance's own bound methods, so overriding is the path
+    the library documents — and it keeps the map's ``MethodType`` values.
+    """
+
+    def heading_open(self, tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
+        token = tokens[idx]
+        if token.tag == "h2":
+            env["h2"] = env.get("h2", 0) + 1
+            token.attrSet("id", f"s{env['h2']:02d}")
+        return self._demoted(tokens, idx, options, env)
+
+    def heading_close(self, tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
+        return self._demoted(tokens, idx, options, env)
+
+    def _demoted(self, tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
+        tokens[idx].tag = f"h{min(int(tokens[idx].tag[1:]) + 1, 6)}"
+        return self.renderToken(tokens, idx, options, env)
+
+
+_MD = MarkdownIt("commonmark", {"html": False}, renderer_cls=_SopRenderer).enable(["table", "strikethrough"])
 
 
 def _default_root() -> Path:
@@ -74,6 +94,24 @@ def _default_root() -> Path:
 def _rail_label(heading: str) -> str:
     """The rail's short form of a section heading (see the module docstring)."""
     return heading.split("（", 1)[0].strip() or heading
+
+
+def _sections_from_tokens(md_text: str) -> list[tuple[str, str]]:
+    """The ``##`` outline as ``(anchor, title)``, read from the markdown token
+    stream — the ids match exactly what the renderer assigns (``s01``…), and
+    nothing is scraped back out of rendered HTML."""
+    sections: list[tuple[str, str]] = []
+    pending = False
+    counter = 0
+    for tok in _MD.parse(_H1.sub("", md_text, count=1), {"h2": 0}):
+        if tok.type == "heading_open" and tok.tag == "h2":
+            counter += 1
+            pending = True
+            continue
+        if pending and tok.type == "inline":
+            sections.append((f"s{counter:02d}", tok.content.strip()))
+            pending = False
+    return sections
 
 
 def _render_body(md_text: str) -> str:
@@ -164,7 +202,7 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
         sections: list[tuple[str, str]] = []
     else:
         body = _render_body(text)
-        sections = _H3.findall(body)
+        sections = _sections_from_tokens(text) if text is not None else []
 
     lang = "en" if en else "zh"
     other = "/sop" if en else "/en/sop"
@@ -186,7 +224,7 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 <style>{_STYLE}</style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">__ICON_SPRITE__</svg>
+__ICON_SPRITE__
 <div class="shell">
 <aside class="side">
 <div class="brand">
@@ -205,7 +243,8 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
     if sections:
         add('<div class="subnav">')
         for anchor, heading in sections:
-            add(f'<a href="#{anchor}">{_rail_label(heading)}</a>')
+            label = _RAIL_EN.get(heading, _rail_label(heading)) if en else _rail_label(heading)
+            add(f'<a href="#{anchor}">{label}</a>')
         add("</div>")
     add(
         f"""<a href="{catalog}">{p("技能手册库", "Skills handbook")}</a>
@@ -241,6 +280,20 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 </div>
 <p class="src">{p("来源：", "Source: ")}{_SOP_DIRNAME}/{_SOP_FILENAME}</p>"""
     )
+
+    if body is not None:
+        add(
+            f"""<div class="sop-note">
+<svg class="ic" aria-hidden="true"><use href="#i-rocket"/></svg>
+<p>{
+                p(
+                    "本文档是方法论全文；实际的阶段推进、门禁校验与留痕在 Engagement 控制台完成 —— ",
+                    "This document is the methodology; actual phase advancement, gate checks and "
+                    "audit trails happen in the engagement console — ",
+                )
+            }<a href="{base}/console">{p("打开控制台 →", "open the console →")}</a></p>
+</div>""",
+        )
 
     if body is not None and en:
         add(

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
+
+from fde_scope.web.mdrender import fenced_indices
 
 pytestmark = pytest.mark.filterwarnings("ignore")
 
@@ -137,7 +142,7 @@ def test_glossary_html(client) -> None:
     assert "__ICON_SPRITE__" not in r.text  # placeholder is filled by app.py
     missing = [term for term, _ in GLOSSARY_ZH if term not in r.text]
     assert missing == []
-    assert r.text.count('<div class="card">') == len(GLOSSARY_ZH)  # no duplicates
+    assert r.text.count('<div class="card" data-t=') == len(GLOSSARY_ZH)  # no duplicates
 
 
 def test_en_glossary_html(client) -> None:
@@ -154,12 +159,33 @@ def test_en_glossary_html(client) -> None:
     assert "Every term in this material, one line each" in r.text
     missing = [term for term, _ in GLOSSARY_EN if term not in r.text]
     assert missing == []
-    assert r.text.count('<div class="card">') == len(GLOSSARY_EN)
+    assert r.text.count('<div class="card" data-t=') == len(GLOSSARY_EN)
 
     stripped = r.text.replace('<a class="lang" href="/glossary">中文</a>', "")
     stripped = re.sub(r'<span class="alias">[^<]*</span>', "", stripped)
+    # the per-card search haystack deliberately carries the zh alias — it is
+    # machine-read, not rendered text
+    stripped = re.sub(r'data-t="[^"]*"', "", stripped)
     leaked = [ln for ln in stripped.splitlines() if re.search(r"[\u4e00-\u9fff]", ln)]
     assert leaked == []
+
+
+def test_glossary_has_instant_search_and_glosses_are_escaped(client) -> None:
+    """≈80 terms with no filter was unusable (plan §4.1); the search box hides
+    non-matching cards and empty groups client-side. Glosses and aliases go
+    through ``html.escape`` so a future dynamic source cannot become an XSS
+    sink (plan §4.3), and a back-to-top link closes the long page (§4.5)."""
+    from fde_scope.web.glossary import GLOSSARY_ZH, render
+
+    html = render("zh")
+    assert 'id="gl-q"' in html and 'oninput="glFilter(this.value)"' in html
+    assert 'aria-label="搜索术语"' in html
+    assert "glFilter" in html and "gl-empty" in html
+    assert 'id="top"' in html and "回到顶部" in html
+    # every card is filterable on term, alias and gloss
+    assert html.count("data-t=") == len(GLOSSARY_ZH)
+    en = render("en")
+    assert 'aria-label="Search terms"' in en and "No matching terms." in en
 
 
 def test_glossary_grouping_is_total(client) -> None:
@@ -318,16 +344,39 @@ def test_course_code_blocks_survive_rendering(client) -> None:
 
 
 def test_course_task_items_become_checkboxes(client) -> None:
-    """``- [ ]`` renders as ☐ so the homework lists read as checkboxes; the
-    count is derived from the sources, not hand-maintained."""
+    """Every ``- [ ]`` practice item renders as a real checkbox (state lives
+    in localStorage), the stats row's practice count equals the checkbox
+    count, and the numbers come from the token stream — literals in fenced
+    examples can no longer inflate them (plan §5.2/§5.6)."""
     from fde_scope.web.course import _CHAPTERS, _default_root
 
     root = _default_root()
-    sources = [((root / fn).read_text(encoding="utf-8")) for _key, fn, *_ in _CHAPTERS]
-    expected = sum(text.count("- [ ] ") for text in sources) + sum(text.count("☐") for text in sources)
+    expected = 0
+    for _key, fn, *_ in _CHAPTERS:
+        lines = (root / fn).read_text(encoding="utf-8").split("\n")
+        fenced = fenced_indices(lines)
+        expected += sum(1 for i, ln in enumerate(lines) if i not in fenced and re.match(r"^\s*- \[ \] ", ln))
     html = client.get("/course").text
-    assert html.count("☐") == expected
+    assert html.count('class="taskbox"') == expected
     assert "- [ ]" not in html
+    # the 练习 stat is the checkbox count, not every literal ☐ in the prose
+    assert f'<div class="num">{expected}</div><div class="lab">项练习</div>' in html
+    assert html.count("☐") < expected  # remaining ☐ glyphs are prose mentions, not items
+
+
+def test_course_has_progress_and_search(client) -> None:
+    """Read-progress toggles per chapter, a progress bar, and an in-page
+    filter across the 25 chapters — all client-side, zero backend
+    (plan §5.4/§5.5)."""
+    html = client.get("/course").text
+    assert "toggleRead" in html and "refreshProgress" in html
+    assert 'class="readbtn"' in html and html.count('data-ch="') == 25
+    assert 'id="cr-bar"' in html and 'id="cr-lab"' in html
+    assert 'id="cr-q"' in html and "courseFilter" in html
+    assert 'id="cr-empty"' in html
+    en = client.get("/en/course").text
+    assert "mark read" in en
+    assert 'aria-label="Search the course"' in en
 
 
 def test_en_course_translates_the_chrome_and_says_the_lessons_are_chinese(
@@ -384,8 +433,8 @@ def test_course_gateway_is_public(client, monkeypatch) -> None:
 
 
 def test_course_degrades_when_the_sources_are_missing(tmp_path) -> None:
-    """A wheel install has no ``course-level-1/``: the page must explain that
-    and keep its anchors, not raise."""
+    """Neither the repo-root directory nor the wheel's package-data copy is
+    readable: the page must explain that and keep its anchors, not raise."""
     from fde_scope.web.course import _CHAPTERS, render
 
     html = render("zh", root=tmp_path)
@@ -393,6 +442,43 @@ def test_course_degrades_when_the_sources_are_missing(tmp_path) -> None:
     assert "读不到课程文件" in html
     assert html.count('id="doc-') == len(_CHAPTERS)
     assert html.count("这一章读不到") == len(_CHAPTERS)
+
+
+def test_course_root_prefers_the_checkout_and_falls_back_to_package_data(tmp_path) -> None:
+    """A checkout wins over the installed copy so that editing a lesson is
+    what ``/course`` serves; an installed app, which has no repo root, still
+    finds the lessons inside the package (see ``force-include`` in
+    pyproject.toml). With neither present the repo path is returned so the
+    notice names the directory a reader can actually restore."""
+    from fde_scope.web.course import _choose_root
+
+    repo, packaged = tmp_path / "repo", tmp_path / "packaged"
+    packaged.mkdir()
+    assert _choose_root(repo, packaged) == packaged
+    repo.mkdir()
+    assert _choose_root(repo, packaged) == repo
+    missing = tmp_path / "missing"
+    assert _choose_root(missing, tmp_path / "also-missing") == missing
+
+
+def test_installed_course_root_renders_the_lessons(tmp_path, monkeypatch) -> None:
+    """End-to-end form of the fallback above, exercising the real resolver:
+    lay out an installed tree (package data present, repo root absent), point
+    the module at it, and ``/course`` must serve the chapters rather than the
+    notice."""
+    import shutil
+
+    from fde_scope.web import course
+
+    packaged = tmp_path / "fde_scope" / "_data" / course._COURSE_DIRNAME
+    (tmp_path / "fde_scope" / "web").mkdir(parents=True)
+    shutil.copytree(course._default_root(), packaged)
+    monkeypatch.setattr(course, "__file__", str(tmp_path / "fde_scope" / "web" / "course.py"))
+
+    assert course._default_root() == packaged
+    html = course.render("zh")
+    assert "读不到课程文件" not in html
+    assert "这一章读不到" not in html
 
 
 def test_course_reports_one_unreadable_chapter_without_losing_the_rest(
@@ -675,6 +761,83 @@ def test_advance_completed_engagement_returns_reason(client) -> None:
     assert r.json() == {"advanced": False, "reason": "complete"}
 
 
+def test_rollback_moves_phase_and_audits(client) -> None:
+    """``POST …/rollback`` goes through ``Engagement.rollback`` and leaves a trace.
+
+    P1 wired the domain transition (already present in ``engagement.py`` and the
+    CLI) to the web layer; the route must not assign ``current_phase`` itself,
+    and the reason/operator the UI now collects must land in the audit record.
+    """
+    eid = client.post("/api/engagements", data={"customer": "RollCo", "profile": "ticket"}).json()[
+        "engagement_id"
+    ]
+    assert client.post(f"/api/engagements/{eid}/advance").json()["advanced"] is True
+    assert client.get(f"/api/engagements/{eid}").json()["current_phase"] == "stakeholder_map"
+
+    r = client.post(
+        f"/api/engagements/{eid}/rollback",
+        data={"to_phase": "qualification", "reason": "客户改需求", "operator": "ada"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["rolled_back"] is True
+    assert (body["from_phase"], body["to_phase"]) == ("stakeholder_map", "qualification")
+    assert body["status"]["current_phase"] == "qualification"
+    # the persisted record moved too, not just the response
+    assert client.get(f"/api/engagements/{eid}").json()["current_phase"] == "qualification"
+
+    events = [
+        e
+        for e in client.get(f"/api/engagements/{eid}/audit").json()["events"]
+        if e["action"] == "engagement.rollback"
+    ]
+    assert len(events) == 1
+    assert events[0]["detail"]["to_phase"] == "qualification"
+    assert events[0]["detail"]["reason"] == "客户改需求"
+    assert events[0]["detail"]["operator"] == "ada"
+
+
+def test_rollback_unknown_phase_is_404(client) -> None:
+    eid = client.post("/api/engagements", data={"customer": "Roll404", "profile": "ticket"}).json()[
+        "engagement_id"
+    ]
+    r = client.post(f"/api/engagements/{eid}/rollback", data={"to_phase": "not_a_phase"})
+    assert r.status_code == 404
+    assert "not_a_phase" in r.json()["detail"]
+
+
+def test_rollback_forward_is_400(client) -> None:
+    """Rollback is one-directional: a later phase is a 400, not a silent jump."""
+    eid = client.post("/api/engagements", data={"customer": "RollFwd", "profile": "ticket"}).json()[
+        "engagement_id"
+    ]
+    r = client.post(f"/api/engagements/{eid}/rollback", data={"to_phase": "stakeholder_map"})
+    assert r.status_code == 400
+    assert "forward" in r.json()["detail"].lower()
+    assert client.get(f"/api/engagements/{eid}").json()["current_phase"] == "qualification"
+
+
+def test_audit_json_is_free_but_md_export_is_licensed(client, monkeypatch) -> None:
+    """``?format=md`` writes the same report as ``/audit/export``, so it carries
+    the same tier gate — reading events stays free.
+
+    Regression: the export branch used to skip ``_require_feature``, making
+    ``GET …/audit?format=md`` a one-query-string bypass of the paid feature.
+    """
+    from fde_scope import license as lic
+
+    eid = client.post("/api/engagements", data={"customer": "LicCo", "profile": "ticket"}).json()[
+        "engagement_id"
+    ]
+    assert client.get(f"/api/engagements/{eid}/audit").status_code == 200
+    assert client.get(f"/api/engagements/{eid}/audit?format=md").status_code == 200
+
+    monkeypatch.delenv(lic.ENV_LICENSE_KEY, raising=False)
+    assert client.get(f"/api/engagements/{eid}/audit").status_code == 200
+    assert client.get(f"/api/engagements/{eid}/audit?format=md").status_code == 402
+    assert client.get(f"/api/engagements/{eid}/audit/export").status_code == 402
+
+
 def test_phases_unknown_profile_404(client) -> None:
     r = client.get("/api/phases?profile=nope")
     assert r.status_code == 404
@@ -839,6 +1002,46 @@ def test_skills_api_roundtrip(client, tmp_path, monkeypatch) -> None:
     assert arch.status_code == 200 and arch.json()["status"] == "archived"
 
 
+def test_skills_facets_power_the_console_filters(client) -> None:
+    """``/api/skills/facets`` backs the tag / profile / gate / phase selects
+    added to the skills view in P1 §1.2.
+
+    The search endpoint has accepted these params all along (``api_skills``),
+    but the console only ever sent ``q`` / ``category`` / ``status`` — the four
+    remaining filters were dead capability. Facets return the distinct values
+    that actually exist so the UI offers selects instead of making the user
+    guess a slug."""
+    sid = client.post(
+        "/api/skills",
+        json={
+            "title": "OPC UA 排查",
+            "category": "implementation",
+            "tags": ["opcua", "plc"],
+            "phase_slug": "deploy",
+            "gate_slug": "solution_blueprint",
+            "applies_to": ["manufacturing"],
+        },
+    ).json()["id"]
+    client.post(f"/api/skills/{sid}/publish")  # the default list is status=published
+    f = client.get("/api/skills/facets")
+    assert f.status_code == 200
+    assert f.json() == {
+        "tags": ["opcua", "plc"],
+        "phases": ["deploy"],
+        "gates": ["solution_blueprint"],
+        "profiles": ["manufacturing"],
+    }
+    # each of the four filters really filters, in both directions
+    assert len(client.get("/api/skills?tag=plc").json()) == 1
+    assert client.get("/api/skills?tag=nope").json() == []
+    assert len(client.get("/api/skills?profile=manufacturing").json()) == 1
+    assert client.get("/api/skills?profile=ticket").json() == []
+    assert len(client.get("/api/skills?phase=deploy").json()) == 1
+    assert client.get("/api/skills?phase=qualification").json() == []
+    assert len(client.get("/api/skills?gate=solution_blueprint").json()) == 1
+    assert client.get("/api/skills?gate=no-such-gate").json() == []
+
+
 # ---------------------------------------------------------------------------
 # journal（现场记录）
 # ---------------------------------------------------------------------------
@@ -924,9 +1127,87 @@ def test_console_has_workbench_and_skills_views(client) -> None:
     assert "草稿审阅队列" in r.text
 
 
+def test_console_skills_view_sends_every_backend_filter(client) -> None:
+    """The skills search endpoint accepts ``tag``/``profile``/``gate``/``phase``
+    (`api_skills`); the console must actually send them, backed by facets.
+
+    A filter param the front-end never sends is dead capability — the exact
+    gap the plan called out for this view, so the wiring is pinned here."""
+    html = client.get("/console").text
+    for control in ("sk-tag", "sk-profile", "sk-gate", "sk-phase"):
+        assert f'id="{control}"' in html, f"missing facet control: {control}"
+    for param in ("'tag', tag", "'profile', prof", "'gate', gate", "'phase', phase"):
+        assert f"params.set({param})" in html, f"filter param not sent: {param}"
+    assert "/api/skills/facets" in html
+    assert "api('/api/skills/facets')" in html
+    # the facet selects re-run the search on change, like the existing ones
+    for control in ("sk-tag", "sk-profile", "sk-gate", "sk-phase"):
+        assert f'id="{control}" onchange="loadSkills()"' in html
+
+
+def test_en_console_translates_skills_facet_filters(client) -> None:
+    html = client.get("/en/console").text
+    assert "<label>Applies to</label>" in html
+    assert "<label>Gate</label>" in html
+    assert "<label>Phase</label>" in html
+
+
 # ---------------------------------------------------------------------------
 # deploy plan API（角色 → 连接器 → 工具绑定）
 # ---------------------------------------------------------------------------
+def test_deploy_parse_reports_line_numbers(client) -> None:
+    """Textarea parsing moved server-side (P1 §1.2): a malformed line comes
+    back with its line number and a reason instead of vanishing in the browser.
+
+    The old JS parser silently dropped anything without ``name: role`` — the
+    agent simply disappeared from the plan with no explanation."""
+    ok = client.post(
+        "/api/deploy/parse",
+        json={
+            "agents_text": "analyst: 数据分析:qwen-max\n\narchivist: 文件分析",
+            "sources_text": "csv=data/a.csv",
+        },
+    )
+    assert ok.status_code == 200
+    body = ok.json()
+    assert body["errors"] == []
+    assert body["agents"] == [
+        {"name": "analyst", "role": "数据分析", "model": "qwen-max"},
+        {"name": "archivist", "role": "文件分析"},
+    ]
+    assert body["sources"] == {"csv": "data/a.csv"}
+
+    bad = client.post(
+        "/api/deploy/parse",
+        json={
+            "agents_text": "analyst: 数据分析\nno-role-here\n: 缺名字",
+            "sources_text": "csv=data/a.csv\nno-equals-sign\n=empty-key",
+        },
+    ).json()
+    assert [(e["field"], e["line"], e["text"]) for e in bad["errors"]] == [
+        ("agents", 2, "no-role-here"),
+        ("agents", 3, ": 缺名字"),
+        ("sources", 2, "no-equals-sign"),
+        ("sources", 3, "=empty-key"),
+    ]
+    # the well-formed lines still come through despite the errors
+    assert bad["agents"] == [{"name": "analyst", "role": "数据分析"}]
+    assert bad["sources"] == {"csv": "data/a.csv"}
+
+
+def test_console_deploy_parses_on_the_server(client) -> None:
+    """The deploy view must not ship its own parser: it cannot report line
+    numbers, and a second parser drifts from the CLI/backend behaviour."""
+    html = client.get("/console").text
+    assert "_parseAgentLines" not in html and "_parseSourceLines" not in html
+    assert "/api/deploy/parse" in html
+    assert "parsed.errors" in html
+    assert "输入格式有误" in html
+    en = client.get("/en/console").text
+    assert "Input format errors" in en
+    assert "<th>Raw line</th>" in en
+
+
 def test_deploy_plan_binds_configured_sources(client) -> None:
     """配了源的角色拿到工具，没配的诚实标 unbound，并进入 ALLOW 规则。"""
     r = client.post(
@@ -1008,6 +1289,207 @@ def test_ontology_export_api_unknown_target_404(client) -> None:
     r = client.get("/api/ontology/export/does-not-exist")
     assert r.status_code == 404
     assert r.json()["detail"] == "unknown ontology export target: does-not-exist"
+
+
+def test_ontology_diagram_api_returns_mermaid(client) -> None:
+    """`ontology/diagram.py` had a CLI entry but no Web surface (P1 §1.2):
+    the schema card's 类图 button renders this source."""
+    r = client.get("/api/ontology/schema/fde-core/diagram")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["schema_id"] == "fde-core" and body["version"]
+    assert body["mermaid"].startswith("classDiagram")
+    assert "<|--" in body["mermaid"]
+    assert client.get("/api/ontology/schema/nope/diagram").status_code == 404
+
+
+def test_ontology_validate_api_tbox_and_abox(client) -> None:
+    """One endpoint, both layers — same semantics as CLI validate/check."""
+    r = client.get("/api/ontology/validate/fde-core")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["kind"] == "schema" and body["target"].startswith("fde-core@")
+    assert body["ok"] is True and body["errors"] == []
+    assert client.get("/api/ontology/validate/nope").status_code == 404
+
+
+def test_ontology_diff_api_reports_breaking_and_impact(client) -> None:
+    """D1-D4 diff plus ABox impact across every workspace store referencing
+    the old schema — the migration-effort evidence CLI diff prints."""
+    from fde_scope.ontology.models import InstanceStore
+    from fde_scope.ontology.store import OntologyStore
+
+    store = OntologyStore()
+    core = store.load_schema("fde-core")
+    assert core is not None
+    v2 = core.model_copy(deep=True)
+    v2.id = "fde-core-webdiff"
+    v2.version = "1.1.0"
+    v2.classes = v2.classes[:-1]  # drop one class → D1 breaking change
+    dropped = core.classes[-1].curie
+    store.save_schema(v2)
+    store.save_store(InstanceStore(id="acme-webdiff", ontology_ref="fde-core@1.0.0"))
+
+    r = client.post("/api/ontology/diff", json={"old": "fde-core", "new": "fde-core-webdiff"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False
+    assert body["from"] == "fde-core@1.0.0" and body["to"] == "fde-core-webdiff@1.1.0"
+    d1 = [c for c in body["breaking"] if c["kind"] == "D1"]
+    assert d1 and d1[0]["subject"] == dropped
+
+    # unknown ids → 404 naming the missing one; missing params → 422
+    miss = client.post("/api/ontology/diff", json={"old": "fde-core", "new": "ghost"})
+    assert miss.status_code == 404 and "ghost" in miss.json()["detail"]
+    assert client.post("/api/ontology/diff", json={"old": "fde-core"}).status_code == 422
+
+
+def test_ops_connectors_api_reports_import_truth_and_env_booleans(client, monkeypatch) -> None:
+    """The connectors panel is import-level truth plus env *booleans* —
+    credential values must never reach a response (invariant 3)."""
+    monkeypatch.setenv("FDE_SCOPE_MQTT_USERNAME", "super-secret-value")
+    r = client.get("/api/connectors")
+    assert r.status_code == 200
+    body = r.json()
+    by_slug = {c["slug"]: c for c in body["connectors"]}
+    assert by_slug["csv"]["import_ok"] is True
+    assert "JSONL" in by_slug["csv"]["note"]
+    mqtt = by_slug["mqtt_sparkplug"]
+    assert mqtt["env"]["FDE_SCOPE_MQTT_USERNAME"] is True
+    assert mqtt["env"]["FDE_SCOPE_MQTT_PASSWORD"] is False
+    assert "super-secret-value" not in r.text  # the value never leaves the process
+    # every slug in the module table is accounted for, importable or not
+    from fde_scope.connectors._registry import _MODULE_BY_TYPE
+
+    assert set(by_slug) == set(_MODULE_BY_TYPE)
+
+
+def test_ops_eval_info_and_mock_run(client) -> None:
+    """Eval panel: metrics + LLM availability up front; a mock run needs no
+    LLM; an unconfigured mimo run says so with 502 instead of pretending."""
+    info = client.get("/api/eval/info").json()
+    assert "intent_accuracy" in info["metrics"]
+    assert info["llm_available"] is False  # conftest clears the LLM env
+
+    run = client.post(
+        "/api/eval/run",
+        json={
+            "agent": "mock",
+            "cases": [{"id": "t1", "input": "怎么退款", "expected_category": "退款"}],
+        },
+    )
+    assert run.status_code == 200
+    report = run.json()
+    assert report["case_count"] == 1
+    assert "intent_accuracy" in report["metrics"]
+    assert "metric_labels" in report
+
+    assert client.post("/api/eval/run", json={"agent": "mock"}).status_code == 422
+    assert client.post("/api/eval/run", json={"agent": "nope", "cases": []}).status_code == 422
+    mimo = client.post("/api/eval/run", json={"agent": "mimo", "cases": [{"id": "t1", "input": "x"}]})
+    assert mimo.status_code == 502
+    assert "mock" in mimo.json()["detail"]
+
+
+def test_ops_flywheel_api_is_honestly_process_local(client) -> None:
+    """The counters are this process's in-memory engine and the retrain jobs
+    are descriptors — the payload says both, so no UI can inherit the old
+    "scheduled" lie."""
+    body = client.get("/api/flywheel").json()
+    assert body["process_local"] is True
+    assert {"collected", "golden", "store_total"} <= set(body["snapshot"])
+    names = {j["name"] for j in body["jobs"]}
+    assert "weekly_incremental_retrain" in names
+    weekly = next(j for j in body["jobs"] if j["name"] == "weekly_incremental_retrain")
+    assert weekly["cron"] == "0 2 * * 1"
+
+
+def test_ops_license_api_reports_tier_without_the_key(client) -> None:
+    """Read-only license facts; the key value never appears — only where the
+    key was found."""
+    from fde_scope import license as lic
+
+    r = client.get("/api/license")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tier"] == "pro"  # conftest issues a pro env license
+    assert body["key_source"] == "env"
+    assert body["features"]["evidence"] is True
+    assert body["features"]["sop"] is True
+    assert body["features"]["multi_tenant"] is False
+    # the actual key text must not leak into the payload
+    assert lic._read_key() not in r.text  # type: ignore[operator]
+
+
+def test_console_has_ops_view(client) -> None:
+    """The ops view: nav button, container, hash route, four panels, eval runner."""
+    html = client.get("/console").text
+    assert """onclick="go('ops')""" in html
+    assert 'id="view-ops"' in html
+    assert "loadOps" in html and "runEval" in html
+    assert "#ops" in html  # boot + hashchange routing
+    assert "/api/connectors" in html and "/api/flywheel" in html and "/api/license" in html
+    assert "/api/eval/run" in html
+    # honesty pinned in the UI: process-local counters, descriptor-only jobs
+    assert "本服务进程" in html and "描述符" in html
+    en = client.get("/en/console").text
+    assert "onclick=\"go('ops')\">Ops</button>" in en
+    assert "<h2>Connector registry</h2>" in en
+    assert "<h2>Eval benchmark</h2>" in en
+    assert "mock (rule-based, no LLM)" in en
+    assert "Key source: " in en
+
+
+def test_workbench_list_has_search_and_filters(client) -> None:
+    """The engagement list filters client-side (P1 §1.2): text search over
+    customer/eid plus phase and zone selects — filtering an in-page matrix
+    needs no new API surface, and the selections survive a re-render."""
+    html = client.get("/console").text
+    assert 'id="wb-q"' in html and "applyWbFilter" in html
+    assert 'id="wb-phase"' in html and 'id="wb-zone"' in html
+    assert 'id="wb-cards"' in html
+    assert "wbFilteredMatrix" in html and "wbMatrix" in html
+    # re-render reads back the previous selections instead of resetting them
+    assert "prevQ = sel('wb-q')" in html and "prevPhase = sel('wb-phase')" in html
+    en = client.get("/en/console").text
+    assert 'placeholder="Search customer / engagement id"' in en
+    assert '<option value="">All phases</option>' in en
+    assert '<option value="">All zones</option>' in en
+    assert "<label>Zone</label>" in en
+
+
+def test_console_context_tab_has_json_editor(client) -> None:
+    """The Context tab's six cards were read-only; P1 §1.2 adds a JSON editor
+    that reuses the existing ``POST …/context`` patch path, and renders the
+    backend's pydantic errors with their field paths."""
+    html = client.get("/console").text
+    assert "contextEditorHtml(ctx)" in html
+    assert 'id="ctx-json"' in html and "saveContextJson" in html
+    assert "CONTEXT_EDITABLE_KEYS" in html
+    # only the keys the endpoint actually patches are offered
+    assert "['site','safety','success_criteria','stakeholders','slos','assets']" in html
+    # field-level errors: loc path + message, from pydantic's errors() body
+    assert "(x.loc||[]).join('.')" in html
+    assert "字段校验失败" in html
+    en = client.get("/en/console").text
+    assert "Edit context (JSON · gates are re-evaluated on save)" in en
+    assert "Save and re-evaluate gates</button>" in en
+    assert "Field validation failed" in en
+
+
+def test_console_ontology_view_has_three_subviews(client) -> None:
+    """diagram / validate / diff were CLI-only; the ontology view now exposes
+    all three (buttons on the cards + a diff form)."""
+    html = client.get("/console").text
+    assert "showDiagram(" in html and ">类图</button>" in html
+    assert "validateTarget(" in html and ">校验</button>" in html
+    assert "runOntoDiff" in html and "ot-diff-old" in html and "ot-diff-new" in html
+    assert "/api/ontology/diff" in html
+    en = client.get("/en/console").text
+    assert ">Class diagram</button>" in en
+    assert ">Validate</button>" in en
+    assert "<h2>Version diff (D1-D4 + ABox impact)</h2>" in en
+    assert "Mermaid source" in en
 
 
 def test_console_has_ontology_view(client) -> None:
@@ -1098,15 +1580,143 @@ def test_console_has_guided_tab(client) -> None:
     html = client.get("/console").text
     assert """tab('guided',this)""" in html
     assert "guidedHtml" in html
-    # the original 7 tabs are untouched
-    for name in ("overview", "sop", "gates", "context", "forge", "kpi", "journal"):
+    # every sibling tab is still there
+    for name in DETAIL_TAB_NAMES:
         assert f"""tab('{name}',this)""" in html
+
+
+#: the 11 engagement-detail tabs, in strip order (``DETAIL_TABS`` in app.py)
+DETAIL_TAB_NAMES = (
+    "overview",
+    "guided",
+    "sop",
+    "gates",
+    "context",
+    "forge",
+    "kpi",
+    "journal",
+    "evidence",
+    "handoff",
+    "audit",
+)
+
+
+def test_console_detail_tab_strip_and_panes_line_up(client) -> None:
+    """Each tab button has a real ``role``/``data-tab`` and a matching pane container.
+
+    A tab whose pane id drifted would render as a button that silently does
+    nothing, and nothing else in the suite would notice.
+    """
+    html = client.get("/console").text
+    for name in DETAIL_TAB_NAMES:
+        assert f'data-tab="{name}"' in html, f"tab button missing data-tab: {name}"
+        assert f'id="t-{name}"' in html, f"pane container missing: t-{name}"
+    assert 'role="tablist"' in html
+    # DETAIL_TABS drives aria-selected bookkeeping and the #t:<name> hash, so it
+    # must stay in sync with the markup above
+    array = html.split("const DETAIL_TABS = [", 1)[1].split("]", 1)[0]
+    assert [t.strip().strip("'") for t in array.split(",")] == list(DETAIL_TAB_NAMES)
+
+
+def test_console_evidence_handoff_audit_load_lazily(client) -> None:
+    """The three P1 tabs fetch on open, keeping selectEng at its 3 blocking calls."""
+    html = client.get("/console").text
+    assert "const LAZY_TABS = {evidence: loadEvidence, handoff: renderHandoff, audit: loadAudit};" in html
+    assert "const lazy = LAZY_TABS[name];" in html
+    # tab() must be callable without an element argument, or the #t:<name> hash
+    # restore path cannot activate a pane
+    assert """el = el || document.querySelector(`.tab[data-tab="${name}"]`);""" in html
+    # evidence and audit fetch on open; handoff renders a form and POSTs on demand
+    assert "/evidence`)" in html and "/audit`)" in html
+    assert "/handoff`, {method:'POST'" in html
+
+
+def test_console_has_one_shared_confirmation_dialog(client) -> None:
+    """force / rollback / archive / delete all route through a single dialog."""
+    html = client.get("/console").text
+    assert '<dialog id="dlg-action"' in html
+    for el in ("dlg-action-title", "dlg-action-msg", "dlg-action-fields", "dlg-action-ok"):
+        assert f'id="{el}"' in html
+    assert "function openActionDialog(cfg)" in html
+    for fn in ("askAdvanceForce", "askRollback", "askArchiveEng", "askDeleteEng"):
+        assert f"function {fn}(" in html
+        assert f"{fn}(" in html.split("function openActionDialog", 1)[0]
+
+
+def test_console_row_actions_carry_data_not_interpolated_handlers(client) -> None:
+    """Engagement-card buttons stop propagation and pass ``this``, never the customer name.
+
+    Interpolating a customer name into an ``onclick`` attribute is an injection
+    sink — the card already exposes ``data-eid``/``data-customer`` for the
+    handler to read back.
+    """
+    html = client.get("/console").text
+    assert 'data-eid="${escapeHtml(s.engagement_id)}" data-customer="${escapeHtml(s.customer)}"' in html
+    assert "event.stopPropagation();askArchiveEng(this)" in html
+    assert "event.stopPropagation();askDeleteEng(this)" in html
+    assert "const card = btn.closest('.eng');" in html
+
+
+def test_console_rollback_only_offers_earlier_phases(client) -> None:
+    """The rollback picker slices the phase list *before* the current index.
+
+    ``Engagement.rollback`` rejects a forward jump with a ValueError, but the UI
+    should not offer one in the first place.
+    """
+    html = client.get("/console").text
+    assert "detailPhases.slice(0, curIdx)" in html
+    assert "to_phase:v.to_phase" in html
+    assert "/rollback`, {method:'POST'" in html
+
+
+def test_console_delete_requires_typed_customer_name(client) -> None:
+    """GDPR erasure is permanent, so the dialog validates a verbatim retype."""
+    html = client.get("/console").text
+    assert "v.confirm === customer ? null :" in html
+    assert "{method:'DELETE'" in html
+    assert "URLSearchParams({confirm:customer})" in html
+
+
+def test_console_states_audit_is_not_tamper_evident(client) -> None:
+    """The UI must not imply a hash chain or a digital signature that does not exist.
+
+    sha256 evidence digests are integrity checks, not signatures, and the audit
+    log is a plain append-only JSONL file. Overclaiming here is a compliance
+    statement, so the honest wording is pinned.
+    """
+    html = client.get("/console").text
+    assert "摘要不是数字签名" in html
+    assert "没有哈希链，也没有数字签名" in html
 
 
 def test_en_console_translates_guided_tab(client) -> None:
     html = client.get("/en/console").text
     assert """tab('guided',this)">Guided</button>""" in html
     assert "What to deliver in this phase" in html
+
+
+def test_en_console_translates_new_engagement_tabs(client) -> None:
+    """The P1 tabs, dialogs and panes are translated, and stay honest in English."""
+    html = client.get("/en/console").text
+    assert """tab('evidence',this)">Evidence</button>""" in html
+    assert """tab('handoff',this)">Handoff</button>""" in html
+    assert """tab('audit',this)">Audit</button>""" in html
+    assert "<h2>Acceptance evidence</h2>" in html
+    assert "<h2>Handoff package</h2>" in html
+    assert "<h2>Audit trail (append-only)</h2>" in html
+    assert "Roll back phase</button>" in html
+    assert "title:'Delete engagement (GDPR right to erasure)'" in html
+    assert "A digest is not a digital signature" in html
+    assert "no hash chain and no digital signature" in html
+    # only the deliberate language switcher may still carry CJK
+    import re
+
+    leftovers = [
+        ln.strip()
+        for ln in html.split("\n")
+        if re.search(r"[\u3400-\u4dbf\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]", ln)
+    ]
+    assert leftovers == ['<a class="lang" href="/console" title="中文版" aria-label="切换到中文">中文</a>']
 
 
 def test_catalog_portal_served_locally(client) -> None:
@@ -1316,6 +1926,29 @@ _CATALOG_GITHUB = (
 )
 
 
+def test_sop_rail_is_translated_and_cross_links_the_console(client) -> None:
+    """The EN rail used to scrape the zh headings out of rendered HTML (plan
+    §6.1); now the outline comes from the token stream and the EN rail uses
+    paired literals. Both locales cross-link the console where the SOP is
+    actually executed (plan §6.3)."""
+    from fde_scope.web.docs_reader import render as docs_render  # noqa: F401
+    from fde_scope.web.sop import _default_root, _sections_from_tokens
+
+    text = _default_root().read_text(encoding="utf-8")
+    sections = _sections_from_tokens(text)
+    assert len(sections) == 7 and sections[0] == ("s01", "为什么不是 5 步")
+
+    en = client.get("/en/sop").text
+    assert "The 18 phases in detail" in en
+    assert "Why not 5 steps" in en
+    assert "为什么不是 5 步" not in en.split("subnav", 1)[-1].split("</div>", 1)[0]
+    assert "open the console →" in en
+    zh = client.get("/sop").text
+    assert "打开控制台 →" in zh
+    console = client.get("/console").text
+    assert "阅读 SOP 全文（含 18 阶段详解）" in console
+
+
 def test_sop_page_renders_the_local_document(client) -> None:
     """``/sop`` renders ``docs/fde_sop_full.md`` in-app: tables, the fenced
     zone diagram and the section rails all come from the source, and nothing
@@ -1410,7 +2043,8 @@ def test_doc_whitelist_covers_every_reader_slug() -> None:
     """Drift guard: auth.py carries an explicit literal slug list instead of
     importing ``docs_reader`` (auditability); this pins the literal to the
     reader's actual corpus so a new document can't ship token-gated by
-    accident. The GTM site's woff2 fonts are whitelisted explicitly too."""
+    accident. The GTM site's woff2 fonts and its two embedded screenshots are
+    whitelisted explicitly too — by exact path, never by directory prefix."""
     from fde_scope.web import auth
     from fde_scope.web.docs_reader import SLUGS
 
@@ -1419,6 +2053,8 @@ def test_doc_whitelist_covers_every_reader_slug() -> None:
         assert f"/en/docs/{slug}" in auth.PUBLIC_PATHS, slug
     fonts = {p for p in auth.PUBLIC_PATHS if p.startswith("/GTM/fonts/")}
     assert len(fonts) == 8, fonts
+    images = {p for p in auth.PUBLIC_PATHS if p.startswith("/GTM/images/")}
+    assert images == {"/GTM/images/console.png", "/GTM/images/overview.png"}, images
 
 
 # ---------------------------------------------------------------------------
@@ -1477,6 +2113,75 @@ def test_doc_images_route_serves_only_allowlisted_files(client) -> None:
     assert client.get("/docs/images/..%2Ffde_sop_full.md").status_code in (404, 400)
 
 
+def test_docs_reader_active_class_follows_the_slug(client) -> None:
+    """The rail's "Repo docs" link is hardcoded to /docs/readme — it may only
+    carry ``class="active"`` while readme itself is open, otherwise every
+    document looks like the README page."""
+    from fde_scope.web.docs_reader import render
+
+    assert 'class="active"' in render("readme")
+    for slug in ("architecture", "license", "features"):
+        assert 'class="active"' not in render(slug), slug
+
+
+def test_docs_reader_builds_a_toc_from_heading_tokens(client) -> None:
+    """Long documents get an on-this-page list built from the heading tokens
+    (never scraped back out of rendered HTML), and every TOC link points at a
+    heading id that really exists in the body."""
+    from fde_scope.web.docs_reader import render
+
+    html = render("architecture")
+    assert '<details class="toc">' in html
+    assert "本页目录" in html
+    # short/sparse documents stay clean
+    assert '<details class="toc">' not in render("notice")
+    # every toc anchor resolves to a real heading id
+    import re
+
+    toc_hrefs = re.findall(r'class="toc-list".*?</ul>', html, re.S)
+    body = html.split("toc-list", 1)[-1]
+    missing = [
+        hid
+        for hid in re.findall(r'<a href="#([^"]+)">', toc_hrefs[0] if toc_hrefs else "")
+        if f'id="{hid}"' not in body
+    ]
+    assert missing == []
+    en = render("ontology", locale="en")
+    assert "On this page" in en
+
+
+def test_docs_reader_strips_unrecognized_absolute_hrefs(client) -> None:
+    """A hand-written absolute href that is not a known in-app route degrades
+    to its label text instead of becoming a link — same policy as external
+    URLs, so a future markdown edit cannot silently grow a broken (or
+    unexpected) link."""
+    from fde_scope.web.docs_reader import _resolve_href
+
+    assert _resolve_href("/console", "", set()) == "/console"
+    assert _resolve_href("/docs/images/overview.png", "", set()) == "/docs/images/overview.png"
+    assert _resolve_href("/catalog/index.html", "", set()) == "/catalog/index.html"
+    assert _resolve_href("/admin/secret", "", set()) is None
+    assert _resolve_href("/definitely/not/a/route", "", set()) is None
+
+
+def test_docs_images_allowlist_is_derived_from_the_directory() -> None:
+    """The allowlist is the ``docs/images/`` listing, not a hand-maintained
+    tuple — dropping a file retires it, adding one serves it, and nothing
+    outside the directory is reachable."""
+    from fde_scope.web.docs_reader import _default_root, _repo_images, image_path
+
+    images = _repo_images()
+    assert "overview.png" in images and "console.png" in images
+    assert image_path("overview.png") is not None
+    assert image_path("../fde_sop_full.md") is None
+    assert image_path("no-such.png") is None
+    # names are files only, sorted, from that directory
+    import os
+
+    on_disk = sorted(p for p in os.listdir(_default_root() / "docs" / "images") if (p))
+    assert list(images) == sorted(on_disk)
+
+
 def test_gtm_site_served_locally(client) -> None:
     """The GTM landing site is mounted at /GTM: the page, its fonts and its
     assets answer locally, and the artifact carries no external anchor."""
@@ -1494,12 +2199,51 @@ def test_gtm_site_served_locally(client) -> None:
         "public-sans-latin-400-normal.woff2",
     ):
         assert client.get(f"/GTM/fonts/{name}").status_code == 200, name
+    for name in ("console.png", "overview.png"):
+        assert client.get(f"/GTM/images/{name}").status_code == 200, name
     import re
 
     for path in ("/GTM/index.html", "/GTM/en/index.html"):
         html = client.get(path).text
         assert re.search(r'<a [^>]*href="https?://', html) is None, path
         assert 'target="_blank"' not in html, path
+
+
+def test_gtm_assets_stay_public_when_auth_is_on(client, monkeypatch) -> None:
+    """The portal's hero and console screenshots are embedded by the *public*
+    GTM pages, so a token-gated install must still serve them — otherwise both
+    locales render with two broken images. The whitelist is exact-path, so a
+    gated API route and a non-whitelisted GTM asset stay behind the token."""
+    from fde_scope.web.deps import gtm_site_dir
+
+    if gtm_site_dir() is None:
+        import pytest
+
+        pytest.skip("GTM site not present in this checkout")
+    monkeypatch.setenv("FDE_SCOPE_API_TOKEN", "gtm-token-123456")
+    for path in ("/GTM/index.html", "/GTM/en/index.html"):
+        assert client.get(path).status_code == 200, path
+        assert "gtm-token-123456" not in client.get(path).text, path
+    for name in ("console.png", "overview.png"):
+        assert client.get(f"/GTM/images/{name}").status_code == 200, name
+    assert client.get("/GTM/images/no-such.png").status_code == 401
+    assert client.get("/api/engagements").status_code == 401
+
+
+def test_favicon_is_served_and_public(client, monkeypatch) -> None:
+    """Every HTML shell links ``/static/favicon.svg``; a missing asset makes
+    browsers fall back to ``/favicon.ico`` (also absent), so both requests 404
+    on every page load. The glyph is a brand asset with no engagement data, so
+    it stays public when auth is on — browsers fetch it without headers."""
+    r = client.get("/static/favicon.svg")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    assert b"<svg" in r.content
+    for shell in ("/", "/en/", "/console", "/en/console"):
+        assert "/static/favicon.svg" in client.get(shell).text, shell
+    monkeypatch.setenv("FDE_SCOPE_API_TOKEN", "favicon-token-123456")
+    assert client.get("/static/favicon.svg").status_code == 200
+    assert client.get("/static/no-such.svg").status_code == 401
 
 
 def test_gtm_root_redirects_to_the_landing_page(client) -> None:
@@ -1513,6 +2257,72 @@ def test_gtm_root_redirects_to_the_landing_page(client) -> None:
         pytest.skip("GTM site not present in this checkout")
     r = client.get("/GTM/", follow_redirects=False)
     assert r.status_code in (200, 307)
+
+
+def test_gtm_anchor_labels_match_their_targets(client) -> None:
+    """No GTM anchor may be labelled "GitHub" while pointing at ``/``: that is
+    the console, and the artifact carries no external anchor by design, so the
+    repo is reached through the in-app readers (``/docs/readme``, ``/sop``,
+    ``/docs/license``). Pins both locales' labels, which ``GTM/i18n_split.py``
+    regenerates from ``GTM/index.bilingual.html``."""
+    import re
+
+    from fde_scope.web.deps import gtm_site_dir
+
+    if gtm_site_dir() is None:
+        import pytest
+
+        pytest.skip("GTM site not present in this checkout")
+    expected = {
+        "/GTM/index.html": ("控制台", "打开控制台", "阅读 README"),
+        "/GTM/en/index.html": ("CONSOLE", "Open the console", "Read the README"),
+    }
+    for path, labels in expected.items():
+        html = client.get(path).text
+        assert re.search(r'<a [^>]*href="/"[^>]*>[^<]*GitHub', html) is None, path
+        assert "Star on GitHub" not in html, path
+        assert 'href="/docs/readme"' in html, path
+        for label in labels:
+            assert f">{label}</a>" in html, (path, label)
+
+
+def test_homepage_connector_tiles_are_registry_generated(client) -> None:
+    """The tiles' status pills come from the connector registry at import
+    time — the hand-written "ROS2 Bag → stub" once drifted from the shipped
+    code (plan §2.1), so the homepage must not carry hand-written statuses
+    anymore. The KPI section states how to replace the demo numbers (§2.3)."""
+    from fde_scope.connectors._registry import _MODULE_BY_TYPE, get_registry
+
+    html = client.get("/").text
+    registry = get_registry()
+    assert "状态由连接器注册表在导入时生成" in html
+    assert html.count("<span") >= len(_MODULE_BY_TYPE)
+    for slug in _MODULE_BY_TYPE:
+        ok = slug in registry
+        assert ('class="status s-ok">已注册' in html) == ok or not ok, slug
+    # no hand-written status vocabulary survives in the connectors section
+    section = html.split('id="connectors"', 1)[1].split("</section>", 1)[0]
+    assert "stub" not in section
+    assert 'class="status s-stub"' not in html  # the scenario tile is fixed too
+    assert "换成真实数据" in html
+
+
+def test_catalog_portal_brand_is_keyboard_reachable_and_gtm_links_resolve(client) -> None:
+    """The brand area was a ``<div onclick>`` (invisible to keyboards) and the
+    GTM links pointed three/four levels above the served root, surviving only
+    because the browser clamps at ``/`` (plan §8.2/§8.6). The search box also
+    needs a label (§8.3), and the search handler must not query a ``#hero``
+    id that does not exist (§8.1)."""
+    site = Path(__file__).resolve().parents[1] / "docs" / "skills-catalog" / "site"
+    zh = (site / "index.html").read_text(encoding="utf-8")
+    en = (site / "en" / "index.html").read_text(encoding="utf-8")
+    for name, html in (("index.html", zh), ("en/index.html", en)):
+        assert '<a class="brand" href="#/">' in html, name
+        assert '<div class="brand"' not in html, name
+        assert 'aria-label="' in html and 'type="search"' in html, name
+        assert "getElementById('hero')" not in html, name
+    assert '"../../../GTM' not in zh and '"../../../../GTM' not in en
+    assert '"../GTM/index.html"' in zh and '"../../GTM/index.html"' in en
 
 
 def test_catalog_links_survive_an_install_without_docs(client) -> None:
@@ -1537,7 +2347,63 @@ def test_catalog_links_survive_an_install_without_docs(client) -> None:
         assert "docs/skills-catalog/site" in zh.text
         en = bare.get("/catalog/en/index.html")
         assert en.status_code == 200
-        assert "docs/skills-catalog/site" in en.text and "not in this install" in en.text
+        en_text = en.text
+        assert "docs/skills-catalog/site" in en_text and "not in this install" in en_text
     finally:
         deps.catalog_site_dir = real
+        # the reload swapped the module-global app for the no-docs variant;
+        # leaving it that way leaked into every later test (order-dependent
+        # failures in anything inspecting the mounts)
         importlib.reload(app_mod)
+        importlib.reload(app_mod)
+
+
+def test_ontology_store_api_success_path(client) -> None:
+    """Q3: ``GET /api/ontology/store/{id}`` had no success-path test."""
+    from fde_scope.ontology.models import InstanceStore
+    from fde_scope.ontology.store import OntologyStore
+
+    OntologyStore().save_store(
+        InstanceStore(id="q3-store", ontology_ref="fde-core@1.0.0", individuals=[{"curie": "ex:i1"}])
+    )
+    r = client.get("/api/ontology/store/q3-store")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "q3-store" and body["ontology_ref"] == "fde-core@1.0.0"
+    assert len(body["individuals"]) == 1
+    assert client.get("/api/ontology/store/nope").status_code == 404
+
+
+def test_skill_and_journal_error_branches(client) -> None:
+    """Q3: the 404/409/422 branches of skills, journal and context."""
+    # unknown skill id on publish / export / archive
+    for path in ("/api/skills/ghost/publish", "/api/skills/ghost/archive"):
+        assert client.post(path).status_code == 404, path
+    assert client.post("/api/skills/ghost/export", json={"format": "agentscope"}).status_code == 404
+    # journal: unknown engagement
+    assert client.get("/api/engagements/ghost/journal").status_code == 404
+    eid = client.post("/api/engagements", data={"customer": "Q3"}).json()["engagement_id"]
+    # context: pydantic 422 carries the field path
+    bad = client.post(f"/api/engagements/{eid}/context", json={"success_criteria": "not-a-list"})
+    assert bad.status_code == 422
+    assert any("success_criteria" in str(e.get("loc", "")) for e in bad.json()["detail"])
+
+
+def test_fallback_notices_are_wellformed(client) -> None:
+    """Q3: the conditional fallback branches for a wheel install (no docs/,
+    no GTM/) — the templates are import-time constants, so assert their
+    content here; the routes themselves only exist on an installed app."""
+    import fde_scope.web.app as webapp
+
+    mounted = {getattr(r, "path", "") for r in webapp.app.routes}
+    for prefix, names in (
+        ("/catalog", ("_CATALOG_NOTICE", "_CATALOG_NOTICE_EN")),
+        ("/GTM", ("_GTM_NOTICE", "_GTM_NOTICE_EN")),
+    ):
+        # when the install has no asset dir the else-branch registers the
+        # notice routes instead of a mount; either way the notice template
+        # (module-level when that branch ran) must be a well-formed shell.
+        if prefix not in mounted:
+            for name in names:
+                notice = getattr(webapp, name, None)
+                assert notice is not None and "DOCTYPE" in notice and "/static/favicon.svg" in notice, name

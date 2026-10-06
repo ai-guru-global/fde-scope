@@ -17,6 +17,8 @@ the certification material readable. They are not vendor documentation and
 carry no provenance claim.
 """
 
+import html
+
 from .i18n import GLOSSARY_EN, GLOSSARY_ZH
 from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
 
@@ -226,6 +228,13 @@ def _label(term: str, en: bool) -> str:
 _STYLE = (
     BASE_CSS
     + """
+.gsearch{display:flex;gap:10px;align-items:center;margin:14px 0 0;max-width:860px}
+.gsearch input{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+padding:8px 12px;font-size:.9rem;color:var(--fg)}
+.gsearch input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.gl-count{font-size:.78rem;color:var(--faint);white-space:nowrap}
+.totop{margin-left:auto;color:var(--muted);text-decoration:none;font-size:.8rem}
+.totop:hover{color:var(--accent)}
 .gl{display:grid;gap:10px;margin:0}
 .gl .card{background:var(--panel);border:1px solid var(--border);border-radius:9px;
 padding:13px 15px;min-width:0;transition:border-color .15s}
@@ -250,6 +259,24 @@ function toggleTheme(){
   var n = h.dataset.theme === 'light' ? 'dark' : 'light';
   h.dataset.theme = n;
   try { localStorage.setItem('fde-theme', n); } catch(e) {}
+}
+function glFilter(q){
+  q = q.trim().toLowerCase();
+  var shown = 0, total = 0;
+  document.querySelectorAll('.card[data-t]').forEach(function(c){
+    total++;
+    var hit = !q || c.dataset.t.indexOf(q) !== -1;
+    c.hidden = !hit;
+    if (hit) shown++;
+  });
+  document.querySelectorAll('section[id^=g]').forEach(function(s){
+    var any = s.querySelector('.card[data-t]:not([hidden])');
+    s.hidden = !any;
+  });
+  var count = document.getElementById('gl-count');
+  if (count) count.textContent = q ? (shown + ' / ' + total) : '';
+  var empty = document.getElementById('gl-empty');
+  if (empty) empty.hidden = shown !== 0;
 }
 """
 
@@ -289,8 +316,8 @@ def render(locale: str = "zh") -> str:
 <script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
 <style>{_STYLE}</style>
 </head>
-<body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">__ICON_SPRITE__</svg>
+<body id="top">
+__ICON_SPRITE__
 <div class="shell">
 <aside class="side">
 <div class="brand">
@@ -341,7 +368,13 @@ def render(locale: str = "zh") -> str:
                 "whole sentences, and the terms are collected here, grouped by theme.",
             )
         }</p>
-</div>"""
+</div>
+<div class="gsearch">
+<input id="gl-q" type="search" aria-label="{p("搜索术语", "Search terms")}"
+ placeholder="{p("输入关键词即时过滤…", "Type to filter instantly…")}" oninput="glFilter(this.value)">
+<span id="gl-count" class="gl-count" aria-live="polite"></span>
+</div>
+<p id="gl-empty" class="sec-note" hidden>{p("没有匹配的术语。", "No matching terms.")}</p>"""
     )
     for idx, (head, group) in enumerate(zip(heads, groups), 1):
         _, zh_label, en_label, zh_blurb, en_blurb = head
@@ -358,11 +391,18 @@ def render(locale: str = "zh") -> str:
         )
         for term in group:
             label = _label(term, en)
-            alias = f'<span class="alias">{term}</span>' if label.casefold() != term.casefold() else ""
+            alias = (
+                f'<span class="alias">{html.escape(term)}</span>'
+                if label.casefold() != term.casefold()
+                else ""
+            )
+            # the haystack also carries the alias and the gloss, so a search
+            # for either language's wording finds the card
+            haystack = html.escape(f"{label} {term} {tips[term]}".casefold(), quote=True)
             add(
-                f"""<div class="card">
-<dt>{label}{alias}</dt>
-<dd>{tips[term]}</dd>
+                f"""<div class="card" data-t="{haystack}">
+<dt>{html.escape(label)}{alias}</dt>
+<dd>{html.escape(tips[term])}</dd>
 </div>"""
             )
         add("""</dl>
@@ -372,6 +412,7 @@ def render(locale: str = "zh") -> str:
 <footer>
 <span>{p("FDE Scope · 名词解释", "FDE Scope · Glossary")}</span>
 <span>{p("本站自撰的一行释义，非厂商文档", "One-line glosses written for this site, not vendor documentation")}</span>
+<a href="#top" class="totop">{p("回到顶部 ↑", "Back to top ↑")}</a>
 </footer>
 
 </div>

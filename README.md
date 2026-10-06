@@ -86,6 +86,7 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 - [Tests](#-tests)
 - [Installation](#-installation) · [macOS App](#macos-app)
 - [Documentation](#-documentation)
+- [加强计划（Enhancement Plan）](#-加强计划enhancement-plan)
 - [Roadmap](#-roadmap)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -130,6 +131,14 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 ```bash
 # install (core + dev + web; no agentscope/docker/api-key needed)
 pip install -e ".[dev]"
+
+# shell completion + version (Typer built-ins)
+fde-scope --install-completion       # bash/zsh/fish
+fde-scope --version
+
+# scriptable output: every data command has --json (plain JSON on stdout)
+fde-scope deploy --tenant acme --dry-run --json | jq '.permissions.allow'
+fde-scope engage list --json
 
 # ── Scenario 1: customer-service tickets (the original) ──
 fde-scope connect --type csv --source examples/quickstart_csv/sample_tickets.csv
@@ -242,8 +251,8 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 **Surfaces**
 
 - [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web)
-- [x] Web console — FastAPI, 36 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
-- [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 2 agent tools, skill provider
+- [x] Web console — FastAPI, 69 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
+- [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 3 agent tools, skill provider
 - [x] macOS app — double-click DMG (universal2, signed/notarized release path, same console as `fde-scope web`)
 
 **Data & intelligence**
@@ -266,7 +275,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 flowchart TB
     subgraph surfaces["Surfaces · 四个入口,同一引擎同一数据根"]
         CLI["fde-scope CLI<br/>13 组命令"]
-        WEB["web/ FastAPI 控制台<br/>36 路由 · 单页"]
+        WEB["web/ FastAPI 控制台<br/>69 路由 · 单页"]
         PAW["pawapp/ QwenPaw 插件<br/>/api/fde-scope · 18 路由"]
         MAC["macOS App<br/>universal2 DMG"]
     end
@@ -332,7 +341,7 @@ flowchart TB
 | 6 | `skills/` | Methodology capture (draft → published → archived, dual-format export) | ❌ |
 | 7 | `integrations/` | QwenPaw bundle export + ACP adapter + manifest validator | ❌ |
 | 8 | `ontology/` | Semantic layer: TBox schemas + SKOS concepts + ABox stores, SHACL-lite validation, JSON-LD 1.1 export | ❌ |
-| **Web** | `web/` | FastAPI engagement console (36 routes, single-page, JSON APIs) | ❌ |
+| **Web** | `web/` | FastAPI engagement console (69 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
 
@@ -351,7 +360,7 @@ fde-scope/
 │   ├── skills/           # methodology capture (draft → published → archived)
 │   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
 │   ├── ontology/         # TBox schemas + SKOS concepts + ABox stores + JSON-LD export (data/*.yaml built-ins)
-│   └── web/              # FastAPI engagement console (36 routes)
+│   └── web/              # FastAPI engagement console (69 routes)
 ├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
 ├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
 ├── GTM/                  # product / GTM landing page (single-file HTML)
@@ -745,6 +754,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 
 ## 📄 Documentation
 
+- [`docs/enhancement-plan.md`](docs/enhancement-plan.md) — **全面加强计划与进度台账**：逐页逐功能加强项、每条带 `file:line` 证据、分期路线图（详见 [加强计划](#-加强计划enhancement-plan)）
 - [`docs/features.md`](docs/features.md) — 完整功能清单：18 阶段逐条说明 / 10 门禁执行流 / 连接器成熟度 / "功能 → 优点"速查表（English: [`docs/features-en.md`](docs/features-en.md)）
 - [`docs/user-guide.md`](docs/user-guide.md) — 客户侧快速上手：5 分钟跑通、核心概念、常用操作、env 速查、故障 FAQ
 - [`docs/api-reference.md`](docs/api-reference.md) — Web 控制台 REST API 参考（认证 + 全路由逐条对照代码）
@@ -763,6 +773,38 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [`docs/agentscope_api_mapping.md`](docs/agentscope_api_mapping.md) — design-doc fiction vs. real 2.0.x API (measured version matrix)
 - [`docs/fde_playbook.md`](docs/fde_playbook.md) — on-site 72h playbook
 - [`examples/README.md`](examples/README.md) — CSV cold-start walkthrough (quickstart data included)
+
+---
+
+## 🧭 加强计划（Enhancement Plan）
+
+完整台账见 [`docs/enhancement-plan.md`](docs/enhancement-plan.md)：逐页逐功能的加强项，每条都带
+`file:line` 证据与验收动作。这里只放骨架与当前状态。
+
+**基线（实测，非估计）**：867 passed / 4 skipped / 92% 覆盖率 / 20.6s；`ruff check` 绿；
+`ruff format --check` 与 `mypy fde_scope` **红**（CI 阻塞步骤）；Web 路由真实 **57** 条而文档写 56。
+
+**P0 收口后复测（同组命令）**：**876 passed / 4 skipped / exit 0**（+9 条新守卫）；
+`ruff format --check` → `174 files already formatted`；`mypy fde_scope` → `Success: no issues found in 101 source files`；
+路由数 **11 处宣称全部对齐 57**，且装饰器扫描与 `app.openapi()` 逐条对账；
+干净 venv 装 wheel 后 `/course` 正常渲染（zh 770,509 字符），发行版不再空页。
+
+**本轮最高价值发现**：`evidence` / `handoff` / `audit` / `archive` / `delete` 五项能力
+**后端已实现、测试已覆盖，但控制台前端从不调用**；`rollback` 更是**领域层与 CLI 都有、Web 层连端点都没有**
+——而 `docs/features.md` 已经宣称看板支持「回滚」。所以 P1 几乎全是「给已测后端接前端」，
+不引入新领域逻辑，风险最低、收益最高。
+
+| 期 | 状态 | 工作量 | 范围 | 出口标准 |
+| --- | --- | --- | --- | --- |
+| **P0 止血** | ✅ **已完成**（9/9） | 0.5–1 天 | 9 项：格式/类型红、GTM 图片 401、GTM GitHub 假链、`course-level-1/` 未打包、路由守卫漏 `patch`、favicon、嵌套 SVG、误提交的 `.apk.idsig` | 四条回归锚全绿 ✅ |
+| **P1 补齐已实现能力** | ✅ **已完成**（§1.1–§1.3） | 3–5 天 | 回滚端点、11 tab、四确认框、skills 四筛选+facets、deploy 服务端解析、ontology 三子视图、Context JSON 编辑器、workbench 筛选、运维视图（连接器/eval/flywheel/license，**env 只报布尔**）、flywheel CLI 假计划修复、鉴权全量枚举守卫、favicon 死链修复（落地记录见计划 §1.1–§1.3） | 每项都有 UI **和**测试；文档宣称变成事实 ✅ |
+| **P2 页面质量** | ✅ **已完成** | 5–8 天 | glossary 搜索+转义、course 进度/勾选/搜索/token 流统计、sop token rail+EN 标签、docs TOC+href 白名单+mdrender 抽取、catalog a11y+暗色+⚰️ chip、首页磁贴注册表化、**i18n 键漂移守卫**、CLI C1–C12（`--version`、9 命令 `--json`、spinner、友好错误、公共 agent 解析/门禁访问器）（落地记录见计划 P2 节）；C13 help 全文双语留独立批次 | 每页至少一项导航增强 ✅；CLI 可脚本化 ✅ |
+| **P3 工程化** | 🔄 主体完成（Q2/Q4/Q5/§12 部分待立项） | 8–12 天 | ✅ 覆盖率门禁（fail_under=90，实测 92.08%）、未测路由/分支补齐（连带修 context 字段路径缺陷）、macOS CI 冒烟、文档零漂移（5 处）；⬜ CI service containers、前端 JS 抽出+DOM 测试、`app.py` 拆分、PawApp 共享层（落地记录见计划 P3 节） | 门禁生效 ✅、文档不再漂移 ✅、巨石拆分 ⬜ |
+| **P4 独立立项** | [-] 本轮不做 | — | 多租户/RBAC/SSO、PII 字段级加密与保留期、数字签名、真实训练管道、真实连接器 POC | 不在本轮 |
+
+**红线**：所有加强都受 [AGENTS.md](AGENTS.md) 七条不变式约束。计划文档 §15 逐条列出
+「哪条不变式约束了哪条加强」，以及本轮明确不做的 6 件事（含「审计证据是 sha256 文件哈希，
+**不是**数字签名，不得在文档里说成签名」）。
 
 ---
 

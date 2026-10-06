@@ -192,3 +192,13 @@ def _default_gate_registry() -> dict[str, Gate]:
         HandoffSignoffGate(),
     ]
     return {g.slug: g for g in gates}
+
+
+def default_gate_registry() -> dict[str, Gate]:
+    """Public accessor for the built-in gate registry.
+
+    The CLI (``gate list``) and the PawApp backend used to import the private
+    ``_default_gate_registry`` across module boundaries; they read gates
+    through this name instead.
+    """
+    return _default_gate_registry()

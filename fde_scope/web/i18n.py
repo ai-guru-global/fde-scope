@@ -532,23 +532,19 @@ I18N_PAIRS: list[tuple[str, str]] = [
     # -- overview: connectors -------------------------------------------------
     ("<h2>10 个数据连接器</h2>", "<h2>10 data connectors</h2>"),
     ('<div class="desc">通用兜底，冷启动</div>', '<div class="desc">Universal fallback, cold start</div>'),
-    (">真实可用</span>", ">Live</span>"),
     ('<div class="desc">关系库直连</div>', '<div class="desc">Direct relational-DB access</div>'),
     ('<div class="desc">工厂设备遥测</div>', '<div class="desc">Factory device telemetry</div>'),
-    (">JSONL 可用</span>", ">JSONL</span>"),
     ('<div class="desc">工单/质量/停机</div>', '<div class="desc">Work orders / quality / downtime</div>'),
     (
         '<div class="desc">PLC tag 读取（asyncua 驱动）</div>',
         '<div class="desc">PLC tag reads (asyncua driver)</div>',
     ),
-    ('<div class="desc">机器人轨迹回放</div>', '<div class="desc">Robot trajectory replay</div>'),
     ('<div class="desc">时序历史库</div>', '<div class="desc">Time-series historian</div>'),
     ('<div class="desc">工单系统</div>', '<div class="desc">Ticketing system</div>'),
     (
         '<div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div>',
         '<div class="desc">PDF/Word/Excel/PPT parsing (agentscope.rag, lazy import)</div>',
     ),
-    (">需 [agentscope]</span>", ">needs [agentscope]</span>"),
     # -- overview: ontology ---------------------------------------------------
     ("<h2>Ontology 语义层 · TBox + ABox</h2>", "<h2>Ontology semantic layer · TBox + ABox</h2>"),
     ('<div class="name">TBox 双 Schema</div>', '<div class="name">Dual TBox schemas</div>'),
@@ -615,8 +611,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ('<div class="name">UI 层</div>', '<div class="name">UI layer</div>'),
     (
-        "CLI（Typer，全延迟导入）· Web 控制台（43 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
-        "CLI (Typer, fully lazy imports) · Web console (43 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
+        "CLI（Typer，全延迟导入）· Web 控制台（69 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
+        "CLI (Typer, fully lazy imports) · Web console (69 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
         "macOS app (double-click DMG — this console).",
     ),
     ('<div class="name">SOP 层</div>', '<div class="name">SOP layer</div>'),
@@ -739,10 +735,6 @@ I18N_PAIRS: list[tuple[str, str]] = [
     (
         "OPC UA/MQTT/ROS2/MES/Historian 接入。OEE/MTBF/抓取率/碰撞率 + 6 个工业合规 gate。",
         "OPC UA/MQTT/ROS2/MES/Historian ingestion. OEE/MTBF/pick rate/collision rate + 6 industrial compliance gates.",
-    ),
-    (
-        '<span class="status s-partial">核心可用 · 工业IO部分 stub</span>',
-        '<span class="status s-partial">Core available · industrial IO partly stub</span>',
     ),
     (
         "<span>FDE Scope · 基于真实 AgentScope 2.0 API · MIT License</span>",
@@ -981,10 +973,6 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("<h2>权限规则</h2>", "<h2>Permission rules</h2>"),
     (">审批模式：", ">Approval mode: "),
     ("<summary>查看完整 manifest JSON</summary>", "<summary>View full manifest JSON</summary>"),
-    (
-        '\'<div class="empty" style="padding:14px">暂无</div>\'',
-        '\'<div class="empty" style="padding:14px">None yet</div>\'',
-    ),
     ("toast('请填写客户名','warn')", "toast('Please enter a customer name','warn')"),
     ("toast('已创建 engagement','ok')", "toast('Engagement created','ok')"),
     # -- dashboard: JS detail (tabs + overview) -------------------------------------------
@@ -1263,6 +1251,387 @@ I18N_PAIRS: list[tuple[str, str]] = [
     (" —— 可重试，或改用手动填写。", " — retry, or switch to manual entry."),
     ("<label>目标</label>", "<label>Goal</label>"),
     ('<span class="pill">当前阶段</span>', '<span class="pill">current</span>'),
+    # -- dashboard: engagement tabs added in P1 §1.1 (evidence / handoff / audit) ---------------
+    (
+        """onclick="tab('evidence',this)">证据</button>""",
+        """onclick="tab('evidence',this)">Evidence</button>""",
+    ),
+    ("""onclick="tab('handoff',this)">交接</button>""", """onclick="tab('handoff',this)">Handoff</button>"""),
+    ("""onclick="tab('audit',this)">审计</button>""", """onclick="tab('audit',this)">Audit</button>"""),
+    ('askDeleteEng(this)">删除</button>', 'askDeleteEng(this)">Delete</button>'),
+    (
+        """askRollback()">${icon('i-refresh')} 回滚阶段</button>""",
+        """askRollback()">${icon('i-refresh')} Roll back phase</button>""",
+    ),
+    # -- shared confirmation dialog plumbing ----------------------------------------------------
+    ("ok.textContent = cfg.confirmLabel || '确定';", "ok.textContent = cfg.confirmLabel || 'Confirm';"),
+    ("toast('操作失败：'+e.message,'bad',8000)", "toast('Action failed: '+e.message,'bad',8000)"),
+    # -- advance: the two toasts the force dialog introduced ------------------------------------
+    (
+        "toast('已是最后阶段，无可推进目标','warn',6000)",
+        "toast('Already at the last phase — nothing to advance to','warn',6000)",
+    ),
+    (
+        "toast('已 force 推进（原因已入审计）','ok',6000)",
+        "toast('Force-advanced (reason recorded in the audit log)','ok',6000)",
+    ),
+    # -- force advance dialog -------------------------------------------------------------------
+    ("title:'force 推进',", "title:'Force advance',"),
+    (
+        "message:`force 会越过未通过的门禁把 <b>${escapeHtml(detailStatus.current_phase)}</b> 推进到下一阶段；"
+        "<b>原因必填</b>，与操作人一并写入审计。`,",
+        "message:`force bypasses the failing gates and moves <b>${escapeHtml(detailStatus.current_phase)}</b> "
+        "to the next phase; the <b>reason is required</b> and is written to the audit log alongside the operator.`,",
+    ),
+    (
+        "{name:'reason', label:'原因', placeholder:'为什么必须强制推进（必填）'},",
+        "{name:'reason', label:'Reason', placeholder:'Why the forced advance is unavoidable (required)'},",
+    ),
+    (
+        "{name:'operator', label:'操作人', placeholder:'可选'},",
+        "{name:'operator', label:'Operator', placeholder:'optional'},",
+    ),
+    ("confirmLabel:'强制推进', danger:true,", "confirmLabel:'Force advance', danger:true,"),
+    (
+        "validate: v => v.reason.trim() ? null : '请填写强制推进的原因',",
+        "validate: v => v.reason.trim() ? null : 'Enter a reason for the forced advance',",
+    ),
+    # -- rollback dialog ------------------------------------------------------------------------
+    (
+        "toast('已在可见阶段的最前面，无可回滚目标','warn',6000)",
+        "toast('Already at the first visible phase — nothing to roll back to','warn',6000)",
+    ),
+    ("title:'回滚阶段',", "title:'Roll back phase',"),
+    (
+        "message:`当前阶段 <b>${escapeHtml(detailStatus.current_phase)}</b>。回滚只能往<b>更早</b>的阶段走，"
+        "门禁会在下次推进时重新校验。`,",
+        "message:`Current phase: <b>${escapeHtml(detailStatus.current_phase)}</b>. Rollback only moves "
+        "<b>backwards</b>; the gates are re-evaluated on the next advance.`,",
+    ),
+    (
+        "{name:'to_phase', label:'目标阶段', type:'select', options:opts},",
+        "{name:'to_phase', label:'Target phase', type:'select', options:opts},",
+    ),
+    (
+        "{name:'reason', label:'原因', placeholder:'写入审计（可选）'},",
+        "{name:'reason', label:'Reason', placeholder:'written to the audit log (optional)'},",
+    ),
+    ("confirmLabel:'回滚', danger:true,", "confirmLabel:'Roll back', danger:true,"),
+    (
+        "toast(`已回滚 ${r.from_phase} → ${r.to_phase}`,'ok',6000);",
+        "toast(`Rolled back ${r.from_phase} → ${r.to_phase}`,'ok',6000);",
+    ),
+    # -- archive dialog -------------------------------------------------------------------------
+    ("title:'归档 engagement',", "title:'Archive engagement',"),
+    (
+        "message:`归档 <b>${escapeHtml(customer)}</b> 后它会离开所有列表（数据保留在归档目录，审计留痕）。`,",
+        "message:`Archiving <b>${escapeHtml(customer)}</b> removes it from every list (the data stays in the "
+        "archive directory and the audit trail survives).`,",
+    ),
+    ("confirmLabel:'归档', danger:true,", "confirmLabel:'Archive', danger:true,"),
+    # -- delete dialog (GDPR right to erasure) --------------------------------------------------
+    ("title:'删除 engagement（GDPR 删除权）',", "title:'Delete engagement (GDPR right to erasure)',"),
+    (
+        "message:`将永久删除 <b>${escapeHtml(customer)}</b> 的 engagement JSON 与全部证据文件，<b>不可恢复</b>。"
+        "审计日志本身按合规要求保留。<br>请原样输入客户名以确认：`,",
+        "message:`Permanently deletes the engagement JSON and every evidence file for "
+        "<b>${escapeHtml(customer)}</b> — <b>unrecoverable</b>. The audit log itself is retained for "
+        "compliance.<br>Type the customer name exactly to confirm:`,",
+    ),
+    (
+        "fields:[{name:'confirm', label:'客户名', placeholder:customer}],",
+        "fields:[{name:'confirm', label:'Customer name', placeholder:customer}],",
+    ),
+    ("confirmLabel:'永久删除', danger:true,", "confirmLabel:'Delete permanently', danger:true,"),
+    (
+        "validate: v => v.confirm === customer ? null : '客户名不一致，已取消',",
+        "validate: v => v.confirm === customer ? null : 'Customer name does not match — cancelled',",
+    ),
+    ("toast('已删除','ok');", "toast('Deleted','ok');"),
+    # -- evidence pane --------------------------------------------------------------------------
+    (
+        """box.innerHTML = '<div class="card"><div class="empty">加载中…</div></div>';""",
+        """box.innerHTML = '<div class="card"><div class="empty">Loading…</div></div>';""",
+    ),
+    ("<h2>验收证据</h2>", "<h2>Acceptance evidence</h2>"),
+    (
+        '<div class="hint">FAT/SAT 签字扫描件等外部凭证；留存 sha256 摘要供完整性核对。<b>摘要不是数字签名</b>，'
+        "也不构成链式审计——那两项在商业版路线上。</div>",
+        '<div class="hint">External artefacts such as signed FAT/SAT scans; the sha256 digest is kept for '
+        "integrity checks. <b>A digest is not a digital signature</b>, and this is not a chained audit log "
+        "— both are on the commercial roadmap.</div>",
+    ),
+    (
+        "<thead><tr><th>文件</th><th>sha256</th><th>大小</th><th>留存时间</th><th>操作人</th></tr></thead>",
+        "<thead><tr><th>File</th><th>sha256</th><th>Size</th><th>Stored at</th><th>Operator</th></tr></thead>",
+    ),
+    ("""'<div class="empty">尚无证据</div>'""", """'<div class="empty">No evidence yet</div>'"""),
+    (
+        '<div class="row"><label>名称</label><input id="ev-name" placeholder="留空则用文件名"></div>',
+        '<div class="row"><label>Name</label><input id="ev-name" placeholder="defaults to the file name"></div>',
+    ),
+    (
+        '<div class="row"><label>操作人</label><input id="ev-op" placeholder="可选"></div>',
+        '<div class="row"><label>Operator</label><input id="ev-op" placeholder="optional"></div>',
+    ),
+    (
+        '<button onclick="uploadEvidence()">上传证据</button>',
+        '<button onclick="uploadEvidence()">Upload evidence</button>',
+    ),
+    (
+        '<div class="hint mt6">上传需要 pro / enterprise 许可（feature: evidence）；未授权时接口返回 402 与升级指引。</div>',
+        '<div class="hint mt6">Uploading requires a pro / enterprise licence (feature: evidence); without it '
+        "the API returns 402 with upgrade guidance.</div>",
+    ),
+    ("${icon('i-alert')}加载失败：", "${icon('i-alert')}Failed to load: "),
+    ("toast('请选择文件','warn')", "toast('Pick a file first','warn')"),
+    ("toast('证据已留存 '", "toast('Evidence stored '"),
+    ("toast('留存失败：'", "toast('Failed to store: '"),
+    # -- handoff pane ---------------------------------------------------------------------------
+    ("<h2>交接包</h2>", "<h2>Handoff package</h2>"),
+    (
+        '<div class="hint">渲染 runbook、组装 handoff package JSON，并把两个文件的 sha256 写入审计'
+        "（客户勾选验收时另记一条 handoff.accepted）。</div>",
+        '<div class="hint">Renders the runbook, assembles the handoff package JSON and writes the sha256 of '
+        "both files to the audit log (ticking customer acceptance records a separate handoff.accepted "
+        "event).</div>",
+    ),
+    (
+        '<div class="row" style="margin-top:10px"><label>操作人</label><input id="ho-op" placeholder="可选"></div>',
+        '<div class="row" style="margin-top:10px"><label>Operator</label><input id="ho-op" placeholder="optional"></div>',
+    ),
+    (
+        '<div class="row"><label>客户已验收</label><input type="checkbox" id="ho-accept"></div>',
+        '<div class="row"><label>Customer accepted</label><input type="checkbox" id="ho-accept"></div>',
+    ),
+    ("${icon('i-rocket')} 生成交接包</button>", "${icon('i-rocket')} Build handoff package</button>"),
+    (
+        '<div class="hint">客户已验收：${yn(r.customer_accepted)}</div>',
+        '<div class="hint">Customer accepted: ${yn(r.customer_accepted)}</div>',
+    ),
+    ("${icon('i-doc')} 交接包 JSON</a>", "${icon('i-doc')} Handoff package JSON</a>"),
+    ("${icon('i-folder')} 报告目录</a>", "${icon('i-folder')} Reports directory</a>"),
+    ("<summary>交接摘要</summary>", "<summary>Handoff summary</summary>"),
+    ("toast('交接包已生成','ok')", "toast('Handoff package built','ok')"),
+    # -- audit pane -----------------------------------------------------------------------------
+    ("<h2>审计轨迹（append-only）</h2>", "<h2>Audit trail (append-only)</h2>"),
+    (
+        '<div class="hint">共 <b>${r.count||0}</b> 条本 engagement 事件，最新在前。日志为单文件 JSONL 追加写，'
+        "<b>没有哈希链，也没有数字签名</b>——它证明「发生过什么」，不防篡改；防篡改在商业版路线上。</div>",
+        '<div class="hint"><b>${r.count||0}</b> events for this engagement, newest first. The log is a single '
+        "append-only JSONL file with <b>no hash chain and no digital signature</b> — it proves what happened, "
+        "it does not resist tampering; tamper evidence is on the commercial roadmap.</div>",
+    ),
+    (
+        "<thead><tr><th>时间</th><th>动作</th><th>来源</th><th>详情</th></tr></thead>",
+        "<thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Detail</th></tr></thead>",
+    ),
+    ("""'<div class="empty">尚无审计事件</div>'""", """'<div class="empty">No audit events yet</div>'"""),
+    ("${icon('i-doc')} 导出 Markdown</button>", "${icon('i-doc')} Export Markdown</button>"),
+    (
+        '<span class="hint">导出需要 pro / enterprise 许可（feature: audit_export）。</span>',
+        '<span class="hint">Exporting requires a pro / enterprise licence (feature: audit_export).</span>',
+    ),
+    (
+        "`已导出 ${r.count} 条 → <code>${escapeHtml(String(r.path||'').split('/').pop())}</code>（报告目录）`;",
+        "`Exported ${r.count} events → <code>${escapeHtml(String(r.path||'').split('/').pop())}</code> "
+        "(reports directory)`;",
+    ),
+    ("toast('审计已导出','ok')", "toast('Audit log exported','ok')"),
+    ("toast('导出失败：'", "toast('Export failed: '"),
+    # -- skills: facet filters wired up in P1 §1.2 ----------------------------------------------
+    ("<label>适用画像</label>", "<label>Applies to</label>"),
+    ("<label>门禁</label>", "<label>Gate</label>"),
+    ("<label>阶段</label>", "<label>Phase</label>"),
+    # -- deploy: server-side textarea parsing (P1 §1.2) ------------------------------------------
+    (
+        "<b>输入格式有误（${parsed.errors.length} 行）</b>",
+        "<b>Input format errors (${parsed.errors.length} lines)</b>",
+    ),
+    (
+        "<thead><tr><th>字段</th><th>行号</th><th>原始行</th><th>原因</th></tr></thead>",
+        "<thead><tr><th>Field</th><th>Line</th><th>Raw line</th><th>Reason</th></tr></thead>",
+    ),
+    # -- ontology: diagram / validate / diff subviews (P1 §1.2) ----------------------------------
+    (">类图</button>", ">Class diagram</button>"),
+    (">校验</button>", ">Validate</button>"),
+    ("<h2>版本 diff（D1-D4 + ABox 影响面）</h2>", "<h2>Version diff (D1-D4 + ABox impact)</h2>"),
+    ("<label>旧 schema</label>", "<label>Old schema</label>"),
+    ("<label>新 schema</label>", "<label>New schema</label>"),
+    ("<h2>类图 · ", "<h2>Class diagram · "),
+    (
+        '<p class="meta">Mermaid 源码——控制台不打包渲染器；粘贴到任意 Mermaid 渲染器（或 CLI "fde-scope ontology diagram"）出图。</p>',
+        '<p class="meta">Mermaid source — the console does not bundle a renderer; paste it into any Mermaid '
+        'renderer (or the CLI "fde-scope ontology diagram") to get the picture.</p>',
+    ),
+    ('<div class="empty">校验中…</div>', '<div class="empty">Validating…</div>'),
+    ("<h2>校验 · ", "<h2>Validation · "),
+    (">✅ 通过（0 个 ONTO-* 错误）<", ">✅ Pass (0 ONTO-* errors)<"),
+    ("'✅ 无破坏性变更'", "'✅ No breaking changes'"),
+    ("<b>${(r.errors||[]).length} 个错误</b>", "<b>${(r.errors||[]).length} errors</b>"),
+    (
+        "<thead><tr><th>错误码</th><th>主体</th><th>说明</th></tr></thead>",
+        "<thead><tr><th>Code</th><th>Subject</th><th>Message</th></tr></thead>",
+    ),
+    ("校验失败：", "Validation failed: "),
+    ("toast('请选择两个 schema','warn')", "toast('Pick two schemas first','warn')"),
+    ("toast('旧 schema 与新 schema 相同','warn')", "toast('Old and new schema are the same','warn')"),
+    (
+        "⛔ ${(r.breaking||[]).length} 个破坏性变更（D1-D4）",
+        "⛔ ${(r.breaking||[]).length} breaking changes (D1-D4)",
+    ),
+    (
+        "<thead><tr><th>级别</th><th>主体</th><th>说明</th></tr></thead>",
+        "<thead><tr><th>Level</th><th>Subject</th><th>Detail</th></tr></thead>",
+    ),
+    (
+        "ABox 影响面：${(r.impact||[]).length} 个个体引用了被变更元素",
+        "ABox impact: ${(r.impact||[]).length} individuals touch changed elements",
+    ),
+    (
+        "<thead><tr><th>个体</th><th>触及</th></tr></thead>",
+        "<thead><tr><th>Individual</th><th>Touches</th></tr></thead>",
+    ),
+    (">diff 失败：", ">Diff failed: "),
+    # -- context: read-only cards gained a JSON editor (P1 §1.2) ---------------------------------
+    (
+        "<summary>编辑上下文（JSON · 保存后门禁重评）</summary>",
+        "<summary>Edit context (JSON · gates are re-evaluated on save)</summary>",
+    ),
+    (
+        '<button onclick="saveContextJson()">保存并重评门禁</button>',
+        '<button onclick="saveContextJson()">Save and re-evaluate gates</button>',
+    ),
+    (
+        "可编辑键：site / safety / success_criteria / stakeholders / slos / assets；后端做字段级校验，错误带字段路径。",
+        "Editable keys: site / safety / success_criteria / stakeholders / slos / assets; the backend validates "
+        "per field and errors carry the field path.",
+    ),
+    ("JSON 解析失败：", "JSON parse failed: "),
+    (
+        "没有可保存的字段（仅 site / safety / success_criteria / stakeholders / slos / assets）",
+        "nothing to save (only site / safety / success_criteria / stakeholders / slos / assets are editable)",
+    ),
+    ("<b>字段校验失败</b>", "<b>Field validation failed</b>"),
+    # -- workbench: engagement list search + phase/zone filters (P1 §1.2) ------------------------
+    ('placeholder="搜索客户 / engagement id"', 'placeholder="Search customer / engagement id"'),
+    ('<option value="">全部阶段</option>', '<option value="">All phases</option>'),
+    ('<option value="">全部分区</option>', '<option value="">All zones</option>'),
+    ("<label>分区</label>", "<label>Zone</label>"),
+    # -- ops view: connectors / eval / flywheel / license (P1 §1.3) ------------------------------
+    (
+        '\'<div class="card"><div class="empty">加载中…</div></div>\'',
+        '\'<div class="card"><div class="empty">Loading…</div></div>\'',
+    ),
+    (
+        "<h2>运维 · 连接器 / eval / flywheel / license</h2>",
+        "<h2>Ops · connectors / eval / flywheel / license</h2>",
+    ),
+    ("<b>部分面板加载失败</b>", "<b>Some panels failed to load</b>"),
+    ("<h2>连接器注册表</h2>", "<h2>Connector registry</h2>"),
+    (
+        '<p class="meta">导入级状态：注册表里 = 依赖齐；模块表有而注册表无 = 缺可选依赖。GET 不探测客户系统连通性——那是部署时的事。凭据 env 只显示名称与「是否已配置」，值不离开本进程。</p>',
+        '<p class="meta">Import-level truth: in the registry = dependencies OK; in the module table but not the '
+        "registry = missing an optional dependency. The GET does not probe customer systems — that is a "
+        "deploy-time act. Credential env vars show their name and a configured flag only; values never leave "
+        "the process.</p>",
+    ),
+    (
+        "<th>Slug</th><th>状态</th><th>说明</th><th>凭据 env</th>",
+        "<th>Slug</th><th>Status</th><th>Note</th><th>Credential env</th>",
+    ),
+    (">已注册</span>", ">registered</span>"),
+    (">缺可选依赖</span>", ">missing optional dep</span>"),
+    ('<td colspan="4" class="meta">无连接器</td>', '<td colspan="4" class="meta">No connectors</td>'),
+    ("<h2>Eval 基准</h2>", "<h2>Eval benchmark</h2>"),
+    (
+        '<p class="meta">指标与评分口径：${esc(String(Object.keys(ev.metrics||{}).length))} 项，全部确定性打分（LLM 只出现在生成回复那一步）。</p>',
+        '<p class="meta">${esc(String(Object.keys(ev.metrics||{}).length))} metrics, all deterministic scoring '
+        "(the LLM only appears when generating the reply).</p>",
+    ),
+    (
+        "<thead><tr><th>指标</th><th>说明</th></tr></thead>",
+        "<thead><tr><th>Metric</th><th>Description</th></tr></thead>",
+    ),
+    ("<label>用例集</label>", "<label>Cases</label>"),
+    (
+        'placeholder=\'JSON 数组或 JSONL 路径，例：[{"id":"t1","input":"退款怎么走"}]\'',
+        'placeholder=\'JSON array or JSONL path, e.g. [{"id":"t1","input":"how do refunds work"}]\'',
+    ),
+    (
+        '<option value="mock">mock（规则，无需 LLM）</option>',
+        '<option value="mock">mock (rule-based, no LLM)</option>',
+    ),
+    (
+        '<option value="mimo">mimo（需 LLM env）</option>',
+        '<option value="mimo">mimo (needs the LLM env)</option>',
+    ),
+    ('<button onclick="runEval()">运行</button>', '<button onclick="runEval()">Run</button>'),
+    (
+        "toast('请先粘贴用例（JSON 数组）或填 JSONL 路径','warn')",
+        "toast('Paste cases (a JSON array) or fill a JSONL path first','warn')",
+    ),
+    ("toast('用例 JSON 解析失败：'", "toast('Cases JSON parse failed: '"),
+    (
+        "'<div class=\"empty\">运行中（每条用例一次回复）…</div>'",
+        "'<div class=\"empty\">Running (one reply per case)…</div>'",
+    ),
+    ("运行失败：", "Run failed: "),
+    (
+        '<p class="meta">计数器是<b>本服务进程</b>内的（引擎在内存）；retrain 任务是<b>描述符</b>——本进程没有任何调度器在跑，交给外部编排器触发。</p>',
+        '<p class="meta">The counters are <b>this server process</b> (the engine is in-memory); the retrain jobs '
+        "are <b>descriptors</b> — no scheduler runs inside this process, an external orchestrator fires them.</p>",
+    ),
+    (
+        "<thead><tr><th>任务</th><th>计划</th><th>门槛</th><th>类型</th></tr></thead>",
+        "<thead><tr><th>Job</th><th>Schedule</th><th>Threshold</th><th>Kind</th></tr></thead>",
+    ),
+    (
+        '<span class="pill" style="color:var(--bad)">已过期 → community</span>',
+        '<span class="pill" style="color:var(--bad)">expired → community</span>',
+    ),
+    ("key 来源：", "Key source: "),
+    ("（env / 文件 / 无——只报来源，不显示 key）", "(env / file / none — the source only, never the key)"),
+    (
+        "<thead><tr><th>Feature</th><th>开关</th></tr></thead>",
+        "<thead><tr><th>Feature</th><th>Granted</th></tr></thead>",
+    ),
+    ("<label>席位</label>", "<label>Seats</label>"),
+    (" · 到期 ", " · expires "),
+    ("onclick=\"go('ops')\">运维</button>", "onclick=\"go('ops')\">Ops</button>"),
+    (
+        "// -- 运维（连接器 / eval / flywheel / license） ---------------------------",
+        "// -- ops (connectors / eval / flywheel / license) --------------------------",
+    ),
+    ("（只显示是否已配置，不显示值）", "(shows the configured flag only, never the value)"),
+    (" 条用例跑完</div>", " cases completed</div>"),
+    (
+        "<thead><tr><th>指标</th><th>值</th><th>说明</th></tr></thead>",
+        "<thead><tr><th>Metric</th><th>Value</th><th>Description</th></tr></thead>",
+    ),
+    ("<summary>bad cases（${bad.length}）</summary>", "<summary>bad cases (${bad.length})</summary>"),
+    # -- sop tab: cross-link to the full SOP page ------------------------------------------------
+    (
+        "阅读 SOP 全文（含 18 阶段详解）",
+        "Read the full SOP (including the 18-phase detail)",
+    ),
+    # -- homepage: registry-derived connector tiles + real-data pointer (P2 §2) -------------------
+    (
+        '<p class="meta" style="margin:6px 0 0">状态由连接器注册表在导入时生成（依赖齐 = 已注册）；运行时能力矩阵见 <a href="/console#ops">控制台运维面板</a>。</p>',
+        '<p class="meta" style="margin:6px 0 0">Status is generated from the connector registry at import time '
+        "(dependencies intact = registered); the runtime capability matrix lives in the "
+        '<a href="/console#ops">console ops panel</a>.</p>',
+    ),
+    ("机器人轨迹回放（rosbags）", "robot trajectory replay (rosbags)"),
+    ("已注册</span>", "registered</span>"),
+    ("缺可选依赖</span>", "missing optional dep</span>"),
+    (
+        '<p class="meta" style="margin:6px 0 0">换成真实数据：在控制台创建 manufacturing engagement，门禁与 KPI 探索器（/console → KPI tab）会从真实 engagement 计算；本区数字仅作版式演示。</p>',
+        '<p class="meta" style="margin:6px 0 0">To make these real: create a manufacturing engagement in the '
+        "console — the gates and the KPI explorer (/console → KPI tab) compute from the real engagement. "
+        "The numbers here only demonstrate the layout.</p>",
+    ),
+    ("核心可用 · 工业 IO 已接入", "core usable · industrial IO wired in"),
 ]
 
 _PAIRS_SORTED = sorted(I18N_PAIRS, key=lambda pair: len(pair[0]), reverse=True)

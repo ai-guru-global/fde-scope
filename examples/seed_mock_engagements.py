@@ -75,7 +75,9 @@ def _st(name: str, role: str, sponsor: bool = False, metric: str = "") -> Stakeh
     return Stakeholder(name=name, role=role, is_sponsor=sponsor, success_metric=metric)
 
 
-def _slo(name: str, target: str, route: str = "primary-oncall", window: str = "28d", budget: str = "") -> SLOSpec:
+def _slo(
+    name: str, target: str, route: str = "primary-oncall", window: str = "28d", budget: str = ""
+) -> SLOSpec:
     return SLOSpec(name=name, target=target, error_budget=budget, alert_route=route, window=window)
 
 
@@ -911,7 +913,12 @@ def whitelake() -> EngagementContext:
         ],
         slos=[
             _slo("availability", "99.5%", window="14d", budget="3.6h 停机预算 / 14d 滚动"),
-            _slo("alert_response_p95", "<5min", route="cold-chain-oncall", budget="已耗 52% · 温控超限工单 4.1min"),
+            _slo(
+                "alert_response_p95",
+                "<5min",
+                route="cold-chain-oncall",
+                budget="已耗 52% · 温控超限工单 4.1min",
+            ),
             _slo("bad_case_rate", "<8%", route="fde-oncall", budget="人工复核抽 5%/周 · 已耗 40%"),
         ],
         assets={

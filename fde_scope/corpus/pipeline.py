@@ -28,7 +28,7 @@ logger = get_logger("corpus.pipeline")
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
     from fde_scope.connectors import DataConnector
-    from fde_scope.llm import MiMoClient
+    from fde_scope.llm import LLMClient
     from fde_scope.ontology.models import OntologySchema
 
 
@@ -38,7 +38,7 @@ class CorpusForge:
     def __init__(
         self,
         config: CorpusConfig,
-        llm: MiMoClient | None = None,
+        llm: LLMClient | None = None,
         ontology: OntologySchema | None = None,
     ) -> None:
         self.config = config

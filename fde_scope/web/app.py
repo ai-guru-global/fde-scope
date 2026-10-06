@@ -23,7 +23,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import TypeAdapter, ValidationError
 
 from .. import audit, fsutil, paths
@@ -87,6 +87,27 @@ from .glossary import render as _render_glossary  # noqa: E402
 from .sop import render as _render_sop  # noqa: E402
 
 app.add_middleware(ApiTokenAuthMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Static assets
+# ---------------------------------------------------------------------------
+#: Every HTML shell links ``/static/favicon.svg``; the glyph is inlined here so
+#: the asset ships with the package and never 404s (a missing icon makes the
+#: browser fall back to ``/favicon.ico``, which is also absent).
+_FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+    '<rect width="32" height="32" rx="7" fill="#3b5bdb"/>'
+    '<path d="M16 6l2.6 6.6L25 15l-6.4 2.4L16 24l-2.6-6.6L7 15l6.4-2.4z" fill="#fff"/>'
+    "</svg>"
+)
+
+
+@app.get("/static/favicon.svg")
+def favicon() -> Response:
+    return Response(
+        content=_FAVICON_SVG, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +246,44 @@ def advance_engagement(
     return result
 
 
+@app.post("/api/engagements/{eid}/rollback")
+def rollback_engagement(
+    eid: str,
+    to_phase: str = Form(...),
+    reason: str | None = Form(None),
+    operator: str | None = Form(None),
+) -> dict:
+    """Roll an engagement back to an earlier phase.
+
+    The transition belongs to ``Engagement.rollback`` (profile visibility +
+    no-forward checks live there); this route only maps its domain errors onto
+    HTTP codes and leaves a trace in the audit log.
+    """
+    with engagement_lock(eid):
+        eng = _load(eid)
+        from_phase = eng.ctx.current_phase
+        try:
+            target = eng.rollback(to_phase)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=f"unknown phase: {to_phase!r}") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+        _save(eng)
+        status = eng.status()
+    detail = {"engagement_id": eid, "from_phase": from_phase, "to_phase": target.slug}
+    if reason and reason.strip():
+        detail["reason"] = reason.strip()
+    if operator and operator.strip():
+        detail["operator"] = operator.strip()
+    audit.log_event("engagement.rollback", detail=detail)
+    return {
+        "rolled_back": True,
+        "from_phase": from_phase,
+        "to_phase": target.slug,
+        "status": status,
+    }
+
+
 @app.post("/api/engagements/{eid}/gate/{slug}")
 def evaluate_gate(eid: str, slug: str, operator: str | None = Form(None)) -> dict:
     with engagement_lock(eid):
@@ -288,6 +347,9 @@ def engagement_audit(eid: str, format: str | None = None) -> dict:
     events = list(audit.read_events(eid))
     out = {"engagement_id": eid, "count": len(events), "events": events}
     if format == "md":
+        # writes the same report as /audit/export, so it carries the same gate —
+        # reading events is free, materialising a file is a paid feature
+        _require_feature("audit_export")
         out["path"] = str(_export_audit_md(eid, events))
     return out
 
@@ -540,28 +602,40 @@ def journal_to_skill(eid: str, jid: str) -> dict:
 def update_context(eid: str, body: dict | None = None) -> dict:
     """Patch an engagement context (site / safety / slo / stakeholders / assets)."""
     body = body or {}
-    try:
-        patched: dict = {}
-        if "site" in body:
-            from ..engagement.context import SiteInfo
 
-            patched["site"] = SiteInfo.model_validate(body["site"])
-        if "safety" in body:
-            from ..engagement.context import SafetyPosture
+    def _checked(field: str, validate, value):
+        """Validate one field, prefixing bare pydantic errors with the field
+        name — the console's context editor renders ``loc`` as the field path,
+        and a bare ``validate_python`` error carries an empty one."""
+        try:
+            return validate(value)
+        except ValidationError as exc:
+            errors = [{**e, "loc": (field, *e.get("loc", ()))} for e in exc.errors()]
+            raise HTTPException(status_code=422, detail=errors) from None
 
-            patched["safety"] = SafetyPosture.model_validate(body["safety"])
-        if "success_criteria" in body:
-            patched["success_criteria"] = _STR_LIST.validate_python(body["success_criteria"])
-        if "stakeholders" in body:
-            from ..engagement.context import Stakeholder
+    patched: dict = {}
+    if "site" in body:
+        from ..engagement.context import SiteInfo
 
-            patched["stakeholders"] = [Stakeholder.model_validate(s) for s in body["stakeholders"]]
-        if "slos" in body:
-            from ..engagement.context import SLOSpec
+        patched["site"] = _checked("site", SiteInfo.model_validate, body["site"])
+    if "safety" in body:
+        from ..engagement.context import SafetyPosture
 
-            patched["slos"] = [SLOSpec.model_validate(s) for s in body["slos"]]
-    except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=exc.errors()) from None
+        patched["safety"] = _checked("safety", SafetyPosture.model_validate, body["safety"])
+    if "success_criteria" in body:
+        patched["success_criteria"] = _checked(
+            "success_criteria", _STR_LIST.validate_python, body["success_criteria"]
+        )
+    if "stakeholders" in body:
+        from ..engagement.context import Stakeholder
+
+        patched["stakeholders"] = _checked(
+            "stakeholders", lambda v: [Stakeholder.model_validate(s) for s in v], body["stakeholders"]
+        )
+    if "slos" in body:
+        from ..engagement.context import SLOSpec
+
+        patched["slos"] = _checked("slos", lambda v: [SLOSpec.model_validate(s) for s in v], body["slos"])
     with engagement_lock(eid):
         eng = _load(eid)
         for field, value in patched.items():
@@ -657,6 +731,71 @@ async def compute_kpis(
 # ---------------------------------------------------------------------------
 # deploy API（Layer 3 装配计划：角色 → 连接器 → 工具绑定，dry-run，不碰运行时）
 # ---------------------------------------------------------------------------
+def _parse_agent_lines(text: str) -> tuple[list[dict], list[dict]]:
+    """Parse the deploy form's agent textarea: ``name: role[: model]`` per line.
+
+    Returns ``(agents, errors)``. Blank lines are skipped (not user errors);
+    anything else that cannot become an ``AgentSpec`` comes back as a
+    structured error with its 1-based line number, instead of being silently
+    dropped by the front-end like the old JS parser did.
+    """
+    agents: list[dict] = []
+    errors: list[dict] = []
+    for i, raw in enumerate(text.split("\n"), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split(":")]
+        name, role = parts[0], parts[1] if len(parts) > 1 else ""
+        if not name or not role:
+            errors.append(
+                {
+                    "field": "agents",
+                    "line": i,
+                    "text": line,
+                    "reason": "expected `name: role` (optional third segment: model)",
+                }
+            )
+            continue
+        agent: dict = {"name": name, "role": role}
+        if len(parts) > 2 and parts[2]:
+            agent["model"] = parts[2]
+        agents.append(agent)
+    return agents, errors
+
+
+def _parse_source_lines(text: str) -> tuple[dict[str, str], list[dict]]:
+    """Parse the deploy form's source textarea: ``connector_slug=source`` per line."""
+    sources: dict[str, str] = {}
+    errors: list[dict] = []
+    for i, raw in enumerate(text.split("\n"), start=1):
+        line = raw.strip()
+        if not line:
+            continue
+        key, sep, value = line.partition("=")
+        if not sep or not key.strip() or not value.strip():
+            errors.append(
+                {"field": "sources", "line": i, "text": line, "reason": "expected `connector=source`"}
+            )
+            continue
+        sources[key.strip()] = value.strip()
+    return sources, errors
+
+
+@app.post("/api/deploy/parse")
+def deploy_parse(body: dict) -> dict:
+    """Parse the deploy form's raw textarea text server-side.
+
+    The old flow parsed in the browser and silently dropped malformed lines, so
+    a typo made an agent vanish with no explanation. Here every dropped line
+    comes back with its line number and a reason; the front-end renders the
+    list and refuses to build a plan until it is empty.
+    """
+    agents, errors = _parse_agent_lines(str(body.get("agents_text", "")))
+    sources, src_errors = _parse_source_lines(str(body.get("sources_text", "")))
+    return {"agents": agents, "sources": sources, "errors": errors + src_errors}
+
+
 @app.post("/api/deploy/plan")
 def deploy_plan(body: dict | None = None) -> dict:
     """Dry-run ``fde-scope deploy`` for a tenant payload and return the manifest.
@@ -747,6 +886,33 @@ def api_skills(
             phase_slug=phase,
         )
     ]
+
+
+@app.get("/api/skills/facets")
+def api_skills_facets() -> dict:
+    """Distinct facet values across the skill store, for the console filters.
+
+    The search endpoint already accepts ``tag`` / ``profile`` / ``gate`` /
+    ``phase``; this returns the values that actually exist so the UI can offer
+    selects instead of asking the user to guess slugs.
+    """
+    tags: set[str] = set()
+    phases: set[str] = set()
+    gates: set[str] = set()
+    profiles: set[str] = set()
+    for rec in _skill_service().store.load_all():
+        tags.update(rec.tags)
+        if rec.phase_slug:
+            phases.add(rec.phase_slug)
+        if rec.gate_slug:
+            gates.add(rec.gate_slug)
+        profiles.update(rec.applies_to)
+    return {
+        "tags": sorted(tags),
+        "phases": sorted(phases),
+        "gates": sorted(gates),
+        "profiles": sorted(profiles),
+    }
 
 
 @app.post("/api/skills")
@@ -871,6 +1037,236 @@ def api_ontology_export(target_id: str) -> dict:
     from ..ontology.jsonld import store_to_jsonld
 
     return store_to_jsonld(inst, ref_schema)
+
+
+@app.get("/api/ontology/schema/{schema_id}/diagram")
+def api_ontology_diagram(schema_id: str) -> dict:
+    """Mermaid 类图（与 CLI ``ontology diagram`` 同语义：父类继承 + 对象属性边 + 数据属性行）。"""
+    from ..ontology.diagram import schema_to_mermaid
+    from ..ontology.store import OntologyStore
+
+    store = OntologyStore()
+    schema = store.load_schema(schema_id)
+    if schema is None:
+        raise HTTPException(status_code=404, detail=f"unknown ontology schema: {schema_id}")
+    return {"schema_id": schema.id, "version": schema.version, "mermaid": schema_to_mermaid(schema)}
+
+
+@app.get("/api/ontology/validate/{target_id}")
+def api_ontology_validate(target_id: str) -> dict:
+    """SHACL-lite 校验：schema 走 TBox（含 import 合并视图），store 走 ABox（对
+    ``ontology_ref`` 指向的 TBox）——与 CLI ``ontology validate`` / ``check`` 同语义。"""
+    from ..ontology.store import OntologyStore
+
+    store = OntologyStore()
+    schema = store.load_schema(target_id)
+    if schema is not None:
+        from ..ontology.validation import validate_schema
+
+        report = validate_schema(schema, loader=store.load_schema)
+        return {"kind": "schema", "target": f"{schema.id}@{schema.version}", **report.model_dump()}
+    inst = store.load_store(target_id)
+    if inst is None:
+        raise HTTPException(status_code=404, detail=f"unknown ontology target: {target_id}")
+    from ..ontology.validation import validate_store
+
+    report = validate_store(inst, loader=store.load_schema)
+    return {"kind": "store", "target": target_id, **report.model_dump()}
+
+
+@app.post("/api/ontology/diff")
+def api_ontology_diff(body: dict) -> dict:
+    """TBox 版本 diff（D1-D4）+ 全部引用工作区实例库的 ABox 影响面
+    （与 CLI ``ontology diff`` 同语义；影响面是迁移工作量证据，不是推断）。"""
+    from dataclasses import asdict
+
+    from ..ontology.diff import diff_schemas, store_impact
+    from ..ontology.store import OntologyStore
+
+    old_id = str(body.get("old", "")).strip()
+    new_id = str(body.get("new", "")).strip()
+    if not old_id or not new_id:
+        raise HTTPException(status_code=422, detail="both `old` and `new` schema ids are required")
+    store = OntologyStore()
+    old = store.load_schema(old_id)
+    new = store.load_schema(new_id)
+    missing = [i for i, s in ((old_id, old), (new_id, new)) if s is None]
+    if missing:
+        raise HTTPException(status_code=404, detail=f"unknown ontology schema: {', '.join(missing)}")
+    assert old is not None and new is not None  # narrowed above; mypy cannot see the comprehension
+    diff = diff_schemas(old, new)
+    impact: list[dict] = []
+    for meta in store.list_stores():
+        inst = store.load_store(meta["id"])
+        if inst is not None and inst.ontology_ref.split("@", 1)[0] == old.id:
+            impact.extend(asdict(c) for c in store_impact(inst, diff))
+    return {
+        "from": f"{old.id}@{diff.from_version}",
+        "to": f"{new.id}@{diff.to_version}",
+        "ok": diff.ok,
+        "breaking": [asdict(c) for c in diff.breaking],
+        "info": [asdict(c) for c in diff.info],
+        "impact": impact,
+    }
+
+
+# ---------------------------------------------------------------------------
+# ops API（连接器 / eval / flywheel / license —— §1.3 的四个面板）
+# ---------------------------------------------------------------------------
+#: Credential env var *names* per connector. The endpoint reports only
+#: whether each is set (a boolean) — never its value (invariant 3).
+_CONNECTOR_ENV: dict[str, tuple[str, ...]] = {
+    "mes": ("FDE_SCOPE_MES_BASE_URL", "FDE_SCOPE_MES_API_TOKEN"),
+    "historian": ("FDE_SCOPE_HISTORIAN_BASE_URL", "FDE_SCOPE_HISTORIAN_API_TOKEN"),
+    "mqtt_sparkplug": ("FDE_SCOPE_MQTT_USERNAME", "FDE_SCOPE_MQTT_PASSWORD"),
+    "zammad": ("FDE_SCOPE_ZAMMAD_BASE_URL", "FDE_SCOPE_ZAMMAD_API_TOKEN"),
+    "salesforce": ("FDE_SCOPE_SF_INSTANCE_URL", "FDE_SCOPE_SF_ACCESS_TOKEN"),
+}
+
+#: One-line mode notes from each module's docstring — what the connector does
+#: when its optional dependency or its credentials are missing.
+_CONNECTOR_NOTES: dict[str, str] = {
+    "csv": "JSONL/CSV 通用兜底，零依赖，冷启动默认路径",
+    "documents": "导入无需 extra；解析文件需要 [agentscope]",
+    "mqtt_sparkplug": "JSONL 抓包回放零依赖；实连 broker 需 paho-mqtt（[mqtt]），凭据走 env",
+    "mes": "HTTP 模式 / JSONL 回放 / 未配置三态；凭据走 env 或 options",
+    "historian": "时序库 HTTP API；凭据走 env 或 options",
+    "zammad": "纯 urllib 的 REST 实现；凭据走 env",
+    "salesforce": "纯 urllib 的 REST 实现；凭据走 env",
+    "mysql": "MySQL 8+ 直连，选 [mysql] extra",
+    "opcua": "asyncua 对接 OPC UA 地址空间，选 [opcua] extra",
+    "ros2_bag": "读 rosbag2 / .mcap，选 [ros2] extra；大二进制类型默认排除",
+}
+
+
+@app.get("/api/connectors")
+def api_connectors() -> dict:
+    """Connector registry status. Import-level truth only: a slug in the
+    registry imported cleanly, one in the module table but not the registry is
+    missing its optional dependency. Runtime reachability of a customer system
+    is deliberately NOT probed from a GET — constructing connections is a
+    deploy-time act. Env credentials surface as booleans, never values."""
+    from ..connectors._registry import _MODULE_BY_TYPE, get_registry
+
+    registry = get_registry()
+    entries: list[dict] = []
+    for slug in sorted(set(_MODULE_BY_TYPE) | set(registry)):
+        env_names = _CONNECTOR_ENV.get(slug, ())
+        entries.append(
+            {
+                "slug": slug,
+                "import_ok": slug in registry,
+                "note": _CONNECTOR_NOTES.get(slug, ""),
+                # names + booleans only — values never leave the process
+                "env": {name: bool(os.environ.get(name, "").strip()) for name in env_names},
+            }
+        )
+    return {"connectors": entries, "registered": len(registry)}
+
+
+@app.get("/api/eval/info")
+def api_eval_info() -> dict:
+    """What the eval panel needs before running: metric names + honest labels,
+    and whether a real LLM is configured (mock runs need nothing)."""
+    from ..eval.metrics import METRICS
+    from ..llm import get_llm_client
+
+    return {"metrics": dict(METRICS), "llm_available": get_llm_client().available}
+
+
+@app.post("/api/eval/run")
+def api_eval_run(body: dict) -> dict:
+    """Run the FDE benchmark over inline cases or a JSON/JSONL test-set path.
+
+    ``agent: "mock"`` needs nothing; ``"mimo"`` needs a configured LLM and
+    returns 502 with upgrade guidance when the env has none — the panel shows
+    that instead of pretending to run.
+    """
+    import json as _json
+
+    from ..eval import FDEBenchmark, MiMoReplyFn, MockReplyFn
+    from ..eval.metrics import EvalCase, ReplyFn
+    from ..llm import LLMError, get_llm_client
+
+    agent = str(body.get("agent", "mock"))
+    cases_raw = body.get("cases")
+    if not cases_raw and body.get("test_set"):
+        path = Path(str(body["test_set"]))
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"test_set not found: {path}")
+        text = path.read_text(encoding="utf-8")
+        try:
+            cases_raw = _json.loads(text)
+        except _json.JSONDecodeError:
+            cases_raw = [_json.loads(line) for line in text.splitlines() if line.strip()]
+    if not cases_raw:
+        raise HTTPException(status_code=422, detail="provide `cases` (list) or `test_set` (JSON/JSONL path)")
+    try:
+        cases = [EvalCase.model_validate(c) for c in cases_raw]
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from None
+
+    reply_fn: ReplyFn
+    if agent == "mock":
+        accuracy = min(1.0, max(0.0, float(body.get("accuracy", 0.9))))
+        reply_fn = MockReplyFn(accuracy=accuracy)
+    elif agent == "mimo":
+        client = get_llm_client()
+        if not client.available:
+            raise HTTPException(
+                status_code=502,
+                detail="no LLM configured — set the provider env key (see llm docs), or run agent=mock",
+            )
+        reply_fn = MiMoReplyFn(client)
+    else:
+        raise HTTPException(status_code=422, detail=f"unknown agent: {agent!r} — use 'mock' or 'mimo'")
+    try:
+        report = FDEBenchmark().run(reply_fn, cases)
+    except LLMError as exc:
+        raise HTTPException(status_code=502, detail=f"LLM call failed mid-run: {exc}") from exc
+    return report.model_dump(mode="json")
+
+
+@app.get("/api/flywheel")
+def api_flywheel() -> dict:
+    """Flywheel snapshot + retrain job descriptors, honestly labelled.
+
+    The counters are *this server process*: the engine is in-memory, so the
+    panel must not claim fleet-wide numbers. The jobs are descriptors for an
+    external orchestrator — nothing in this process fires them (the CLI used
+    to print a nonexistent scheduler; the panel will not repeat that)."""
+    from ..flywheel import DataFlywheel
+    from ..flywheel.retrain_scheduler import RetrainScheduler
+
+    jobs = [
+        {"name": j.name, "cron": j.cron, "min_new_samples": j.min_new_samples, "kind": j.kind}
+        for j in RetrainScheduler().jobs
+    ]
+    return {"snapshot": DataFlywheel().snapshot(), "jobs": jobs, "process_local": True}
+
+
+@app.get("/api/license")
+def api_license() -> dict:
+    """Read-only license facts. The key and its signature never appear here —
+    only where the key was found (env / key file / none)."""
+    from .. import license as lic
+
+    info = lic.load_license()
+    if os.environ.get(lic.ENV_LICENSE_KEY, "").strip():
+        key_source = "env"
+    else:
+        key_source = "file" if (paths.data_root() / paths.DATA_SUBDIR / lic.KEY_FILENAME).exists() else "none"
+    all_features = sorted(set().union(*lic.TIER_FEATURES.values()))
+    return {
+        "customer": info.customer,
+        "tier": info.tier,
+        "tier_rank": lic.TIER_ORDER[info.tier],
+        "seats": info.seats,
+        "expires_at": info.expires_at.isoformat() if info.expires_at else None,
+        "expired": bool(info.expired),
+        "key_source": key_source,
+        "features": {name: lic.has_feature(name) for name in all_features},
+    }
 
 
 from fastapi.staticfiles import StaticFiles  # noqa: E402
@@ -1168,12 +1564,47 @@ def doc_page_en(slug: str) -> str:
     return _DOC_PAGES_EN[slug]
 
 
+#: Homepage connector tiles: curated copy per slug (what it is), while the
+#: status pill comes from the registry at import time — a hand-written "stub"
+#: label drifted from the shipped code once already (plan §2.1).
+_CONNECTOR_TILE_META: dict[str, tuple[str, str, str]] = {
+    "csv": ("i-doc", "CSV", "通用兜底，冷启动"),
+    "zammad": ("i-ticket", "Zammad", "工单系统"),
+    "salesforce": ("i-cloud", "Salesforce", "CRM"),
+    "mysql": ("i-db", "MySQL", "关系库直连"),
+    "documents": ("i-docs", "Documents", "PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）"),
+    "opcua": ("i-cpu", "OPC UA", "PLC tag 读取（asyncua 驱动）"),
+    "mqtt_sparkplug": ("i-broadcast", "MQTT-Sparkplug", "工厂设备遥测"),
+    "ros2_bag": ("i-bot", "ROS2 Bag", "机器人轨迹回放（rosbags）"),
+    "mes": ("i-factory", "MES (ISA-95)", "工单/质量/停机"),
+    "historian": ("i-trend", "Historian", "时序历史库"),
+}
+
+
+def _connector_tiles() -> tuple[int, str]:
+    """(count, tile markup) for the homepage connectors section."""
+    from ..connectors._registry import _MODULE_BY_TYPE, get_registry
+
+    registry = get_registry()
+    tiles: list[str] = []
+    for slug in _MODULE_BY_TYPE:
+        icon, name, desc = _CONNECTOR_TILE_META.get(slug, ("i-plug", slug, ""))
+        ok = slug in registry
+        tiles.append(
+            f'<div class="tile"><svg class="ic"><use href="#{icon}"/></svg><div class="name">{name}</div>'
+            f'<div class="desc">{desc}</div><span class="status {"s-ok" if ok else "s-stub"}">'
+            f"{'已注册' if ok else '缺可选依赖'}</span></div>"
+        )
+    return len(tiles), "\n".join(tiles)
+
+
 _OVERVIEW_HTML = """<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · 功能总览</title>
+<link rel="icon" href="/static/favicon.svg">
 <script>(function(){var t=null,q=null;try{t=localStorage.getItem('fde-theme')}catch(e){}try{q=new URLSearchParams(location.search).get('theme')}catch(e){}if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}document.documentElement.dataset.theme=t})();</script>
 <style>
 /* Hallmark · genre: modern-minimal · macrostructure: long-document · design-system: design.md (Graphite) · designed-as-app */
@@ -1409,18 +1840,10 @@ __ICON_SPRITE__
 </section>
 
 <section id="connectors">
-<div class="sec-head"><svg class="ic"><use href="#i-plug"/></svg><h2>10 个数据连接器</h2><span class="n">03</span></div>
+<div class="sec-head"><svg class="ic"><use href="#i-plug"/></svg><h2>__CONNECTOR_COUNT__ 个数据连接器</h2><span class="n">03</span></div>
+<p class="meta" style="margin:6px 0 0">状态由连接器注册表在导入时生成（依赖齐 = 已注册）；运行时能力矩阵见 <a href="/console#ops">控制台运维面板</a>。</p>
 <div class="grid cols-4">
-  <div class="tile"><svg class="ic"><use href="#i-doc"/></svg><div class="name">CSV</div><div class="desc">通用兜底，冷启动</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-db"/></svg><div class="name">MySQL</div><div class="desc">关系库直连</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-broadcast"/></svg><div class="name">MQTT-Sparkplug</div><div class="desc">工厂设备遥测</div><span class="status s-ok">JSONL 可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-factory"/></svg><div class="name">MES (ISA-95)</div><div class="desc">工单/质量/停机</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-cpu"/></svg><div class="name">OPC UA</div><div class="desc">PLC tag 读取（asyncua 驱动）</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-bot"/></svg><div class="name">ROS2 Bag</div><div class="desc">机器人轨迹回放</div><span class="status s-stub">stub</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-trend"/></svg><div class="name">Historian</div><div class="desc">时序历史库</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-ticket"/></svg><div class="name">Zammad</div><div class="desc">工单系统</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-cloud"/></svg><div class="name">Salesforce</div><div class="desc">CRM</div><span class="status s-ok">真实可用</span></div>
-  <div class="tile"><svg class="ic"><use href="#i-docs"/></svg><div class="name">Documents</div><div class="desc">PDF/Word/Excel/PPT 解析（agentscope.rag，延迟导入）</div><span class="status s-partial">需 [agentscope]</span></div>
+__CONNECTOR_TILES__
 </div>
 </section>
 
@@ -1450,7 +1873,7 @@ __ICON_SPRITE__
 <div class="sec-head"><svg class="ic"><use href="#i-layers"/></svg><h2>架构清单 · 四层 + 横切</h2><span class="n">06</span></div>
 <p class="sec-note">证据化建模见 docs/architecture-model/。</p>
 <div class="grid cols-3">
-  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（43 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（69 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-compass"/></svg><div class="name">SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-gears"/></svg><div class="name">能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · ontology · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-wrench"/></svg><div class="name">横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>
@@ -1476,6 +1899,7 @@ __ICON_SPRITE__
 
 <section id="kpi">
 <div class="sec-head"><svg class="ic"><use href="#i-trend"/></svg><h2>制造业 KPI（虚构演示数据）</h2><span class="n">08</span></div>
+<p class="meta" style="margin:6px 0 0">换成真实数据：在控制台创建 manufacturing engagement，门禁与 KPI 探索器（/console → KPI tab）会从真实 engagement 计算；本区数字仅作版式演示。</p>
 <div class="grid cols-4">
   <div class="tile"><div class="name">OEE</div><div class="kpi-row"><span>设备综合效率</span><span class="v">0.724</span></div><div class="desc">世界级 ≥0.85</div></div>
   <div class="tile"><div class="name">抓取成功率</div><div class="kpi-row"><span>pick success</span><span class="v">0.793</span></div><div class="desc">DexNet 基准 ~0.80</div></div>
@@ -1536,7 +1960,7 @@ __ICON_SPRITE__
     <svg class="ic"><use href="#i-factory"/></svg>
     <div class="name">manufacturing · 具身机器人</div>
     <div class="desc">OPC UA/MQTT/ROS2/MES/Historian 接入。OEE/MTBF/抓取率/碰撞率 + 6 个工业合规 gate。</div>
-    <span class="status s-partial">核心可用 · 工业IO部分 stub</span>
+    <span class="status s-ok">核心可用 · 工业 IO 已接入</span>
   </div>
 </div>
 </section>
@@ -1569,6 +1993,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FDE Scope · Engagement Console</title>
+<link rel="icon" href="/static/favicon.svg">
 <script>(function(){var t=null,q=null;try{t=localStorage.getItem('fde-theme')}catch(e){}try{q=new URLSearchParams(location.search).get('theme')}catch(e){}if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}document.documentElement.dataset.theme=t})();</script>
 <style>
 /* Hallmark · genre: modern-minimal · macrostructure: workbench · design-system: design.md (Graphite) · designed-as-app */
@@ -1756,6 +2181,7 @@ __ICON_SPRITE__
         <button class="navbtn" data-view="skills" onclick="go('skills')">技能库</button>
         <button class="navbtn" data-view="deploy" onclick="go('deploy')">Agent 部署</button>
         <button class="navbtn" data-view="ontology" onclick="go('ontology')">本体库</button>
+        <button class="navbtn" data-view="ops" onclick="go('ops')">运维</button>
       </div>
       <div class="grp">外部</div>
       <a href="/GTM/index.html">GTM 官网</a>
@@ -1773,6 +2199,7 @@ __ICON_SPRITE__
     <div id="view-skills" class="hidden"></div>
     <div id="view-deploy" class="hidden"></div>
     <div id="view-ontology" class="hidden"></div>
+    <div id="view-ops" class="hidden"></div>
   </main>
 </div>
 
@@ -1815,14 +2242,30 @@ function go(name) {
   if (name==='skills') location.hash = 'skills';
   else if (name==='deploy') location.hash = 'deploy';
   else if (name==='ontology') location.hash = 'ontology';
+  else if (name==='ops') location.hash = 'ops';
   else if (location.hash) history.replaceState(null,'',location.pathname);
   if (name==='workbench') loadWorkbench();
   if (name==='skills') loadSkills();
   if (name==='deploy') renderDeploy();
   if (name==='ontology') loadOntology();
+  if (name==='ops') loadOps();
 }
 
 // -- 工作台 ---------------------------------------------------------------
+let wbMatrix = [];
+function wbFilteredMatrix() {
+  const q = ((document.getElementById('wb-q')||{}).value||'').trim().toLowerCase();
+  const ph = (document.getElementById('wb-phase')||{}).value||'';
+  const zo = (document.getElementById('wb-zone')||{}).value||'';
+  return wbMatrix.filter(s =>
+    (!q || (s.customer||'').toLowerCase().includes(q) || (s.engagement_id||'').toLowerCase().includes(q))
+    && (!ph || s.current_phase === ph) && (!zo || s.current_zone === zo));
+}
+function applyWbFilter() {
+  const box = document.getElementById('wb-cards');
+  if (box) box.innerHTML = engCardsHtml(wbFilteredMatrix());
+}
+
 async function loadWorkbench() {
   const w = await api('/api/workbench');
   const st = w.stats;
@@ -1843,10 +2286,21 @@ async function loadWorkbench() {
       <div class="kpi"><div class="k">待审草稿</div><div class="v" style="color:${st.draft_skills?'var(--warn)':'var(--fg)'}">${st.draft_skills}</div></div>
     </div>
     <div class="phasebar"><span class="lab">阶段分布</span>${phaseChips}</div>`;
+  wbMatrix = w.matrix;
+  const sel = id => (document.getElementById(id)||{}).value||'';
+  const prevQ = sel('wb-q'), prevPhase = sel('wb-phase'), prevZone = sel('wb-zone');
+  const opt = (v, cur) => `<option value="${escapeHtml(v)}"${v===cur?' selected':''}>${escapeHtml(v)}</option>`;
+  const phaseOpts = [...new Set(w.matrix.map(s=>s.current_phase))].sort().map(p=>opt(p, prevPhase)).join('');
+  const zoneOpts = [...new Set(w.matrix.map(s=>s.current_zone))].sort().map(z=>opt(z, prevZone)).join('');
   const master = `<section class="md-list">
     <div class="md-head"><h2>Engagements</h2><span class="n">${w.matrix.length}</span></div>
     ${createBoxHtml(empty)}
-    ${engCardsHtml(w.matrix)}
+    ${empty?'':`<div class="row">
+      <input id="wb-q" value="${escapeHtml(prevQ)}" placeholder="搜索客户 / engagement id" oninput="applyWbFilter()">
+      <label>阶段</label><select id="wb-phase" onchange="applyWbFilter()"><option value="">全部阶段</option>${phaseOpts}</select>
+      <label>分区</label><select id="wb-zone" onchange="applyWbFilter()"><option value="">全部分区</option>${zoneOpts}</select>
+    </div>`}
+    <div id="wb-cards">${engCardsHtml(empty?w.matrix:wbFilteredMatrix())}</div>
   </section>`;
   const detail = empty ? gettingStartedHtml()
     : `<div class="card"><div class="empty">${icon('i-map')}选择左侧的 engagement，查看阶段、门禁与 KPI</div></div>`;
@@ -1897,12 +2351,18 @@ function engCardsHtml(matrix) {
   if (!matrix.length) return '<div class="md-empty">还没有 engagement —— 用上面的表单创建第一条。</div>';
   return matrix.map(s => {
     const ts = Object.values(s.gate_records||{}).map(g=>g.checked_at).filter(Boolean).sort().pop() || '';
-    return `<div class="card eng${current===s.engagement_id?' sel':''}" data-eid="${escapeHtml(s.engagement_id)}" onclick="selectEng('${escapeHtml(s.engagement_id)}')">
+    // eid/customer travel as data-* attributes, never as inline-JS string
+    // literals: a customer name with a quote would otherwise break the handler.
+    return `<div class="card eng${current===s.engagement_id?' sel':''}" data-eid="${escapeHtml(s.engagement_id)}" data-customer="${escapeHtml(s.customer)}" onclick="selectEng(this.dataset.eid)">
       <div class="id">${escapeHtml(s.customer)}</div>
       <div class="meta"><span class="pill ${s.profile==='manufacturing'?'ind':'tkt'}">${escapeHtml(s.profile)}</span>
         ${s.gate?escapeHtml(s.gate)+' '+dot(s.gate_passed):'—'}</div>
       <div class="meta">${zoneLabel(escapeHtml(s.current_zone))} · ${escapeHtml(s.current_phase)}${s.is_complete?' · '+dot(true)+' 完成':''}</div>
       <div class="meta">${ts?escapeHtml(String(ts).slice(0,16).replace('T',' ')):'—'}</div>
+      <div class="row" style="margin-top:6px">
+        <button class="ghost" style="font-size:.72rem" onclick="event.stopPropagation();askArchiveEng(this)">归档</button>
+        <button class="ghost" style="font-size:.72rem;color:var(--bad)" onclick="event.stopPropagation();askDeleteEng(this)">删除</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -1922,12 +2382,25 @@ async function loadSkills() {
   const q = (document.getElementById('sk-q')||{}).value || '';
   const cat = (document.getElementById('sk-cat')||{}).value || '';
   const st = (document.getElementById('sk-status')||{}).value || 'published';
+  const tag = (document.getElementById('sk-tag')||{}).value || '';
+  const prof = (document.getElementById('sk-profile')||{}).value || '';
+  const gate = (document.getElementById('sk-gate')||{}).value || '';
+  const phase = (document.getElementById('sk-phase')||{}).value || '';
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (cat) params.set('category', cat);
   if (st) params.set('status', st);
-  const list = await api('/api/skills?' + params);
-  const drafts = await api('/api/skills/drafts');
+  if (tag) params.set('tag', tag);
+  if (prof) params.set('profile', prof);
+  if (gate) params.set('gate', gate);
+  if (phase) params.set('phase', phase);
+  const [list, facets, drafts] = await Promise.all([
+    api('/api/skills?' + params),
+    api('/api/skills/facets'),
+    api('/api/skills/drafts'),
+  ]);
+  const opts = (vals, cur) => ['<option value="">全部</option>']
+    .concat(vals.map(v=>`<option value="${escapeHtml(v)}"${v===cur?' selected':''}>${escapeHtml(v)}</option>`)).join('');
   document.getElementById('view-skills').innerHTML = `
     <div class="card"><h2>技能库</h2>
       <div class="row"><label>搜索</label><input id="sk-q" value="${escapeHtml(q)}" placeholder="标题 / 正文关键词" onkeydown="if(event.key==='Enter')loadSkills()"></div>
@@ -1937,6 +2410,10 @@ async function loadSkills() {
         <option value="optimization">optimization</option><option value="methodology">methodology</option></select>
         <label>状态</label><select id="sk-status" onchange="loadSkills()">
         <option value="published">published</option><option value="draft">draft</option><option value="archived">archived</option></select></div>
+      <div class="row"><label>标签</label><select id="sk-tag" onchange="loadSkills()">${opts(facets.tags||[], tag)}</select>
+        <label>适用画像</label><select id="sk-profile" onchange="loadSkills()">${opts(facets.profiles||[], prof)}</select></div>
+      <div class="row"><label>门禁</label><select id="sk-gate" onchange="loadSkills()">${opts(facets.gates||[], gate)}</select>
+        <label>阶段</label><select id="sk-phase" onchange="loadSkills()">${opts(facets.phases||[], phase)}</select></div>
       ${list.map(skillCard).join('') || '<div class="empty">无匹配技能</div>'}
     </div>
     <div class="card"><h2>草稿审阅队列</h2>${draftCards(drafts)}</div>
@@ -2100,39 +2577,35 @@ function renderDeploy() {
   deployInit = true;
 }
 
-function _parseAgentLines(text) {
-  return text.split('\\n').map(s=>s.trim()).filter(Boolean).map(line=>{
-    const parts = line.split(':').map(s=>s.trim());
-    const a = {name: parts[0], role: parts[1] || ''};
-    if (parts[2]) a.model = parts[2];
-    return a;
-  }).filter(a=>a.name && a.role);
-}
-
-function _parseSourceLines(text) {
-  const out = {};
-  text.split('\\n').map(s=>s.trim()).filter(Boolean).forEach(line=>{
-    const i = line.indexOf('=');
-    if (i > 0) out[line.slice(0,i).trim()] = line.slice(i+1).trim();
-  });
-  return out;
-}
-
 async function runDeployPlan() {
   const val = id => (document.getElementById(id)||{}).value || '';
-  const body = {
-    tenant: val('dp-tenant').trim() || 'acme',
-    profile: val('dp-profile'),
-    approval_mode: val('dp-mode'),
-    model: val('dp-model').trim() || 'qwen-max',
-    agents: _parseAgentLines(val('dp-agents')),
-    sources: _parseSourceLines(val('dp-sources')),
-  };
   const out = document.getElementById('dp-result');
   out.innerHTML = '<div class="empty">计算中…</div>';
   try {
+    // server-side parse: every dropped line comes back with a line number and
+    // a reason, instead of vanishing silently like the old JS parser
+    const parsed = await api('/api/deploy/parse', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({agents_text: val('dp-agents'), sources_text: val('dp-sources')})});
+    if ((parsed.errors||[]).length) {
+      const rows = parsed.errors.map(e=>`<tr><td class="meta">${e.field}</td><td class="meta">${e.line}</td>
+        <td><code>${escapeHtml(e.text)}</code></td><td class="meta">${escapeHtml(e.reason)}</td></tr>`).join('');
+      out.innerHTML = `<div class="gate fail"><b>输入格式有误（${parsed.errors.length} 行）</b>
+        <div class="tablewrap" style="margin-top:8px"><table>
+        <thead><tr><th>字段</th><th>行号</th><th>原始行</th><th>原因</th></tr></thead>
+        <tbody>${rows}</tbody></table></div></div>`;
+      return;
+    }
     const plan = await api('/api/deploy/plan', {method:'POST',
-      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        tenant: val('dp-tenant').trim() || 'acme',
+        profile: val('dp-profile'),
+        approval_mode: val('dp-mode'),
+        model: val('dp-model').trim() || 'qwen-max',
+        agents: parsed.agents,
+        sources: parsed.sources,
+      })});
     out.innerHTML = planHtml(plan);
   } catch(e) {
     out.innerHTML = `<div class="gate fail"><b>校验失败（422）</b><pre>${escapeHtml(String(e.message||e))}</pre></div>`;
@@ -2223,9 +2696,14 @@ function renderDetail(s, phases, gates, guided) {
     const cls = g.passed?'pass':'fail';
     const blocks = g.blockers.map(b=>`<li class="bl">${icon('i-ban')} ${escapeHtml(b)}</li>`).join('');
     const warns = g.warnings.map(w=>`<li class="wn">${icon('i-alert')} ${escapeHtml(w)}</li>`).join('');
+    // the guided endpoint already computes per-gate next_steps (issue + advice);
+    // reusing it keeps one source of truth for "what to do next"
+    const steps = ((((guided||{}).gates||{})[slug]||{}).next_steps)||[];
+    const stepsHtml = steps.map((st,i)=>`<li value="${i+1}"><b>${escapeHtml(st.issue)}</b><div class="adv">${escapeHtml(st.advice)}</div></li>`).join('');
     return `<div class="gate ${cls}"><div class="h"><b>${escapeHtml(g.name)}</b>
       <span>${g.passed?dot(true)+' PASS':dot(false)+' BLOCKED'}</span></div>
       ${blocks?`<ul>${blocks}</ul>`:''}${warns?`<ul>${warns}</ul>`:''}
+      ${stepsHtml?`<div class="hint">下一步做什么</div><ol class="steps">${stepsHtml}</ol>`:''}
       <button class="ghost" style="margin-top:6px;font-size:.75rem" onclick="recheck('${escapeHtml(slug)}')">重新校验</button></div>`;
   }).join('') || '<div class="empty">无适用 gate（当前 profile）</div>';
 
@@ -2246,14 +2724,17 @@ function renderDetail(s, phases, gates, guided) {
 
   const html = `
     <div class="tabs" role="tablist">
-      <button class="tab active" role="tab" aria-selected="true" onclick="tab('overview',this)">概览</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('guided',this)">引导</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('sop',this)">SOP 阶段</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('gates',this)">Gates</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('context',this)">Context</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('forge',this)">Corpus Forge</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('kpi',this)">KPI</button>
-      <button class="tab" role="tab" aria-selected="false" onclick="tab('journal',this)">现场记录</button>
+      <button class="tab active" role="tab" data-tab="overview" aria-selected="true" onclick="tab('overview',this)">概览</button>
+      <button class="tab" role="tab" data-tab="guided" aria-selected="false" onclick="tab('guided',this)">引导</button>
+      <button class="tab" role="tab" data-tab="sop" aria-selected="false" onclick="tab('sop',this)">SOP 阶段</button>
+      <button class="tab" role="tab" data-tab="gates" aria-selected="false" onclick="tab('gates',this)">Gates</button>
+      <button class="tab" role="tab" data-tab="context" aria-selected="false" onclick="tab('context',this)">Context</button>
+      <button class="tab" role="tab" data-tab="forge" aria-selected="false" onclick="tab('forge',this)">Corpus Forge</button>
+      <button class="tab" role="tab" data-tab="kpi" aria-selected="false" onclick="tab('kpi',this)">KPI</button>
+      <button class="tab" role="tab" data-tab="journal" aria-selected="false" onclick="tab('journal',this)">现场记录</button>
+      <button class="tab" role="tab" data-tab="evidence" aria-selected="false" onclick="tab('evidence',this)">证据</button>
+      <button class="tab" role="tab" data-tab="handoff" aria-selected="false" onclick="tab('handoff',this)">交接</button>
+      <button class="tab" role="tab" data-tab="audit" aria-selected="false" onclick="tab('audit',this)">审计</button>
     </div>
     <div id="t-overview">
       <div class="card">
@@ -2265,7 +2746,8 @@ function renderDetail(s, phases, gates, guided) {
         <div class="row"><label>进度</label>${curIdx+1}/${phases.phases.length}</div>
         <div class="row" style="margin-top:10px">
           <button onclick="advance(false)">${icon('i-next')} 推进到下一阶段</button>
-          <button class="ghost" onclick="advance(true)">force 推进</button>
+          <button class="ghost" onclick="askAdvanceForce()">force 推进</button>
+          <button class="ghost" onclick="askRollback()">${icon('i-refresh')} 回滚阶段</button>
         </div>
       </div>
       <div class="card">
@@ -2280,7 +2762,8 @@ function renderDetail(s, phases, gates, guided) {
       </div>
     </div>
     <div id="t-guided" class="hidden">${guidedHtml(guided, phases)}</div>
-    <div id="t-sop" class="hidden"><div class="card"><div class="phases">${phaseHtml}</div></div></div>
+    <div id="t-sop" class="hidden"><div class="card"><div class="phases">${phaseHtml}</div>
+      <div class="row" style="margin-top:10px"><a class="btn ghost" href="/sop" target="_blank">${icon('i-book')} 阅读 SOP 全文（含 18 阶段详解）</a></div></div></div>
     <div id="t-gates" class="hidden">${ledgerHtml}${gateHtml}</div>
     <div id="t-context" class="hidden">${contextHtml(s.context)}</div>
     <div id="t-forge" class="hidden"><div class="card">
@@ -2300,12 +2783,29 @@ function renderDetail(s, phases, gates, guided) {
       <button onclick="runKpi()">计算</button>
       <div id="kpi-out" style="margin-top:10px"></div>
     </div></div>
+    <div id="t-evidence" class="hidden"></div>
+    <div id="t-handoff" class="hidden"></div>
+    <div id="t-audit" class="hidden"></div>
   `;
   document.getElementById('md-detail').innerHTML = html;
+  detailStatus = s;
+  detailPhases = phases.phases;
+  // a #t:<name> hash survives reloads and post-action refreshes, so the reader
+  // lands back on the pane they were reading instead of always on Overview
+  const m = /^#t:([a-z]+)$/.exec(location.hash || '');
+  if (m && DETAIL_TABS.includes(m[1]) && m[1] !== 'overview') tab(m[1]);
 }
 
+const DETAIL_TABS = ['overview','guided','sop','gates','context','forge','kpi','journal','evidence','handoff','audit'];
+// panes that fetch only when opened, so selectEng stays at its 3 blocking calls
+const LAZY_TABS = {evidence: loadEvidence, handoff: renderHandoff, audit: loadAudit};
+let detailStatus = null;
+let detailPhases = [];
+
 function tab(name, el) {
-  ['overview','guided','sop','gates','context','forge','kpi','journal'].forEach(t=>{
+  el = el || document.querySelector(`.tab[data-tab="${name}"]`);
+  if (!el) return;
+  DETAIL_TABS.forEach(t=>{
     const e=document.getElementById('t-'+t); if(e) e.classList.toggle('hidden', t!==name);
   });
   document.querySelectorAll('.tab').forEach(t=>{
@@ -2314,9 +2814,56 @@ function tab(name, el) {
   });
   el.classList.add('active');
   el.setAttribute('aria-selected','true');
+  // replaceState, not location.hash: assigning the hash fires hashchange, which
+  // the router at the bottom reads as a top-level view switch.
+  history.replaceState(null, '', '#t:'+name);
+  const lazy = LAZY_TABS[name];
+  if (lazy) lazy();
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+const CONTEXT_EDITABLE_KEYS = ['site','safety','success_criteria','stakeholders','slos','assets'];
+
+function contextEditorHtml(ctx) {
+  if (!ctx) return '';
+  const editable = {};
+  CONTEXT_EDITABLE_KEYS.forEach(k=>{ if (ctx[k] !== undefined) editable[k] = ctx[k]; });
+  return `<details class="mt8"><summary>编辑上下文（JSON · 保存后门禁重评）</summary>
+    <textarea id="ctx-json" rows="12" style="width:100%;margin-top:8px;background:var(--code);border:1px solid var(--border);color:var(--fg);border-radius:6px;font-size:.8rem;padding:8px;font-family:var(--mono,monospace)">${escapeHtml(JSON.stringify(editable, null, 2))}</textarea>
+    <div class="row" style="margin-top:8px"><button onclick="saveContextJson()">保存并重评门禁</button>
+      <span class="hint">可编辑键：site / safety / success_criteria / stakeholders / slos / assets；后端做字段级校验，错误带字段路径。</span></div>
+    <div id="ctx-err" class="mt6"></div></details>`;
+}
+
+async function saveContextJson() {
+  const errBox = document.getElementById('ctx-err');
+  errBox.innerHTML = '';
+  let parsed;
+  try { parsed = JSON.parse(document.getElementById('ctx-json').value); }
+  catch(e){ errBox.innerHTML = `<div class="gate fail">JSON 解析失败：${escapeHtml(e.message)}</div>`; return; }
+  const patch = {};
+  CONTEXT_EDITABLE_KEYS.forEach(k=>{ if (k in parsed) patch[k] = parsed[k]; });
+  if (!Object.keys(patch).length) {
+    errBox.innerHTML = '<div class="gate fail">没有可保存的字段（仅 site / safety / success_criteria / stakeholders / slos / assets）</div>';
+    return;
+  }
+  try {
+    await api(`/api/engagements/${current}/context`, {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(patch)});
+    toast('已保存，门禁已重评','ok');
+    selectEng(current);
+  } catch(e) {
+    // 422 detail is pydantic's errors(): render each with its field path
+    let rows = '';
+    try {
+      const d = JSON.parse(e.message);
+      if (Array.isArray(d.detail))
+        rows = d.detail.map(x=>`<div>· <code>${escapeHtml((x.loc||[]).join('.'))}</code> — ${escapeHtml(x.msg||'')}</div>`).join('');
+    } catch(_){ /* not a pydantic body */ }
+    errBox.innerHTML = `<div class="gate fail"><b>字段校验失败</b>${rows ? `<div class="mt6">${rows}</div>` : `<div class="mt6 meta">${escapeHtml(String(e.message).slice(0,300))}</div>`}</div>`;
+  }
+}
 
 function contextHtml(ctx) {
   if (!ctx) return '<div class="empty">无 context 数据</div>';
@@ -2371,7 +2918,7 @@ function contextHtml(ctx) {
       <div class="row"><label>质量漂移</label>${mon.quality_drift&&mon.quality_drift.enabled?dot(true)+' 启用 · 节奏 '+esc(mon.quality_drift.cadence||'每周')+(mon.quality_drift.threshold?' · 阈值 '+esc(mon.quality_drift.threshold):''):dot(false)+' 未启用'}</div>
       ${mon.feedback_latency&&mon.feedback_latency.target_hours?`<div class="row"><label>反馈时延</label>目标 ${esc(mon.feedback_latency.target_hours)}h 内闭环</div>`:''}
       ${(mon.dashboards||[]).length?`<div class="row"><label>看板</label>${mon.dashboards.map(d=>`<a href="${esc(d.url||'#')}" target="_blank">${esc(d.name||d.url||'看板')}</a>`).join(' · ')}</div>`:''}` : '';
-  return `<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
+  return `${contextEditorHtml(ctx)}<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
     <div class="card"><h2>干系人</h2><div class="tablewrap"><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div></div>
     <div class="card"><h2>成功标准</h2><ul style="padding-left:18px">${crit}</ul></div>
     <div class="card"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>错误预算</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
@@ -2625,18 +3172,225 @@ async function gdPostContext(body) {
 }
 
 
-async function advance(force) {
-  const r = await api(`/api/engagements/${current}/advance?force=${force}`,{method:'POST'});
+async function advance(force, reason, operator) {
+  const opts = {method:'POST'};
+  const fd = new URLSearchParams();
+  if (reason) fd.set('reason', reason);
+  if (operator) fd.set('operator', operator);
+  if (reason || operator) opts.body = fd;
+  const r = await api(`/api/engagements/${current}/advance?force=${!!force}`, opts);
   if (!r.advanced) {
-    const res = r.result;
-    toast('推进被拦截：' + (res.blockers||[]).join('；'), 'bad', 7000);
-  }
+    if (r.reason==='complete') toast('已是最后阶段，无可推进目标','warn',6000);
+    else toast('推进被拦截：' + ((r.result||{}).blockers||[]).join('；'), 'bad', 7000);
+  } else if (force) toast('已 force 推进（原因已入审计）','ok',6000);
   selectEng(current);
 }
 
 async function recheck(slug) {
   await api(`/api/engagements/${current}/gate/${slug}`,{method:'POST'});
   selectEng(current);
+}
+
+// ---- destructive / privileged actions: one shared confirmation dialog --------
+function openActionDialog(cfg) {
+  const dlg = document.getElementById('dlg-action');
+  document.getElementById('dlg-action-title').textContent = cfg.title;
+  document.getElementById('dlg-action-msg').innerHTML = cfg.message || '';
+  document.getElementById('dlg-action-fields').innerHTML = (cfg.fields||[]).map(f=>{
+    if (f.type==='select')
+      return `<div class="row"><label>${f.label}</label><select id="af-${f.name}">${
+        f.options.map(o=>`<option value="${o.value}">${o.text}</option>`).join('')}</select></div>`;
+    return `<div class="row"><label>${f.label}</label><input id="af-${f.name}" placeholder="${f.placeholder||''}"></div>`;
+  }).join('');
+  const ok = document.getElementById('dlg-action-ok');
+  ok.textContent = cfg.confirmLabel || '确定';
+  ok.style.color = cfg.danger ? 'var(--bad)' : '';
+  ok.onclick = async () => {
+    const vals = {};
+    (cfg.fields||[]).forEach(f=>{ const e=document.getElementById('af-'+f.name); vals[f.name] = e ? e.value : ''; });
+    if (cfg.validate) { const err = cfg.validate(vals); if (err) return toast(err,'warn',6000); }
+    dlg.close();
+    try { await cfg.submit(vals); } catch(e){ toast('操作失败：'+e.message,'bad',8000); }
+  };
+  dlg.showModal();
+}
+
+function askAdvanceForce() {
+  if (!detailStatus) return;
+  openActionDialog({
+    title:'force 推进',
+    message:`force 会越过未通过的门禁把 <b>${escapeHtml(detailStatus.current_phase)}</b> 推进到下一阶段；<b>原因必填</b>，与操作人一并写入审计。`,
+    fields:[
+      {name:'reason', label:'原因', placeholder:'为什么必须强制推进（必填）'},
+      {name:'operator', label:'操作人', placeholder:'可选'},
+    ],
+    confirmLabel:'强制推进', danger:true,
+    validate: v => v.reason.trim() ? null : '请填写强制推进的原因',
+    submit: v => advance(true, v.reason.trim(), v.operator.trim()),
+  });
+}
+
+function askRollback() {
+  if (!detailStatus) return;
+  let curIdx = 0;
+  detailPhases.forEach((p,i)=>{ if (p.slug===detailStatus.current_phase) curIdx=i; });
+  const opts = detailPhases.slice(0, curIdx).map(p=>({value:p.slug, text:`${p.index} · ${p.name} (${p.slug})`}));
+  if (!opts.length) return toast('已在可见阶段的最前面，无可回滚目标','warn',6000);
+  openActionDialog({
+    title:'回滚阶段',
+    message:`当前阶段 <b>${escapeHtml(detailStatus.current_phase)}</b>。回滚只能往<b>更早</b>的阶段走，门禁会在下次推进时重新校验。`,
+    fields:[
+      {name:'to_phase', label:'目标阶段', type:'select', options:opts},
+      {name:'reason', label:'原因', placeholder:'写入审计（可选）'},
+      {name:'operator', label:'操作人', placeholder:'可选'},
+    ],
+    confirmLabel:'回滚', danger:true,
+    submit: async v => {
+      const fd = new URLSearchParams({to_phase:v.to_phase});
+      if (v.reason.trim()) fd.set('reason', v.reason.trim());
+      if (v.operator.trim()) fd.set('operator', v.operator.trim());
+      const r = await api(`/api/engagements/${current}/rollback`, {method:'POST', body:fd});
+      toast(`已回滚 ${r.from_phase} → ${r.to_phase}`,'ok',6000);
+      selectEng(current);
+    },
+  });
+}
+
+function askArchiveEng(btn) {
+  const card = btn.closest('.eng');
+  const eid = card.dataset.eid, customer = card.dataset.customer || '';
+  openActionDialog({
+    title:'归档 engagement',
+    message:`归档 <b>${escapeHtml(customer)}</b> 后它会离开所有列表（数据保留在归档目录，审计留痕）。`,
+    confirmLabel:'归档', danger:true,
+    submit: async () => {
+      await api(`/api/engagements/${eid}/archive`, {method:'POST'});
+      toast('已归档','ok');
+      if (current===eid) current='';
+      loadWorkbench();
+    },
+  });
+}
+
+function askDeleteEng(btn) {
+  const card = btn.closest('.eng');
+  const eid = card.dataset.eid, customer = card.dataset.customer || '';
+  openActionDialog({
+    title:'删除 engagement（GDPR 删除权）',
+    message:`将永久删除 <b>${escapeHtml(customer)}</b> 的 engagement JSON 与全部证据文件，<b>不可恢复</b>。审计日志本身按合规要求保留。<br>请原样输入客户名以确认：`,
+    fields:[{name:'confirm', label:'客户名', placeholder:customer}],
+    confirmLabel:'永久删除', danger:true,
+    validate: v => v.confirm === customer ? null : '客户名不一致，已取消',
+    submit: async () => {
+      await api(`/api/engagements/${eid}`, {method:'DELETE',
+        body:new URLSearchParams({confirm:customer})});
+      toast('已删除','ok');
+      if (current===eid) current='';
+      loadWorkbench();
+    },
+  });
+}
+
+// ---- evidence / handoff / audit (lazily loaded panes) ------------------------
+async function loadEvidence() {
+  const box = document.getElementById('t-evidence');
+  box.innerHTML = '<div class="card"><div class="empty">加载中…</div></div>';
+  try {
+    const r = await api(`/api/engagements/${current}/evidence`);
+    const rows = (r.evidence||[]).map(e=>`<tr>
+      <td><b>${escapeHtml(e.name)}</b></td>
+      <td><code style="font-size:.72rem">${escapeHtml(String(e.sha256||''))}</code></td>
+      <td class="meta">${escapeHtml(String(e.bytes||0))} B</td>
+      <td class="meta">${escapeHtml(String(e.ts||'').slice(0,19).replace('T',' '))}</td>
+      <td class="meta">${escapeHtml(e.operator||'—')}</td></tr>`).join('');
+    box.innerHTML = `<div class="card"><h2>验收证据</h2>
+      <div class="hint">FAT/SAT 签字扫描件等外部凭证；留存 sha256 摘要供完整性核对。<b>摘要不是数字签名</b>，也不构成链式审计——那两项在商业版路线上。</div>
+      ${rows?`<div class="tablewrap" style="margin-top:8px"><table>
+        <thead><tr><th>文件</th><th>sha256</th><th>大小</th><th>留存时间</th><th>操作人</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`:'<div class="empty">尚无证据</div>'}
+      <div class="row" style="margin-top:12px"><input type="file" id="ev-file"></div>
+      <div class="row"><label>名称</label><input id="ev-name" placeholder="留空则用文件名"></div>
+      <div class="row"><label>操作人</label><input id="ev-op" placeholder="可选"></div>
+      <button onclick="uploadEvidence()">上传证据</button>
+      <div class="hint mt6">上传需要 pro / enterprise 许可（feature: evidence）；未授权时接口返回 402 与升级指引。</div>
+    </div>`;
+  } catch(e){ box.innerHTML = `<div class="card"><div class="empty">${icon('i-alert')}加载失败：${escapeHtml(e.message)}</div></div>`; }
+}
+
+async function uploadEvidence() {
+  const inp = document.getElementById('ev-file');
+  if (!inp.files || !inp.files.length) return toast('请选择文件','warn');
+  const fd = new FormData();
+  fd.append('name', document.getElementById('ev-name').value.trim() || inp.files[0].name);
+  fd.append('file', inp.files[0]);
+  const op = document.getElementById('ev-op').value.trim();
+  if (op) fd.append('operator', op);
+  try {
+    const r = await api(`/api/engagements/${current}/evidence`, {method:'POST', body:fd});
+    toast('证据已留存 '+String(r.sha256||'').slice(0,12)+'…','ok',6000);
+  } catch(e){ return toast('留存失败：'+e.message,'bad',9000); }
+  loadEvidence();
+}
+
+function renderHandoff() {
+  document.getElementById('t-handoff').innerHTML = `<div class="card"><h2>交接包</h2>
+    <div class="hint">渲染 runbook、组装 handoff package JSON，并把两个文件的 sha256 写入审计（客户勾选验收时另记一条 handoff.accepted）。</div>
+    <div class="row" style="margin-top:10px"><label>操作人</label><input id="ho-op" placeholder="可选"></div>
+    <div class="row"><label>客户已验收</label><input type="checkbox" id="ho-accept"></div>
+    <button onclick="runHandoff()">${icon('i-rocket')} 生成交接包</button>
+    <div id="ho-out" class="mt10"></div></div>`;
+}
+
+async function runHandoff() {
+  const fd = new URLSearchParams({accept: document.getElementById('ho-accept').checked ? 'true' : 'false'});
+  const op = document.getElementById('ho-op').value.trim();
+  if (op) fd.set('operator', op);
+  try {
+    const r = await api(`/api/engagements/${current}/handoff`, {method:'POST', body:fd});
+    const base = p => String(p||'').split('/').pop();
+    document.getElementById('ho-out').innerHTML = `
+      <div class="hint">客户已验收：${yn(r.customer_accepted)}</div>
+      <div class="row mt6">
+        <a class="btn ghost" href="/reports/${escapeHtml(base(r.runbook))}" target="_blank">${icon('i-book')} Runbook</a>
+        <a class="btn ghost" href="/reports/${escapeHtml(base(r.package))}" target="_blank">${icon('i-doc')} 交接包 JSON</a>
+        <a class="btn ghost" href="/reports/" target="_blank">${icon('i-folder')} 报告目录</a>
+      </div>
+      <details class="mt8"><summary>交接摘要</summary><pre>${escapeHtml(r.summary||'')}</pre></details>`;
+    toast('交接包已生成','ok');
+  } catch(e){ toast('生成失败：'+e.message,'bad',8000); }
+}
+
+async function loadAudit() {
+  const box = document.getElementById('t-audit');
+  box.innerHTML = '<div class="card"><div class="empty">加载中…</div></div>';
+  try {
+    const r = await api(`/api/engagements/${current}/audit`);
+    const rows = (r.events||[]).slice().reverse().map(e=>`<tr>
+      <td class="meta">${escapeHtml(String(e.ts||'').slice(0,19).replace('T',' '))}</td>
+      <td><b>${escapeHtml(e.action||'')}</b></td>
+      <td class="meta">${escapeHtml(e.actor||'')}</td>
+      <td class="meta"><code style="font-size:.72rem">${escapeHtml(JSON.stringify(e.detail||{}))}</code></td></tr>`).join('');
+    box.innerHTML = `<div class="card"><h2>审计轨迹（append-only）</h2>
+      <div class="hint">共 <b>${r.count||0}</b> 条本 engagement 事件，最新在前。日志为单文件 JSONL 追加写，<b>没有哈希链，也没有数字签名</b>——它证明「发生过什么」，不防篡改；防篡改在商业版路线上。</div>
+      ${rows?`<div class="tablewrap" style="margin-top:8px"><table>
+        <thead><tr><th>时间</th><th>动作</th><th>来源</th><th>详情</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`:'<div class="empty">尚无审计事件</div>'}
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" onclick="exportAudit()">${icon('i-doc')} 导出 Markdown</button>
+        <span class="hint">导出需要 pro / enterprise 许可（feature: audit_export）。</span>
+      </div>
+      <div id="au-out" class="hint mt6"></div>
+    </div>`;
+  } catch(e){ box.innerHTML = `<div class="card"><div class="empty">${icon('i-alert')}加载失败：${escapeHtml(e.message)}</div></div>`; }
+}
+
+async function exportAudit() {
+  try {
+    const r = await api(`/api/engagements/${current}/audit/export`);
+    document.getElementById('au-out').innerHTML =
+      `已导出 ${r.count} 条 → <code>${escapeHtml(String(r.path||'').split('/').pop())}</code>（报告目录）`;
+    toast('审计已导出','ok');
+  } catch(e){ toast('导出失败：'+e.message,'bad',9000); }
 }
 
 async function forge() {
@@ -2691,6 +3445,8 @@ async function loadOntology() {
       <div class="meta" style="margin:4px 0">类 ${s.classes} · 对象属性 ${s.object_properties} · 数据属性 ${s.data_properties} · 概念体系 ${s.concept_schemes}</div>
       <div class="row" style="margin-top:6px">
         <button class="btn" onclick="showSchema('${esc(s.id)}')">详情</button>
+        <button class="btn ghost" onclick="showDiagram('${esc(s.id)}')">类图</button>
+        <button class="btn ghost" onclick="validateTarget('${esc(s.id)}')">校验</button>
         <button class="btn ghost" onclick="showJsonld('${esc(s.id)}','')">${icon('i-doc')} JSON-LD</button>
       </div>
     </div>`).join('') || '<div class="empty">无 schema</div>';
@@ -2699,14 +3455,79 @@ async function loadOntology() {
       <div class="row"><b>${esc(t.id)}</b> <span class="pill tkt">${esc(t.ontology_ref)}</span>
         <span class="meta" style="margin-left:auto">${t.individuals} individuals</span></div>
       <div class="row" style="margin-top:6px">
+        <button class="btn ghost" onclick="validateTarget('${esc(t.id)}')">校验</button>
         <button class="btn ghost" onclick="showJsonld('${esc(t.id)}','')">${icon('i-doc')} JSON-LD（含 TBox）</button>
       </div>
     </div>`).join('') || '<div class="empty" style="padding:14px">工作区暂无实例库（ontology/stores/*.json）</div>';
+  const schemaOpts = schemas.map(s => `<option value="${esc(s.id)}">${esc(s.id)}@${esc(s.version)}</option>`).join('');
   document.getElementById('view-ontology').innerHTML = `
     <div class="sec-head"><svg class="ic"><use href="#i-globe"/></svg><h2>本体库 · TBox + ABox</h2></div>
     <div class="card"><h2>Schema（TBox）</h2>${sCards}</div>
+    <div class="card" style="margin-top:12px"><h2>版本 diff（D1-D4 + ABox 影响面）</h2>
+      <div class="row"><label>旧 schema</label><select id="ot-diff-old">${schemaOpts}</select>
+        <label>新 schema</label><select id="ot-diff-new">${schemaOpts}</select>
+        <button onclick="runOntoDiff()">diff</button></div>
+      <div id="ot-diff-out" class="mt10"></div></div>
     <div class="card" style="margin-top:12px"><h2>实例库（ABox）</h2>
-      <p class="meta">ontology_ref 指向 schema@version；导出时自动并入其 TBox 上下文（JSON-LD 1.1）。</p>${stCards}</div>`;
+      <p class="meta">ontology_ref 指向 schema@version；导出时自动并入其 TBox 上下文（JSON-LD 1.1）。</p>${stCards}</div>
+    <div id="ot-tool-out"></div>`;
+}
+
+async function showDiagram(sid) {
+  const r = await api(`/api/ontology/schema/${encodeURIComponent(sid)}/diagram`);
+  document.getElementById('ot-tool-out').innerHTML = `
+    <div class="card" style="margin-top:12px"><h2>类图 · ${escapeHtml(r.schema_id)}@${escapeHtml(r.version)}</h2>
+      <p class="meta">Mermaid 源码——控制台不打包渲染器；粘贴到任意 Mermaid 渲染器（或 CLI "fde-scope ontology diagram"）出图。</p>
+      <pre style="background:var(--code);padding:10px;border-radius:8px;overflow:auto;font-size:.8rem">${escapeHtml(r.mermaid)}</pre></div>`;
+  document.getElementById('ot-tool-out').scrollIntoView({behavior:'smooth'});
+}
+
+async function validateTarget(tid) {
+  const out = document.getElementById('ot-tool-out');
+  out.innerHTML = '<div class="card" style="margin-top:12px"><div class="empty">校验中…</div></div>';
+  try {
+    const r = await api(`/api/ontology/validate/${encodeURIComponent(tid)}`);
+    const rows = (r.errors||[]).map(e=>`<tr><td><span class="pill" style="color:var(--bad)">${escapeHtml(e.code)}</span></td>
+      <td><code>${escapeHtml(e.subject)}</code></td><td class="meta">${escapeHtml(e.message)}</td></tr>`).join('');
+    out.innerHTML = `<div class="card" style="margin-top:12px">
+      <h2>校验 · ${escapeHtml(r.kind === 'schema' ? 'TBox' : 'ABox')} ${escapeHtml(r.target)}</h2>
+      ${r.ok ? '<div class="gate pass">✅ 通过（0 个 ONTO-* 错误）</div>'
+        : `<div class="gate fail"><b>${(r.errors||[]).length} 个错误</b>
+           <div class="tablewrap" style="margin-top:8px"><table>
+           <thead><tr><th>错误码</th><th>主体</th><th>说明</th></tr></thead>
+           <tbody>${rows}</tbody></table></div></div>`}</div>`;
+  } catch(e) {
+    out.innerHTML = `<div class="card" style="margin-top:12px"><div class="gate fail">校验失败：${escapeHtml(e.message)}</div></div>`;
+  }
+  out.scrollIntoView({behavior:'smooth'});
+}
+
+async function runOntoDiff() {
+  const oldId = document.getElementById('ot-diff-old').value;
+  const newId = document.getElementById('ot-diff-new').value;
+  const out = document.getElementById('ot-diff-out');
+  if (!oldId || !newId) return toast('请选择两个 schema','warn');
+  if (oldId === newId) return toast('旧 schema 与新 schema 相同','warn');
+  out.innerHTML = '<div class="empty">计算中…</div>';
+  try {
+    const r = await api('/api/ontology/diff', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({old:oldId, new:newId})});
+    const changeRows = list => list.map(c=>`<tr><td><span class="pill" style="color:${c.kind==='INFO'?'var(--fg)':'var(--bad)'}">${escapeHtml(c.kind)}</span></td>
+      <td><code>${escapeHtml(c.subject)}</code></td><td class="meta">${escapeHtml(c.detail)}</td></tr>`).join('');
+    const impactRows = (r.impact||[]).map(c=>`<tr><td><code>${escapeHtml(c.subject)}</code></td>
+      <td class="meta">${escapeHtml(c.detail)}</td></tr>`).join('');
+    out.innerHTML = `
+      <div class="gate ${r.ok?'pass':'fail'}">${r.ok ? '✅ 无破坏性变更' : `⛔ ${(r.breaking||[]).length} 个破坏性变更（D1-D4）`} ·
+        ${escapeHtml(r.from)} → ${escapeHtml(r.to)}</div>
+      ${(r.breaking||[]).length || (r.info||[]).length ? `<div class="tablewrap" style="margin-top:8px"><table>
+        <thead><tr><th>级别</th><th>主体</th><th>说明</th></tr></thead>
+        <tbody>${changeRows(r.breaking)}${changeRows(r.info)}</tbody></table></div>` : ''}
+      <p class="meta" style="margin-top:8px">ABox 影响面：${(r.impact||[]).length} 个个体引用了被变更元素</p>
+      ${impactRows ? `<div class="tablewrap"><table>
+        <thead><tr><th>个体</th><th>触及</th></tr></thead><tbody>${impactRows}</tbody></table></div>` : ''}`;
+  } catch(e) {
+    out.innerHTML = `<div class="gate fail">diff 失败：${escapeHtml(e.message)}</div>`;
+  }
 }
 
 async function showSchema(sid) {
@@ -2782,14 +3603,96 @@ async function showJsonld(target, backSid) {
     <div class="card" style="margin-top:8px"><pre style="max-height:60vh;overflow:auto">${esc(JSON.stringify(doc, null, 2))}</pre></div>`;
 }
 
+// -- 运维（连接器 / eval / flywheel / license） ---------------------------
+async function loadOps() {
+  const out = document.getElementById('view-ops');
+  out.innerHTML = '<div class="card"><div class="empty">加载中…</div></div>';
+  let c, ev, fw, li;
+  const errs = [];
+  const safeGet = async (path, into) => { try { return await api(path); } catch(e){ errs.push(path.split('/')[1] + ': ' + e.message); return {}; } };
+  c = await safeGet('/api/connectors'); ev = await safeGet('/api/eval/info');
+  fw = await safeGet('/api/flywheel'); li = await safeGet('/api/license');
+  const esc = escapeHtml;
+  const yn2 = b => b ? dot(true) : dot(false);
+  const connRows = (c.connectors||[]).map(k => `
+    <tr><td><b>${esc(k.slug)}</b></td>
+    <td>${k.import_ok ? '<span class="pill" style="color:var(--good)">已注册</span>' : '<span class="pill" style="color:var(--warn)">缺可选依赖</span>'}</td>
+    <td class="meta">${esc(k.note||'')}</td>
+    <td>${Object.entries(k.env||[]).length ? Object.entries(k.env).map(([n,v])=>`<span class="pill" title="${esc(n)}（只显示是否已配置，不显示值）">${esc(n.replace('FDE_SCOPE_',''))} ${v?'✓':'—'}</span>`).join(' ') : '<span class="meta">—</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="meta">无连接器</td></tr>';
+  const metricRows = Object.entries(ev.metrics||{}).map(([k,v])=>`<tr><td><code>${esc(k)}</code></td><td class="meta">${esc(v)}</td></tr>`).join('');
+  const jobRows = (fw.jobs||[]).map(j=>`<tr><td><b>${esc(j.name)}</b></td><td class="meta">cron <code>${esc(j.cron)}</code></td>
+    <td class="meta">≥${esc(String(j.min_new_samples))} samples</td><td class="meta">${esc(j.kind)}</td></tr>`).join('');
+  const s = fw.snapshot||{};
+  const featRows = Object.entries(li.features||{}).map(([k,v])=>`<tr><td><code>${esc(k)}</code></td><td>${yn2(v)}</td></tr>`).join('');
+  out.innerHTML = `
+    <div class="sec-head"><svg class="ic"><use href="#i-gears"/></svg><h2>运维 · 连接器 / eval / flywheel / license</h2></div>
+    ${errs.length ? `<div class="gate fail"><b>部分面板加载失败</b><div class="mt6 meta">${errs.map(esc).join('<br>')}</div></div>` : ''}
+    <div class="card"><h2>连接器注册表</h2>
+      <p class="meta">导入级状态：注册表里 = 依赖齐；模块表有而注册表无 = 缺可选依赖。GET 不探测客户系统连通性——那是部署时的事。凭据 env 只显示名称与「是否已配置」，值不离开本进程。</p>
+      <div class="tablewrap"><table><thead><tr><th>Slug</th><th>状态</th><th>说明</th><th>凭据 env</th></tr></thead><tbody>${connRows}</tbody></table></div></div>
+    <div class="card" style="margin-top:12px"><h2>Eval 基准</h2>
+      <p class="meta">指标与评分口径：${esc(String(Object.keys(ev.metrics||{}).length))} 项，全部确定性打分（LLM 只出现在生成回复那一步）。</p>
+      ${metricRows?`<div class="tablewrap"><table><thead><tr><th>指标</th><th>说明</th></tr></thead><tbody>${metricRows}</tbody></table></div>`:''}
+      <div class="row" style="margin-top:8px">
+        <label>用例集</label><input id="ev-cases" placeholder='JSON 数组或 JSONL 路径，例：[{"id":"t1","input":"退款怎么走"}]'>
+        <label>Agent</label><select id="ev-agent"><option value="mock">mock（规则，无需 LLM）</option><option value="mimo">mimo（需 LLM env）</option></select>
+        <button onclick="runEval()">运行</button></div>
+      <div id="ev-out" class="mt10"></div></div>
+    <div class="card" style="margin-top:12px"><h2>Data Flywheel</h2>
+      <p class="meta">计数器是<b>本服务进程</b>内的（引擎在内存）；retrain 任务是<b>描述符</b>——本进程没有任何调度器在跑，交给外部编排器触发。</p>
+      <div class="kpi-grid" style="margin:8px 0">
+        <div class="kpi"><div class="k">collected</div><div class="v">${esc(String(s.collected??'—'))}</div></div>
+        <div class="kpi"><div class="k">golden</div><div class="v">${esc(String(s.golden??'—'))}</div></div>
+        <div class="kpi"><div class="k">labeling</div><div class="v">${esc(String(s.labeling_queued??'—'))}</div></div>
+        <div class="kpi"><div class="k">edge cases</div><div class="v">${esc(String(s.edge_cases??'—'))}</div></div>
+        <div class="kpi"><div class="k">store total</div><div class="v">${esc(String(s.store_total??'—'))}</div></div>
+      </div>
+      ${jobRows?`<div class="tablewrap"><table><thead><tr><th>任务</th><th>计划</th><th>门槛</th><th>类型</th></tr></thead><tbody>${jobRows}</tbody></table></div>`:''}</div>
+    <div class="card" style="margin-top:12px"><h2>License</h2>
+      <div class="row"><label>客户</label><b>${esc(li.customer||'—')}</b></div>
+      <div class="row"><label>Tier</label><span class="pill ${li.tier==='community'?'':(li.tier==='pro'?'tkt':'ind')}">${esc(li.tier||'—')}</span>
+        ${li.expired?'<span class="pill" style="color:var(--bad)">已过期 → community</span>':''}
+        <span class="meta" style="margin-left:auto">key 来源：${esc(li.key_source||'—')}（env / 文件 / 无——只报来源，不显示 key）</span></div>
+      <div class="row"><label>席位</label>${esc(String(li.seats??'—'))} · 到期 ${li.expires_at?esc(String(li.expires_at).slice(0,10)):'—'}</div>
+      ${featRows?`<div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Feature</th><th>开关</th></tr></thead><tbody>${featRows}</tbody></table></div>`:''}</div>`;
+}
+
+async function runEval() {
+  const out = document.getElementById('ev-out');
+  const raw = (document.getElementById('ev-cases')||{}).value||'';
+  const agent = (document.getElementById('ev-agent')||{}).value||'mock';
+  if (!raw.trim()) return toast('请先粘贴用例（JSON 数组）或填 JSONL 路径','warn');
+  let body;
+  if (raw.trim().startsWith('[')) {
+    try { body = {agent, cases: JSON.parse(raw)}; }
+    catch(e){ return toast('用例 JSON 解析失败：'+e.message,'bad',8000); }
+  } else body = {agent, test_set: raw.trim()};
+  out.innerHTML = '<div class="empty">运行中（每条用例一次回复）…</div>';
+  try {
+    const r = await api('/api/eval/run', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const rows = Object.entries(r.metrics||{}).map(([k,v])=>`<tr><td><code>${escapeHtml(k)}</code></td>
+      <td><b>${escapeHtml(String(v))}</b></td><td class="meta">${escapeHtml((r.metric_labels||{})[k]||'')}</td></tr>`).join('');
+    const bad = (r.bad_cases||{}).cases||[];
+    out.innerHTML = `<div class="gate pass">✅ ${escapeHtml(String(r.case_count))} 条用例跑完</div>
+      <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>指标</th><th>值</th><th>说明</th></tr></thead><tbody>${rows}</tbody></table></div>
+      ${bad.length?`<details class="mt8"><summary>bad cases（${bad.length}）</summary><pre style="font-size:.75rem">${escapeHtml(JSON.stringify(bad, null, 2))}</pre></details>`:''}`;
+  } catch(e) {
+    out.innerHTML = `<div class="gate fail">运行失败：${escapeHtml(String(e.message).slice(0,400))}</div>`;
+  }
+}
+
 if (location.hash === '#skills') go('skills');
 else if (location.hash === '#deploy') go('deploy');
 else if (location.hash === '#ontology') go('ontology');
+else if (location.hash === '#ops') go('ops');
 else loadWorkbench();
 window.addEventListener('hashchange', () => {
   if (location.hash === '#skills') go('skills');
   else if (location.hash === '#deploy') go('deploy');
   else if (location.hash === '#ontology') go('ontology');
+  else if (location.hash === '#ops') go('ops');
   else go('workbench');
 });
 </script>
@@ -2806,6 +3709,17 @@ window.addEventListener('hashchange', () => {
 <dialog id="dlg-profiles" aria-label="Profiles &amp; Phases">
   <div class="dlg-h"><svg class="ic"><use href="#i-layers"/></svg><b>Profiles &amp; Phases</b></div>
   <div class="dlg-b" id="dlg-profiles-body"></div>
+</dialog>
+<dialog id="dlg-action" aria-labelledby="dlg-action-title">
+  <div class="dlg-h"><svg class="ic"><use href="#i-alert"/></svg><b id="dlg-action-title"></b></div>
+  <div class="dlg-b">
+    <div id="dlg-action-msg" class="hint"></div>
+    <div id="dlg-action-fields" class="mt8"></div>
+    <div class="row" style="margin:12px 0 0;justify-content:flex-end">
+      <button class="ghost" onclick="document.getElementById('dlg-action').close()">取消</button>
+      <button id="dlg-action-ok"></button>
+    </div>
+  </div>
 </dialog>
 <div id="toast-host" aria-live="polite"></div>
 </body>
@@ -2866,8 +3780,11 @@ _DASHBOARD_HTML_EN = (
     .replace("__SHELL_CSS__", SHELL_CSS)
     .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )
+_N_CONNECTORS, _CONNECTOR_TILES_HTML = _connector_tiles()
 _OVERVIEW_HTML = (
-    _OVERVIEW_HTML.replace("__SHELL_CSS__", SHELL_CSS)
+    _OVERVIEW_HTML.replace("__CONNECTOR_COUNT__", str(_N_CONNECTORS))
+    .replace("__CONNECTOR_TILES__", _CONNECTOR_TILES_HTML)
+    .replace("__SHELL_CSS__", SHELL_CSS)
     .replace("__SHELL_JS__", SHELL_JS)
     .replace("__ICON_SPRITE__", _ICON_SPRITE)
 )

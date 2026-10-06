@@ -38,6 +38,15 @@ def engagement_lock(eid: str) -> threading.Lock:
     Every load→modify→save sequence in the web layer must hold this lock for
     the whole read-modify-write so concurrent requests cannot clobber each
     other's engagement JSON. Process-local by design: still no database.
+
+    Single-worker constraint: these are ``threading.Lock`` objects, so the
+    guarantee holds only **within one process**. Run the console with one
+    uvicorn/hypercorn worker (``--workers 1``, the default for this app);
+    multiple workers would each hold their own lock map and could interleave
+    read-modify-write cycles on the same engagement file. Atomic writes
+    (``fsutil.atomic_write_text``) keep each file internally consistent in
+    that case — you get last-writer-wins, not corruption — but a true
+    multi-worker deployment needs a file lock or a database first.
     """
     with _eng_locks_guard:
         return _eng_locks.setdefault(eid, threading.Lock())

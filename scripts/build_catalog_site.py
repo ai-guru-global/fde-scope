@@ -166,27 +166,51 @@ SCENARIOS = [
 
 # zone_id -> (英文大区名, 英文副题)；缺省回退中文
 ZONES_EN = {
-    "zone-a-pre-engagement": ("Zone A · Pre-engagement", "research · discovery · stakeholders · success criteria"),
+    "zone-a-pre-engagement": (
+        "Zone A · Pre-engagement",
+        "research · discovery · stakeholders · success criteria",
+    ),
     "zone-b-build": ("Zone B · Build", "data ingest · corpus · prototype · validation · deploy · evaluation"),
-    "zone-c-operationalization": ("Zone C · Operationalization", "SLO · monitoring · incidents · training iteration"),
+    "zone-c-operationalization": (
+        "Zone C · Operationalization",
+        "SLO · monitoring · incidents · training iteration",
+    ),
     "zone-d-handoff": ("Zone D · Handoff", "docs · training · handover demo"),
-    "cross-cutting": ("Cross-cutting · Meta-skills", "skill engineering · review · planning · scheduling · platform suites"),
+    "cross-cutting": (
+        "Cross-cutting · Meta-skills",
+        "skill engineering · review · planning · scheduling · platform suites",
+    ),
     "mcp": ("MCP · Servers", "browser · scraping · cloud · desktop · knowledge · docs"),
     "tools": ("Tools · Built-in", "execution-layer panorama · usage discipline"),
 }
 
 # 中文场景标题 -> (英文标题, 英文说明)
 SCENARIOS_EN = {
-    "新人第一周": ("First Week", "three-layer capability model → tool discipline → session methodology → fill scenarios by zone"),
-    "接手陌生系统": ("Taking Over an Unfamiliar System", "wiki recon → evidence modeling → root-cause investigation"),
-    "客户调研摸底": ("Customer Discovery", "web search → extraction → knowledge base → requirement exploration"),
-    "方案书与选型": ("Proposals & Model Selection", "model decisions → explain clearly → draw it → delivery formats"),
+    "新人第一周": (
+        "First Week",
+        "three-layer capability model → tool discipline → session methodology → fill scenarios by zone",
+    ),
+    "接手陌生系统": (
+        "Taking Over an Unfamiliar System",
+        "wiki recon → evidence modeling → root-cause investigation",
+    ),
+    "客户调研摸底": (
+        "Customer Discovery",
+        "web search → extraction → knowledge base → requirement exploration",
+    ),
+    "方案书与选型": (
+        "Proposals & Model Selection",
+        "model decisions → explain clearly → draw it → delivery formats",
+    ),
     "数据接入与语料": ("Data Ingest & Corpus", "profile → convert → attach DB → query → protocol ingest"),
     "训练与评估": ("Training & Evaluation", "datasets → embedding training → local evals → closed loop"),
     "部署上线": ("Deploy to Production", "local inference → containers → orchestration → IaC → quick demo"),
     "运维与排障": ("Ops & Troubleshooting", "root cause → browser forensics → observability → AIOps"),
     "文档与移交": ("Docs & Handoff", "fill docs → publication-grade PDF → standards → courses → podcast"),
-    "工程纪律（横切）": ("Engineering Discipline (Cross-cutting)", "plan → execute → review → security → ecosystem & scheduling"),
+    "工程纪律（横切）": (
+        "Engineering Discipline (Cross-cutting)",
+        "plan → execute → review → security → ecosystem & scheduling",
+    ),
 }
 
 # 页面路由（不含 .md）-> 英文一句话；英文构建缺任一条即失败
@@ -329,13 +353,20 @@ L10N = {
         "docTitle": "FDE Skills 手册库 · 门户",
         "brandSuffix": "手册库",
         "gtaText": "GTM 官网 ↗",
-        "gtaHref": "../../../GTM/index.html",
+        "gtaHref": "../GTM/index.html",  # served at /catalog/; a file:// open of the standalone site would need ../../../ — the mounted portal is the primary reader
         "langHref": "./en/",
         "langLabel": "ENGLISH",
         "searchPh": "搜索 {n} 页 skills / tools / MCP…",
+        "searchAria": "搜索技能手册",
         "heroH1": "FDE Skills 手册库",
         "heroP": "每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。",
-        "statUnits": {"pages": "页能力档案", "installed": "已安装", "installable": "可安装", "zones": "大区", "scenarios": "场景入口"},
+        "statUnits": {
+            "pages": "页能力档案",
+            "installed": "已安装",
+            "installable": "可安装",
+            "zones": "大区",
+            "scenarios": "场景入口",
+        },
         "secTaskT": "按任务开始",
         "secTaskD": "GTM 场景速查：从任务进入，而不是从目录进入",
         "secPhaseT": "按阶段浏览",
@@ -356,13 +387,20 @@ L10N = {
         "docTitle": "FDE Skills Handbook · Portal",
         "brandSuffix": "Handbook",
         "gtaText": "GTM Site ↗",
-        "gtaHref": "../../../../GTM/index.html",
+        "gtaHref": "../../GTM/index.html",  # served at /catalog/en/
         "langHref": "../",
         "langLabel": "中文",
         "searchPh": "Search {n} skills / tools / MCP pages…",
+        "searchAria": "Search the handbook",
         "heroH1": "FDE Skills Handbook",
         "heroP": "One profile page per capability: what it does · when to use it (including anti-boundaries) · best practices · where it plugs into the fde-scope project. Three layers — skills (FDE four zones + cross-cutting), MCP server surfaces, built-in tools. Pick a scenario first, then open a page.",
-        "statUnits": {"pages": "capability profiles", "installed": "installed", "installable": "installable", "zones": "zones", "scenarios": "scenario entries"},
+        "statUnits": {
+            "pages": "capability profiles",
+            "installed": "installed",
+            "installable": "installable",
+            "zones": "zones",
+            "scenarios": "scenario entries",
+        },
         "secTaskT": "Start by Task",
         "secTaskD": "GTM scenario shortcuts: enter by task, not by catalog",
         "secPhaseT": "Browse by Phase",
@@ -641,6 +679,11 @@ CSS = """
 --accent:oklch(0.5 0.095 235);--accent-2:oklch(0.44 0.095 235);--accent-ink:oklch(0.99 0.002 255);
 --ok:oklch(0.51 0.12 152);--warn:oklch(0.53 0.11 75);--bad:oklch(0.55 0.17 25);--radius:12px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
 color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:oklch(0.18 0.01 255);--card:oklch(0.23 0.012 255);--ink:oklch(0.93 0.006 255);--muted:oklch(0.72 0.014 255);
+--line:oklch(0.32 0.012 255);--border-strong:oklch(0.45 0.015 255);
+--accent:oklch(0.68 0.1 235);--accent-2:oklch(0.74 0.09 235);--accent-ink:oklch(0.16 0.01 255);
+--ok:oklch(0.72 0.13 152);--warn:oklch(0.78 0.12 75);--bad:oklch(0.68 0.16 25);color-scheme:dark}
+.article pre{background:oklch(0.16 0.012 255)}}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{overflow-x:clip}
 body{font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
@@ -649,7 +692,8 @@ a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:18px;padding:12px 28px;
 background:color-mix(in oklab,var(--card) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-.nav .brand{font-weight:700;font-size:16px;color:var(--ink);cursor:pointer;white-space:nowrap;letter-spacing:-.01em}
+.nav .brand{font-weight:700;font-size:16px;color:var(--ink);white-space:nowrap;letter-spacing:-.01em;text-decoration:none}
+.nav .brand:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .nav .brand span{color:var(--accent)}
 .nav .gta{font:600 11px/1 var(--mono);letter-spacing:.1em;color:var(--accent);background:color-mix(in oklab,var(--accent) 9%,transparent);
 padding:5px 10px;border-radius:999px;white-space:nowrap;text-decoration:none}
@@ -756,11 +800,11 @@ function badge(st){
 }
 function nav(){
   return `<nav class="nav">
-    <div class="brand" onclick="location.hash='#/'">FDE Skills <span>${L.brandSuffix}</span></div>
+    <a class="brand" href="#/">FDE Skills <span>${L.brandSuffix}</span></a>
     <a class="gta" href="${L.gtaHref}">${L.gtaText}</a>
     <a class="lang" href="${L.langHref}" hreflang="${DATA.lang==='zh'?'en':'zh-CN'}">${L.langLabel}</a>
     <div class="zlinks">${DATA.zones.map(z=>`<a href="#/" onclick="goZone('${z.id}')">${z.label.split('·')[0].trim()}</a>`).join('')}</div>
-    <input id="q" type="search" placeholder="${L.searchPh.replace('{n}',DATA.stats.total)}" oninput="onSearch(this.value)">
+    <input id="q" type="search" aria-label="${L.searchAria}" placeholder="${L.searchPh.replace('{n}',DATA.stats.total)}" oninput="onSearch(this.value)">
   </nav>`;
 }
 function goZone(id){ location.hash='#/'; setTimeout(()=>{const el=document.getElementById('zone-'+id); if(el) el.scrollIntoView({behavior:'smooth'});},30); }
@@ -802,6 +846,7 @@ function home(){
         <button class="chip on" data-f="all" onclick="setFilter(this)">${L.filterAll}</button>
         <button class="chip" data-f="✅" onclick="setFilter(this)">✅ ${L.badgeTxt.ok}</button>
         <button class="chip" data-f="📦" onclick="setFilter(this)">📦 ${L.badgeTxt.pkg}</button>
+        ${DATA.zones.some(z=>z.skills.some(k=>k.status==='⚰️'))?`<button class="chip" data-f="⚰️" onclick="setFilter(this)">⚰️ ${L.badgeTxt.dead}</button>`:''}
         <span id="hit" style="color:var(--muted);font-size:12.5px"></span>
       </div>
       <div class="all-grid" id="all-grid"></div>
@@ -833,7 +878,8 @@ function renderAll(){
 }
 function onSearch(v){
   const hasQ=!!v;
-  ['scen-sec','zones-sec','hero'].forEach(id=>{const el=document.getElementById(id)||document.querySelector('.hero'); if(el) el.style.display=(hasQ&&id!=='all-sec')?'none':'';});
+  ['scen-sec','zones-sec'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=hasQ?'none':'';});
+  const heroEl=document.querySelector('.hero'); if(heroEl) heroEl.style.display=hasQ?'none':'';
   const allSec=document.getElementById('all-sec');
   if(hasQ && allSec) allSec.scrollIntoView({behavior:'smooth'});
   renderAll();

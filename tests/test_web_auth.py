@@ -87,3 +87,50 @@ def test_mutating_route_requires_token(client, monkeypatch) -> None:
 def test_blank_token_disables_auth(client, monkeypatch) -> None:
     monkeypatch.setenv("FDE_SCOPE_API_TOKEN", "   ")
     assert client.get("/api/profiles").status_code == 200
+
+
+#: Methods that change state. A route using one of these must never land in
+#: ``PUBLIC_PATHS`` by accident — AGENTS.md invariant 7.
+MUTATING = frozenset({"POST", "PATCH", "PUT", "DELETE"})
+
+
+def _route_paths() -> list[str]:
+    from fde_scope.web.app import app
+
+    out: list[str] = []
+    for route in app.routes:
+        if not MUTATING.intersection(getattr(route, "methods", None) or set()):
+            continue
+        # ``{eid}`` / ``{rest:path}`` are filled with a placeholder: the auth
+        # middleware runs before routing, so the value is never resolved.
+        path = route.path
+        while "{" in path:
+            path = path[: path.index("{")] + "__probe__" + path[path.index("}", path.index("{")) + 1 :]
+        out.append(path)
+    return sorted(set(out))
+
+
+def test_every_mutating_route_is_token_gated(client, monkeypatch) -> None:
+    """Enumerate the app's mutating routes instead of trusting a hand-picked list.
+
+    ``test_mutating_route_requires_token`` only probes ``POST /api/engagements``,
+    so a new endpoint added to ``PUBLIC_PATHS`` — or a middleware change that
+    lets writes through — would go unnoticed. This walks ``app.routes`` so the
+    guarantee follows the code (invariant 7).
+    """
+    monkeypatch.setenv("FDE_SCOPE_API_TOKEN", TOKEN)
+    paths = _route_paths()
+    assert paths, "no mutating routes found — the enumeration itself is broken"
+    for path in paths:
+        for method in sorted(MUTATING):
+            r = client.request(method, path)
+            assert r.status_code == 401, f"{method} {path} returned {r.status_code}, expected 401"
+            assert TOKEN not in r.text
+
+
+def test_public_paths_hold_no_mutating_route() -> None:
+    """Belt and braces: the whitelist itself must not contain a write route."""
+    from fde_scope.web.auth import PUBLIC_PATHS
+
+    overlap = sorted(set(PUBLIC_PATHS) & set(_route_paths()))
+    assert overlap == [], f"mutating routes are whitelisted: {overlap}"

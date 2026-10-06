@@ -94,14 +94,14 @@ def diff_schemas(old: OntologySchema, new: OntologySchema) -> SchemaDiff:
     for curie in sorted(set(new_dps) - set(old_dps)):
         diff.info.append(Change("INFO", curie, "data property added"))
     for curie in sorted(set(old_dps) & set(new_dps)):
-        old_prop, new_prop = old_dps[curie], new_dps[curie]
-        if (old_prop.domain, old_prop.range) != (new_prop.domain, new_prop.range):
+        old_dp, new_dp = old_dps[curie], new_dps[curie]
+        if (old_dp.domain, old_dp.range) != (new_dp.domain, new_dp.range):
             diff.breaking.append(
                 Change(
-                    "D3" if old_prop.range != new_prop.range else "D2",
+                    "D3" if old_dp.range != new_dp.range else "D2",
                     curie,
-                    f"domain/range changed: ({old_prop.domain}, {old_prop.range})"
-                    f" -> ({new_prop.domain}, {new_prop.range})",
+                    f"domain/range changed: ({old_dp.domain}, {old_dp.range})"
+                    f" -> ({new_dp.domain}, {new_dp.range})",
                 )
             )
     return diff

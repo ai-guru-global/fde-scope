@@ -21,7 +21,7 @@ BAR_H = 52 * SCALE
 RADIUS = 10 * SCALE
 TITLE_SIZE = 13 * SCALE
 
-BAR_RGB = (240, 240, 243)      # matches design.md surface tone
+BAR_RGB = (240, 240, 243)  # matches design.md surface tone
 BAR_LINE = (216, 216, 221)
 BORDER = (198, 198, 206)
 TITLE_RGB = (86, 86, 94)
@@ -59,9 +59,7 @@ def compose(raw: Path, out: Path, title: str) -> None:
 
     # hairline window border
     border = ImageDraw.Draw(canvas)
-    border.rounded_rectangle(
-        [0, 0, w - 1, h + BAR_H - 1], RADIUS, outline=BORDER + (255,), width=SCALE
-    )
+    border.rounded_rectangle([0, 0, w - 1, h + BAR_H - 1], RADIUS, outline=BORDER + (255,), width=SCALE)
 
     # traffic lights
     cy = BAR_H // 2

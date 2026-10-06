@@ -25,7 +25,7 @@ from .agents import QualityGate
 from .types import CategoryGap, ConceptGap, CorpusItem, Provenance
 
 if TYPE_CHECKING:
-    from fde_scope.llm import MiMoClient
+    from fde_scope.llm import LLMClient
     from fde_scope.ontology.extract import ConceptExtractor
 
 
@@ -64,7 +64,7 @@ _CLOSERS = [
 class CorpusSynthesizer:
     """Generate synthetic samples to fill specific coverage gaps.
 
-    Pass ``llm`` (a :class:`~fde_scope.llm.MiMoClient`) to enable the
+    Pass ``llm`` (any :class:`~fde_scope.llm.LLMClient`) to enable the
     LLM-backed path; without it, or when the LLM call fails, the rule-based
     v0 strategies are used.
     """
@@ -74,7 +74,7 @@ class CorpusSynthesizer:
         strategies: list[str] | None = None,
         quality_gate: QualityGate | None = None,
         seed: int = 42,
-        llm: MiMoClient | None = None,
+        llm: LLMClient | None = None,
     ) -> None:
         self.strategies = strategies or ["paraphrase", "adversarial", "multi_turn", "emotion_escalation"]
         self.quality_gate = quality_gate or QualityGate(min_score=2.5)

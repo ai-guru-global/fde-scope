@@ -1,10 +1,14 @@
 """The Level-1 course reading room (``/course``, ``/en/course``).
 
-The lessons are authored as Markdown in ``course-level-1/`` at the repo root.
-That directory is the source of truth and is read here — never copied into the
-package — so a lesson edit reaches this page on the next restart with nothing
-to keep in sync. A wheel install has no ``course-level-1/`` and gets an
-in-page notice instead of a broken route.
+The lessons are authored as Markdown in ``course-level-1/`` at the repo root,
+which is the source of truth: in a checkout this page reads it directly, so a
+lesson edit lands on the next restart with nothing to keep in sync. The same
+directory is also shipped inside the wheel as package data
+(``fde_scope/_data/course-level-1``, see ``pyproject.toml``'s
+``force-include``), and :func:`_default_root` falls back to that copy when the
+repo-root directory is absent — an installed app serves the same 25 chapters.
+If neither is readable the route still renders, with an in-page notice instead
+of a broken page.
 
 Rendered from paired literals, like ``glossary.py`` and ``certification.py``
 (their docstrings explain why the ``to_en`` pass is wrong for whole pages of
@@ -34,13 +38,26 @@ there without a cycle.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import unquote
 
-from markdown_it import MarkdownIt
-
 from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .mdrender import (
+    AUTOLINK as _AUTOLINK,
+)
+from .mdrender import (
+    MD_IMAGE as _MD_IMAGE,
+)
+from .mdrender import (
+    MD_LINK as _MD_LINK,
+)
+from .mdrender import (
+    demoting_markdown,
+    rewrite_outside_fences,
+)
+from .mdrender import (
+    normalize_path as md_normalize,
+)
 
 _COURSE_DIRNAME = "course-level-1"
 
@@ -249,6 +266,11 @@ _CHAPTERS: list[tuple[str, str, str, str, str, str]] = [
     ),
 ]
 
+#: Repo-relative lesson file → chapter anchor key. Public because the docs
+#: reader rewrites course citations into ``/course#doc-<key>`` deep links
+#: without reaching into this module's private table.
+COURSE_FILES: dict[str, str] = {f"{_COURSE_DIRNAME}/{name}": key for key, name, *_ in _CHAPTERS}
+
 #: Rail grouping: (zh caption, en caption, chapter keys). Each group is a
 #: contiguous run of ``_CHAPTERS`` order — the scroll spy walks the page top
 #: to bottom, so interleaving two groups would make the rail's highlight
@@ -280,92 +302,35 @@ _TASK_ITEM = re.compile(r"^(\s*)- \[ \] ", re.M)
 #: otherwise, which would silently delete every fenced block.
 _PRE = re.compile(r"(<pre\b.*?</pre>)", re.S)
 
-_MD = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
 
-_FENCE_OPEN = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
-_FENCE_CLOSE = re.compile(r"^\s{0,3}(`{3,}|~{3,})\s*$")
-_MD_IMAGE = re.compile(r"!\[([^\]\n]*)\]\(([^)\s]+)\)")
-_MD_LINK = re.compile(r"(?<!!)\[([^\]\n]*)\]\(([^)\s]+)\)")
-_AUTOLINK = re.compile(r"<(https?://[^>]+)>")
+#: The shared Markdown plumbing (demoting renderer, fence walker, link
+#: regexes, path normaliser) lives in :mod:`fde_scope.web.mdrender`; this
+#: module keeps module-level aliases because the rest of the file predates it.
+_MD = demoting_markdown()
+_normalize = md_normalize
 
 
-def _fenced_indices(lines: list[str]) -> set[int]:
-    """Indices of lines inside a code fence, the fence markers included.
+def _choose_root(repo_root: Path, packaged_root: Path) -> Path:
+    """Prefer the repo checkout; fall back to the copy shipped in the wheel.
 
-    Reduced CommonMark rule: a fence opens on ``` / ~~~ (≤3 spaces indent)
-    and closes on a bare run of the same character at least as long — one
-    kind cannot close the other and an opener's info string is ignored.
+    ``repo_root`` wins whenever it exists so that editing a lesson in a
+    checkout is what this page serves. ``packaged_root`` is what an installed
+    app has. Returning ``repo_root`` when neither exists keeps the missing-dir
+    notice pointing at the place a reader can actually fix.
     """
-    fenced: set[int] = set()
-    ch, n = "", 0
-    for i, line in enumerate(lines):
-        if ch:
-            m = _FENCE_CLOSE.match(line)
-            if m and m.group(1)[0] == ch and len(m.group(1)) >= n:
-                ch = ""
-            fenced.add(i)
-        elif m := _FENCE_OPEN.match(line):
-            fenced.add(i)
-            ch, n = m.group(1)[0], len(m.group(1))
-    return fenced
-
-
-def rewrite_outside_fences(md_text: str, rewrite: Callable[[str], str]) -> str:
-    """Apply ``rewrite`` to the runs of lines between code fences.
-
-    Fence lines are kept byte-identical and global line numbers survive, so
-    callers can keep line-indexed side tables (heading anchors) intact. This
-    module's lesson preprocessing and ``docs_reader.py``'s document
-    preprocessing both go through it: the corpora's fenced template examples
-    are full of markdown links that must pass through untouched.
-    """
-    lines = md_text.split("\n")
-    fenced = _fenced_indices(lines)
-    out: list[str] = []
-    chunk: list[str] = []
-
-    def flush() -> None:
-        if chunk:
-            out.append(rewrite("\n".join(chunk)))
-            chunk.clear()
-
-    for i, line in enumerate(lines):
-        if i in fenced:
-            flush()
-            out.append(line)
-        else:
-            chunk.append(line)
-    flush()
-    return "\n".join(out)
-
-
-def _normalize(base: str, path: str) -> str:
-    """Resolve ``path`` against the source document's repo-relative directory."""
-    parts = [seg for seg in base.split("/") if seg]
-    for seg in path.split("/"):
-        if seg in ("", "."):
-            continue
-        if seg == "..":
-            if parts:
-                parts.pop()
-        else:
-            parts.append(seg)
-    return "/".join(parts)
-
-
-def _heading_open(tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
-    """Demote every lesson heading one level (see the module docstring)."""
-    token = tokens[idx]
-    token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
-    return _MD.renderer.renderToken(tokens, idx, options, env)
-
-
-_MD.renderer.rules["heading_open"] = _heading_open
-_MD.renderer.rules["heading_close"] = _heading_open
+    if repo_root.is_dir():
+        return repo_root
+    if packaged_root.is_dir():
+        return packaged_root
+    return repo_root
 
 
 def _default_root() -> Path:
-    return Path(__file__).resolve().parents[2] / _COURSE_DIRNAME
+    here = Path(__file__).resolve()
+    return _choose_root(
+        here.parents[2] / _COURSE_DIRNAME,
+        here.parents[1] / "_data" / _COURSE_DIRNAME,
+    )
 
 
 #: every in-app target a lesson link can have. Chapter files become this
@@ -420,19 +385,47 @@ def _preprocess_links(md_text: str) -> str:
     return rewrite_outside_fences(md_text, apply)
 
 
-def _render_body(md_text: str) -> str:
-    """One lesson: drop its own ``# `` heading, box its task items, rewrite
-    its links, render."""
+def _prepare(md_text: str) -> str:
+    """Markdown-level transforms shared by rendering and the token-stream
+    stats: drop the lesson's own ``# `` heading, mark its task items, rewrite
+    its links."""
     body = _H1.sub("", md_text, count=1)
     body = _TASK_ITEM.sub(r"\1- ☐ ", body)
-    body = _preprocess_links(body)
-    html = _MD.render(body)
-    # `<br>` is escaped along with the rest of the raw HTML, but a GFM table
-    # cell has no other line break — restore it, code blocks excluded.
+    return _preprocess_links(body)
+
+
+def _render_body(md_text: str) -> str:
+    """One lesson rendered to HTML, with two post-steps: unchecked task items
+    become real checkboxes (state lives in localStorage, zero backend), and
+    ``<br>`` — the only in-cell line break a GFM table has — is restored
+    outside code blocks."""
+    html = _MD.render(_prepare(md_text))
+    # `- ☐ ` task bullets become checkable list items; the box state is
+    # keyed by (chapter, item index) in the page script
+    html = html.replace(
+        "<li>☐ ",
+        '<li class="task"><input type="checkbox" class="taskbox" aria-label="practice"> ',
+    )
     parts = _PRE.split(html)
     for i in range(0, len(parts), 2):
         parts[i] = parts[i].replace("&lt;br&gt;", "<br>").replace("&lt;br/&gt;", "<br>")
     return "".join(parts)
+
+
+def _structured_stats(markdown_sources: list[str]) -> tuple[int, int, int]:
+    """(sections, code samples, practice items) counted on the markdown token
+    stream — literals inside fenced template examples can no longer inflate
+    the numbers the way ``rendered.count("<h3")`` let them."""
+    sections = code = tasks = 0
+    for source in markdown_sources:
+        for tok in _MD.parse(_prepare(source)):
+            if tok.type == "heading_open" and tok.tag == "h3":
+                sections += 1
+            elif tok.type in ("fence", "code_block"):
+                code += 1
+            elif tok.type == "inline" and tok.content.startswith("☐ "):
+                tasks += 1
+    return sections, code, tasks
 
 
 _STYLE = (
@@ -444,6 +437,20 @@ border-radius:9px;padding:12px 14px;margin:20px 0 0;font-size:.84rem;color:var(-
 .course-note strong{color:var(--fg)}
 .stats{margin-top:24px}
 .chap{padding-top:46px}
+.crbar-row{display:flex;align-items:center;gap:10px;margin:14px 0 0;max-width:860px}
+.crbar{flex:1;height:6px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.crbar>div{height:100%;width:0;background:var(--accent);transition:width .25s}
+.csearch{display:flex;gap:10px;align-items:center;margin:10px 0 0;max-width:860px}
+.csearch input{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+padding:8px 12px;font-size:.9rem;color:var(--fg)}
+.csearch input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.readbtn{margin-left:auto;font:600 .72rem/1.4 inherit;color:var(--muted);background:none;
+border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer}
+.readbtn.on{color:var(--good);border-color:var(--good)}
+.readbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chap.read>.sec-head h2{color:var(--muted)}
+li.task{list-style:none;margin-left:-1.2em}
+li.task .taskbox{accent-color:var(--accent);margin-right:6px}
 .src{font:500 .74rem/1.7 var(--mono);color:var(--faint);margin:7px 0 0;overflow-wrap:anywhere}
 .md{max-width:860px;font-size:.92rem;line-height:1.78;color:var(--fg)}
 .md>*:first-child{margin-top:0}
@@ -482,6 +489,64 @@ function toggleTheme(){
   h.dataset.theme = n;
   try { localStorage.setItem('fde-theme', n); } catch(e) {}
 }
+// -- read progress / practice checkboxes / chapter filter (all client-side) --
+function _store(k){ try { return JSON.parse(localStorage.getItem(k)||'{}'); } catch(e){ return {}; } }
+function _save(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function toggleRead(key){
+  var m = _store('fde-course-read');
+  if (m[key]) delete m[key]; else m[key] = true;
+  _save('fde-course-read', m);
+  refreshProgress();
+}
+function refreshProgress(){
+  var m = _store('fde-course-read');
+  var btns = document.querySelectorAll('.readbtn[data-ch]');
+  var done = 0;
+  btns.forEach(function(b){
+    var on = !!m[b.dataset.ch];
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.textContent = on ? '✓ ' + b.dataset.done : b.dataset.todo;
+    if (on) done++;
+    var sec = document.getElementById('doc-' + b.dataset.ch);
+    if (sec) sec.classList.toggle('read', on);
+  });
+  var bar = document.getElementById('cr-bar'), lab = document.getElementById('cr-lab');
+  if (bar && btns.length) bar.style.width = Math.round(100*done/btns.length) + '%';
+  if (lab) lab.textContent = done + ' / ' + btns.length;
+}
+document.addEventListener('change', function(e){
+  if (!e.target.classList.contains('taskbox')) return;
+  var li = e.target.closest('li.task');
+  var sec = e.target.closest('section.chap');
+  if (!li || !sec) return;
+  var m = _store('fde-course-tasks');
+  var k = sec.id + '::' + Array.prototype.indexOf.call(sec.querySelectorAll('li.task'), li);
+  if (e.target.checked) m[k] = true; else delete m[k];
+  _save('fde-course-tasks', m);
+});
+function restoreTasks(){
+  var m = _store('fde-course-tasks');
+  document.querySelectorAll('section.chap').forEach(function(sec){
+    sec.querySelectorAll('li.task').forEach(function(li, i){
+      var box = li.querySelector('.taskbox');
+      if (box) box.checked = !!m[sec.id + '::' + i];
+    });
+  });
+}
+function courseFilter(q){
+  q = q.trim().toLowerCase();
+  var shown = 0, total = 0;
+  document.querySelectorAll('section.chap').forEach(function(s){
+    total++;
+    var hit = !q || s.textContent.toLowerCase().indexOf(q) !== -1;
+    s.hidden = !hit;
+    if (hit) shown++;
+  });
+  var c = document.getElementById('cr-count'); if (c) c.textContent = q ? (shown + ' / ' + total) : '';
+  var e = document.getElementById('cr-empty'); if (e) e.hidden = shown !== 0;
+}
+window.addEventListener('DOMContentLoaded', function(){ refreshProgress(); restoreTasks(); });
 """
 
 
@@ -500,6 +565,7 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 
     directory = root if root is not None else _default_root()
     bodies: list[tuple[tuple[str, str, str, str, str, str], str | None]] = []
+    sources: list[str] = []
     for chapter in _CHAPTERS:
         filename = chapter[1]
         try:
@@ -507,15 +573,16 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
         except (OSError, UnicodeDecodeError):
             bodies.append((chapter, None))
         else:
+            sources.append(text)
             bodies.append((chapter, _render_body(text)))
 
     served = [(chapter, body) for chapter, body in bodies if body is not None]
-    joined = "".join(body for _, body in served)
+    sections, code, tasks = _structured_stats(sources)
     stats = (
         (len(served), p("篇文档", "documents")),
-        (joined.count("<h3"), p("个小节", "sections")),
-        (joined.count("<pre"), p("段代码", "code samples")),
-        (joined.count("☐"), p("项练习", "practice items")),
+        (sections, p("个小节", "sections")),
+        (code, p("段代码", "code samples")),
+        (tasks, p("项练习", "practice items")),
     )
 
     lang = "en" if en else "zh"
@@ -537,7 +604,7 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 <style>{_STYLE}</style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">__ICON_SPRITE__</svg>
+__ICON_SPRITE__
 <div class="shell">
 <aside class="side">
 <div class="brand">
@@ -626,6 +693,20 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
             )
         }</p>
 </div>
+<div class="crbar-row">
+<div class="crbar" role="progressbar" aria-label="{
+            p("阅读进度", "Reading progress")
+        }"><div id="cr-bar"></div></div>
+<span id="cr-lab" class="meta">0 / {len(_CHAPTERS)}</span>
+</div>
+<div class="csearch">
+<input id="cr-q" type="search" aria-label="{p("搜索课程内容", "Search the course")}"
+ placeholder="{
+            p("在 25 篇课程文档中搜索…", "Search across the 25 chapters…")
+        }" oninput="courseFilter(this.value)">
+<span id="cr-count" class="meta" aria-live="polite"></span>
+</div>
+<p id="cr-empty" class="course-note" hidden>{p("没有匹配的章节。", "No matching chapters.")}</p>
 <div class="stats">"""
     )
     for num, label in stats:
@@ -642,6 +723,7 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 <svg class="ic" aria-hidden="true"><use href="#i-book"/></svg>
 <h2>{en_title if en else zh_title}</h2>
 <span class="n">{number}</span>
+<button class="readbtn" type="button" data-ch="{key}" data-done="{p("已读", "read")}" data-todo="{p("标记已读", "mark read")}" onclick="toggleRead(this.dataset.ch)" aria-pressed="false">{p("标记已读", "mark read")}</button>
 </div>
 <p class="src">{_COURSE_DIRNAME}/{filename}</p>"""
         )
@@ -671,14 +753,15 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
 <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>
 <p>{
                 p(
-                    "这台机器上读不到课程文件：仓库根目录下没有 "
-                    f"<code>{_COURSE_DIRNAME}/</code> 目录（从 wheel 安装时就是这种情况）。"
-                    "课程全文在仓库里，<code>course-level-1/</code> 目录下 25 篇 Markdown，"
-                    "克隆仓库后重启本页即可在这里阅读。",
+                    "这台机器上读不到课程文件：仓库根目录和已安装的包数据里都没有 "
+                    f"<code>{_COURSE_DIRNAME}/</code> 目录。课程全文是仓库里 "
+                    f"<code>{_COURSE_DIRNAME}/</code> 下的 25 篇 Markdown；"
+                    "克隆仓库后重启本页，或重新安装 fde-scope，即可在这里阅读。",
                     "The course files are not on this machine: there is no "
-                    f"<code>{_COURSE_DIRNAME}/</code> directory at the repo root (a wheel install "
-                    f"has none). The lessons are 25 Markdown files in <code>{_COURSE_DIRNAME}/</code> "
-                    "in the repository; clone it and reopen this page to read them here.",
+                    f"<code>{_COURSE_DIRNAME}/</code> directory at the repo root, and none in the "
+                    f"installed package data. The lessons are 25 Markdown files in "
+                    f"<code>{_COURSE_DIRNAME}/</code> in the repository; clone it and reopen this "
+                    "page — or reinstall fde-scope — to read them here.",
                 )
             }</p>
 </div>"""

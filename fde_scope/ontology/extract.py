@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from ..llm import LLMError, MiMoClient
+from ..llm import LLMClient, LLMError
 from .models import Concept, OntologySchema
 
 
@@ -42,7 +42,7 @@ class ConceptExtractor:
                 push(curie)
         return out
 
-    def annotate(self, text: str, *, llm: MiMoClient | None = None) -> tuple[list[str], str]:
+    def annotate(self, text: str, *, llm: LLMClient | None = None) -> tuple[list[str], str]:
         """返回（概念 CURIE 列表, 来源标签 ``rule``|``llm``）。
 
         llm 缺失/不可用/调用失败时走规则路径并如实标 ``rule``。
@@ -91,7 +91,7 @@ class ConceptExtractor:
         return out
 
     # -- LLM 辅助 ---------------------------------------------------------------
-    def _llm_labels(self, text: str, llm: MiMoClient) -> list[str]:
+    def _llm_labels(self, text: str, llm: LLMClient) -> list[str]:
         catalog = "\n".join(
             f"- {c.curie}: {c.label_zh or c.label}" for c in self._concepts.values() if not c.deprecated
         )
@@ -102,11 +102,11 @@ class ConceptExtractor:
         raw = llm.complete(prompt, temperature=0.0, max_tokens=256)
         start, end = raw.find("["), raw.rfind("]")
         if start == -1 or end <= start:
-            raise LLMError(f"MiMo annotation output is not a JSON array: {raw[:200]!r}")
+            raise LLMError(f"LLM annotation output is not a JSON array: {raw[:200]!r}")
         try:
             data = json.loads(raw[start : end + 1])
         except json.JSONDecodeError as exc:
-            raise LLMError(f"MiMo annotation output is not valid JSON: {raw[:200]!r}") from exc
+            raise LLMError(f"LLM annotation output is not valid JSON: {raw[:200]!r}") from exc
         if not isinstance(data, list):
-            raise LLMError(f"MiMo annotation output is not a list: {raw[:200]!r}")
+            raise LLMError(f"LLM annotation output is not a list: {raw[:200]!r}")
         return [c for c in data if isinstance(c, str) and c in self._concepts]

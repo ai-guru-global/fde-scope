@@ -26,16 +26,21 @@ SCM = "https://ai-guru-global.github.io/fde-scope/ontology/supplychain#"
 PREFIX = f"PREFIX scm: <{SCM}>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n"
 
 # CQ1 结构层：销售订单 → 产品/数量/交期（数字与日期是 JSON-LD 字面量）
-CQ1 = PREFIX + """
+CQ1 = (
+    PREFIX
+    + """
 SELECT ?so ?product ?qty ?due WHERE {
   ?so a scm:SalesOrder ; scm:contains ?product ;
       scm:order_qty ?qty ; scm:due_date ?due .
 } ORDER BY ?due
 """
+)
 
 # CQ2 结构暴露集：从被延迟的 PO 沿"供应→消耗→履约"属性路径反推销售订单。
 # 直接消耗（scm:consumes）与 BOM 行具体化（line_order/line_material）都算路。
-CQ2 = PREFIX + """
+CQ2 = (
+    PREFIX
+    + """
 SELECT DISTINCT ?so ?wo WHERE {
   ?so a scm:SalesOrder ; scm:fulfilled_by ?wo .
   { ?wo scm:consumes ?mat . }
@@ -45,15 +50,19 @@ SELECT DISTINCT ?so ?wo WHERE {
   FILTER (?po = scm:PO-3001)
 } ORDER BY ?so
 """
+)
 
 # CQ3 结构层：触发规则1 的战略级物料（现货 < 7天预测；路由读 rdf:type）
-CQ3 = PREFIX + """
+CQ3 = (
+    PREFIX
+    + """
 SELECT ?mat ?name ?onhand ?forecast WHERE {
   ?mat a scm:StrategicMaterial ; scm:name ?name ;
        scm:qty_on_hand ?onhand ; scm:forecast_demand_7d ?forecast .
   FILTER (?onhand < ?forecast)
 } ORDER BY ?mat
 """
+)
 
 
 def build_graph():

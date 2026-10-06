@@ -68,6 +68,12 @@ def test_flywheel_replay(tmp_path: Path) -> None:
     result = runner.invoke(app, ["flywheel", "--agent", "acme", "--events", str(ev_path)])
     assert result.exit_code == 0, result.stdout
     assert "golden=1" in result.stdout
+    # the flywheel panel must not inherit the old lie: no scheduler fires in
+    # this process, so the CLI says "descriptors only" and lists the real jobs
+    assert "scheduled: next Mon 02:00" not in result.stdout
+    assert "descriptors only" in result.stdout
+    assert "weekly_incremental_retrain" in result.stdout
+    assert "cron=0 2 * * 1" in result.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -459,3 +465,103 @@ def test_skill_export_ontology_missing_schema_exits_2(tmp_path: Path, monkeypatc
     r = runner.invoke(app, ["skill", "export", sid, "--format", "agentscope", "--ontology"])
     assert r.exit_code == 2
     assert "fde-core" in r.stdout
+
+
+# ---------------------------------------------------------------------------
+# P2 CLI ergonomics (C1-C11): version, --json, friendly errors
+# ---------------------------------------------------------------------------
+def test_version_flag() -> None:
+    """C3: a real --version flag, not just a banner line."""
+    from fde_scope import __version__
+
+    r = runner.invoke(app, ["--version"])
+    assert r.exit_code == 0
+    assert __version__ in r.stdout
+
+
+def test_deploy_json_is_plain_parseable_output(tmp_path: Path, sample_csv: Path) -> None:
+    """C2: --json prints pure JSON with no rich decorations, so scripts can
+    parse stdout directly."""
+    html_out = tmp_path / "report.html"
+    runner.invoke(app, ["corpus", "--input", str(sample_csv), "--out", str(html_out)])
+    corpus_json = tmp_path / "corpus_report.json"
+    assert corpus_json.is_file()
+    r = runner.invoke(
+        app,
+        ["deploy", "--tenant", "acme", "--corpus", str(corpus_json), "--json", "--dry-run"],
+    )
+    assert r.exit_code == 0, r.stdout
+    body = json.loads(r.stdout)
+    assert "sandbox" in body and "permissions" in body
+
+
+def test_eval_json_report(eval_cases_jsonl: Path) -> None:
+    r = runner.invoke(app, ["eval", "--agent", "mock", "--test-set", str(eval_cases_jsonl), "--json"])
+    assert r.exit_code == 0, r.stdout
+    body = json.loads(r.stdout)
+    assert body["case_count"] > 0 and "intent_accuracy" in body["metrics"]
+
+
+def test_kpi_and_engage_list_json(tmp_path: Path, sample_csv: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["engage", "init", "--customer", "Acme"])
+    samples = tmp_path / "s.json"
+    samples.write_text(
+        json.dumps([{"id": "1", "category": "退款", "handle_time_seconds": 10}]), encoding="utf-8"
+    )
+    eid = _any_eid(tmp_path)
+    kpi_r = runner.invoke(app, ["kpi", eid, "--samples", str(samples), "--json"])
+    assert kpi_r.exit_code == 0, kpi_r.stdout
+    body = json.loads(kpi_r.stdout)
+    assert body["engagement_id"].startswith("eng-acme")
+    lst = runner.invoke(app, ["engage", "list", "--json"])
+    assert json.loads(lst.stdout)[0]["customer"] == "Acme"
+
+
+def _any_eid(tmp_path: Path) -> str:
+    from fde_scope import paths
+
+    files = sorted((paths.data_root() / ".fde_scope" / "engagements").glob("*.json"))
+    return files[0].stem
+
+
+def test_engage_status_json(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(app, ["engage", "init", "--customer", "Beta"])
+    import re
+
+    m = re.search(r"eng-[a-z0-9-]+", r.stdout)
+    eid = m.group(0)
+    out = runner.invoke(app, ["engage", "status", eid, "--json"])
+    assert out.exit_code == 0, out.stdout
+    body = json.loads(out.stdout)
+    assert body["engagement_id"] == eid and body["current_phase"]
+
+
+def test_ontology_validate_json() -> None:
+    r = runner.invoke(app, ["ontology", "validate", "fde-core", "--json"])
+    assert r.exit_code == 0, r.stdout
+    body = json.loads(r.stdout)
+    assert body["ok"] is True and body["errors"] == []
+
+
+def test_missing_input_file_is_a_clean_error(tmp_path: Path, monkeypatch) -> None:
+    """C7: a bad path exits 2 with a one-line message, no traceback."""
+    monkeypatch.chdir(tmp_path)
+    r = runner.invoke(
+        app, ["corpus", "--input", str(tmp_path / "nope.csv"), "--out", str(tmp_path / "o.html")]
+    )
+    assert r.exit_code == 2
+    assert "not found" in r.stdout
+    assert "Traceback" not in r.stdout
+
+
+def test_connect_preview_lands_under_the_data_root(tmp_path: Path, sample_csv: Path, monkeypatch) -> None:
+    """C8: the preview is written under the data root via the atomic writer,
+    never into whatever directory the user happened to be in."""
+    data_home = tmp_path / "data"
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(data_home))
+    r = runner.invoke(app, ["connect", "--type", "csv", "--source", str(sample_csv)])
+    assert r.exit_code == 0, r.stdout
+    assert (data_home / "samples" / "preview.json").is_file()
+    assert not (tmp_path / "samples").exists()  # never the CWD

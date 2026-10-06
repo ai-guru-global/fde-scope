@@ -26,7 +26,7 @@ from qwenpaw.pawapp import PawApp, get_ctx
 
 try:
     import fde_scope  # noqa: F401
-    from fde_scope import paths
+    from fde_scope import __version__, paths
 except ModuleNotFoundError as exc:  # pragma: no cover — env guard
     raise ModuleNotFoundError(
         "fde_scope is not importable from the QwenPaw host process. "
@@ -111,7 +111,7 @@ async def _sync_storage_snapshot(ctx, engagements: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "app": "fde-scope", "version": "0.1.0"}
+    return {"status": "ok", "app": "fde-scope", "version": __version__}
 
 
 @router.get("/profiles")
@@ -168,11 +168,11 @@ def get_engagement(eid: str) -> dict:
 
 @router.get("/engagements/{eid}/gates")
 def engagement_gates(eid: str) -> dict:
-    from fde_scope.engagement.engagement import _default_gate_registry
+    from fde_scope.engagement.engagement import default_gate_registry
 
     eng = _load_engagement(eid)
     out = {}
-    for slug, gate in _default_gate_registry().items():
+    for slug, gate in default_gate_registry().items():
         if gate.applies(eng.ctx):
             r = gate.check(eng.ctx)
             out[slug] = {

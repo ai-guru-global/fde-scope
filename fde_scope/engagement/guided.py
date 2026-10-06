@@ -425,9 +425,9 @@ def _validate_draft(data: dict) -> dict:
             out["stakeholders"] = items
     criteria = data.get("success_criteria")
     if isinstance(criteria, list):
-        items = [c.strip() for c in criteria[:_MAX_CRITERIA] if isinstance(c, str) and c.strip()]
-        if items:
-            out["success_criteria"] = items
+        names = [c.strip() for c in criteria[:_MAX_CRITERIA] if isinstance(c, str) and c.strip()]
+        if names:
+            out["success_criteria"] = names
     slos = data.get("slos")
     if isinstance(slos, list):
         items = []

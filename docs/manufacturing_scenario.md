@@ -25,7 +25,7 @@
 - **④ success_criteria**：抓取率 73% → 85%（6 个月）、干预率 3.2% → 1.5%、OEE +5pp。**写进 success_criteria gate。**
 
 ### Zone B · Build
-- **⑤ connect**：OPC UA 接 PLC tag（节拍/报警）、MQTT-Sparkplug 接 AMR、rosbag2 接机器人抓取轨迹、MES 接工单/停机码、Historian 接振动/电流时序。（连接器 stub 已就位；真实 IO 路线图。）
+- **⑤ connect**：OPC UA 接 PLC tag（节拍/报警）、MQTT-Sparkplug 接 AMR、rosbag2 接机器人抓取轨迹、MES 接工单/停机码、Historian 接振动/电流时序。（五类连接器均为真实实现：OPC UA/MQTT-Sparkplug 走真实 IO，rosbag2/MES/Historian 支持 JSONL 回放冷启动。能力矩阵见控制台运维面板。）
 - **⑥ corpus**：rosbag 抓取轨迹 + 报警日志 → 锻造语料 → 覆盖度报告发现"人形机器人碰撞后恢复"语料极少（缺口）→ 合成补盲。
 - **⑦ prototype_real_data**：在**真实未策展的** rosbag 上原型任务规划，不用 curated demo。
 - **⑧ validate**：与生产总监 + 班组长验证（班组长关心干预率，总监关心 OEE）。

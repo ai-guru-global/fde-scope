@@ -27,8 +27,9 @@ from starlette.responses import JSONResponse, Response
 #: and repo-docs pages are such shells too: public exam specs, field
 #: vocabulary, the Level-1 course text, the full SOP and the repository's own
 #: documents, no engagement data, no mutating endpoints. The two
-#: skills-handbook portal indexes, the GTM site and the repo screenshot files
-#: are static build output / content under the same rule. Matching is
+#: skills-handbook portal indexes, the GTM site (page, fonts and the two
+#: screenshots it embeds) and the repo screenshot files are static build
+#: output / content under the same rule. Matching is
 #: exact-path (``request.url.path in PUBLIC_PATHS``), so sibling paths such as
 #: ``/catalog/`` or ``/docs/`` itself are still gated.
 public_html = frozenset(
@@ -54,6 +55,9 @@ public_html = frozenset(
         "/GTM/en/index.html",
         "/docs/images/overview.png",
         "/docs/images/console.png",
+        # Browsers fetch the tab icon without auth headers; it is a brand
+        # glyph, not engagement data.
+        "/static/favicon.svg",
     }
 )
 _gtm_assets = frozenset(
@@ -70,6 +74,11 @@ _gtm_assets = frozenset(
             "spline-sans-mono-latin-600-normal.woff2",
         )
     }
+    # The two screenshots the portal embeds (``GTM/index.html`` as
+    # ``images/*.png``, ``GTM/en/index.html`` as ``../images/*.png``; both
+    # resolve to these paths). Exact paths only — nothing else under
+    # ``GTM/images/`` becomes reachable, and no directory prefix is granted.
+    | {f"/GTM/images/{name}" for name in ("console.png", "overview.png")}
 )
 #: Local reader routes for the repository's documents — the slug list lives in
 #: ``docs_reader.py``, and the read-only pages it renders carry no engagement
@@ -114,7 +123,12 @@ def _configured_token() -> str | None:
 
 
 def _matches(candidate: str | None, token: str) -> bool:
-    return bool(candidate) and hmac.compare_digest(candidate, token)
+    # Narrowed before the call: ``compare_digest`` is generic over ``AnyStr`` and
+    # cannot accept ``str | None``, and the guard keeps the timing-safe compare
+    # the only path that ever touches a real candidate.
+    if candidate is None:
+        return False
+    return hmac.compare_digest(candidate, token)
 
 
 class ApiTokenAuthMiddleware(BaseHTTPMiddleware):

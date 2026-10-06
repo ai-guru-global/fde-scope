@@ -23,6 +23,6 @@ def schema_to_mermaid(schema: OntologySchema) -> str:
         lines.append(f"  {parent.split(':')[-1]} <|-- {child.split(':')[-1]}")
     for p in sorted(schema.object_properties, key=lambda x: x.curie):
         lines.append(f"  {p.domain.split(':')[-1]} --> {p.range.split(':')[-1]} : {p.curie.split(':')[-1]}")
-    for p in sorted(schema.data_properties, key=lambda x: x.curie):
-        lines.append(f"  {p.domain.split(':')[-1]} : +{p.curie.split(':')[-1]}({p.range})")
+    for dp in sorted(schema.data_properties, key=lambda x: x.curie):
+        lines.append(f"  {dp.domain.split(':')[-1]} : +{dp.curie.split(':')[-1]}({dp.range})")
     return "\n".join(lines) + "\n"

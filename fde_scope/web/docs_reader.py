@@ -39,20 +39,18 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from markdown_it import MarkdownIt
-
-from .course import (
-    _AUTOLINK,
-    _CHAPTERS,
-    _MD_IMAGE,
-    _MD_LINK,
-    _fenced_indices,
-    _normalize,
+from .course import COURSE_FILES
+from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .mdrender import (
+    AUTOLINK,
+    MD_IMAGE,
+    MD_LINK,
+    DemotingRenderer,
+    demoting_markdown,
+    fenced_indices,
+    normalize_path,
     rewrite_outside_fences,
 )
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
-
-REPO_IMAGES = ("overview.png", "console.png")
 
 #: slug → (repo-relative path, zh hero title, en hero title). ``SLUGS`` drives
 #: the app's route validation; ``_PATH_TO_SLUG`` drives link rewriting.
@@ -101,14 +99,25 @@ _DOCS: tuple[tuple[str, str, str, str], ...] = (
 
 SLUGS: tuple[str, ...] = tuple(slug for slug, *_ in _DOCS)
 _PATH_TO_SLUG: dict[str, str] = {path: slug for slug, path, *_ in _DOCS}
-_COURSE_BY_FILE: dict[str, str] = {f"course-level-1/{name}": key for key, name, *_ in _CHAPTERS}
+_COURSE_BY_FILE: dict[str, str] = COURSE_FILES
 
 _H1 = re.compile(r"^#\s+(.*?)\s*$", re.M)
 _ATX_LINE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 _EXPLICIT_ANCHOR = re.compile(r'^<a id="([^"]+)"></a>\s*$')
 _PRE = re.compile(r"(<pre\b.*?</pre>)", re.S)
 
-_MD = MarkdownIt("commonmark", {"html": False}).enable(["table", "strikethrough"])
+
+class _DocsRenderer(DemotingRenderer):
+    """Anchor every heading with its slug (or the explicit ``<a id>`` that
+    preceded it), then let the shared rule demote it one level."""
+
+    def heading_open(self, tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
+        token = tokens[idx]
+        if token.map:
+            hid = env.get("extra_ids", {}).get(token.map[0]) or _slug(tokens[idx + 1].content)
+            if hid:
+                token.attrSet("id", hid)
+        return super().heading_open(tokens, idx, options, env)
 
 
 def _slug(text: str) -> str:
@@ -120,40 +129,35 @@ def _slug(text: str) -> str:
     )
 
 
-def _heading_open(tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
-    """Anchor every heading with its slug (or the explicit ``<a id>`` that
-    preceded it) and demote it one level."""
-    token = tokens[idx]
-    if token.map:
-        hid = env.get("extra_ids", {}).get(token.map[0]) or _slug(tokens[idx + 1].content)
-        if hid:
-            token.attrSet("id", hid)
-    token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
-    return _MD.renderer.renderToken(tokens, idx, options, env)
-
-
-def _heading_close(tokens, idx, options, env):  # noqa: ANN001 - markdown-it rule signature
-    token = tokens[idx]
-    token.tag = f"h{min(int(token.tag[1:]) + 1, 6)}"
-    return _MD.renderer.renderToken(tokens, idx, options, env)
-
-
-_MD.renderer.rules["heading_open"] = _heading_open
-_MD.renderer.rules["heading_close"] = _heading_close
+_MD = demoting_markdown(_DocsRenderer)
 
 
 def _default_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _repo_images() -> tuple[str, ...]:
+    """Every image that actually exists under ``docs/images/``, sorted.
+
+    Derived from the directory instead of hand-maintained, so adding a picture
+    does not require touching code (and cannot 404 against a stale tuple). A
+    wheel install has no ``docs/`` and gets an empty tuple — ``image_path``
+    then serves nothing, which is correct.
+    """
+    d = _default_root() / "docs" / "images"
+    if not d.is_dir():
+        return ()
+    return tuple(sorted(p.name for p in d.iterdir() if p.is_file()))
+
+
 def image_path(name: str, root: Path | None = None) -> Path | None:
     """Absolute path of an allowlisted repo image under ``docs/images/``, or None.
 
-    ``name`` comes straight from a URL segment; the allowlist is the only
-    resolution channel, so nothing outside ``docs/images/{REPO_IMAGES}`` can
-    be served.
+    ``name`` comes straight from a URL segment; the directory-derived allowlist
+    is the only resolution channel, so nothing outside ``docs/images/`` can be
+    served and no path component in ``name`` is ever honoured.
     """
-    if name not in REPO_IMAGES:
+    if name not in _repo_images():
         return None
     p = (root if root is not None else _default_root()) / "docs" / "images" / name
     return p if p.is_file() else None
@@ -175,20 +179,46 @@ def _repo_target(path: str) -> str | None:
     if path == "GTM/index.html":
         return "/GTM/index.html"
     name = path.removeprefix("docs/images/")
-    if path.startswith("docs/images/") and name in REPO_IMAGES:
+    if path.startswith("docs/images/") and name in _repo_images():
         return f"/docs/images/{name}"
     return None
+
+
+#: Absolute in-app paths a document may link to. Anything else degrades to
+#: its label text, same as an external URL — a hand-written ``/admin`` in a
+#: markdown file must not silently become a link the app 404s (or worse,
+#: serves) later.
+_STATIC_HREFS = frozenset(
+    {
+        "/",
+        "/en/",
+        "/console",
+        "/en/console",
+        "/course",
+        "/en/course",
+        "/glossary",
+        "/en/glossary",
+        "/certification",
+        "/en/certification",
+        "/sop",
+        "/en/sop",
+        "/api/health",
+    }
+)
+_HREF_PREFIXES = ("/docs/", "/en/docs/", "/catalog/", "/GTM/", "/static/")
 
 
 def _resolve_href(href: str, base: str, anchors: set[str]) -> str | None:
     if href.startswith("#"):
         return href if href[1:] in anchors else None
     if href.startswith("/"):
-        return href
+        if href in _STATIC_HREFS or href.startswith(_HREF_PREFIXES):
+            return href
+        return None
     if href.startswith(("http://", "https://", "mailto:")):
         return None
     path, _, frag = href.partition("#")
-    target = _repo_target(_normalize(base, path))
+    target = _repo_target(normalize_path(base, path))
     if target is None:
         return None
     if frag and target.startswith("/docs/"):
@@ -196,13 +226,14 @@ def _resolve_href(href: str, base: str, anchors: set[str]) -> str | None:
     return target
 
 
-def _preprocess(md_text: str, base: str) -> tuple[str, dict[int, str]]:
-    """Rewrite every link/image to its in-app form (or its bare label) and
-    lift the README's explicit ``<a id>`` markers onto the heading that
-    follows them. Line numbers survive: markers become blank lines and code
-    fences are left byte-identical."""
+def _preprocess(md_text: str, base: str) -> tuple[str, dict[int, str], list[tuple[int, str, str]]]:
+    """Rewrite every link/image to its in-app form (or its bare label), lift
+    the README's explicit ``<a id>`` markers onto the heading that follows
+    them, and collect the ``##``/``###`` outline for the TOC. Line numbers
+    survive: markers become blank lines and code fences are left
+    byte-identical."""
     lines = md_text.split("\n")
-    fenced = _fenced_indices(lines)
+    fenced = fenced_indices(lines)
     extra: dict[int, str] = {}
     for i, line in enumerate(lines):
         if i in fenced:
@@ -218,6 +249,7 @@ def _preprocess(md_text: str, base: str) -> tuple[str, dict[int, str]]:
                 break
 
     anchors = set(extra.values())
+    toc: list[tuple[int, str, str]] = []
     for i, line in enumerate(lines):
         if i in fenced:
             continue
@@ -226,6 +258,10 @@ def _preprocess(md_text: str, base: str) -> tuple[str, dict[int, str]]:
             hid = extra.get(i) or _slug(m.group(2))
             if hid:
                 anchors.add(hid)
+                if m.group(1) in ("##", "###"):
+                    # title text as authored, minus inline links (labels only)
+                    title = MD_LINK.sub(r"\1", m.group(2)).strip()
+                    toc.append((len(m.group(1)), hid, title))
 
     def repl_image(m: re.Match[str]) -> str:
         src, _, _frag = m.group(2).partition("#")
@@ -239,22 +275,38 @@ def _preprocess(md_text: str, base: str) -> tuple[str, dict[int, str]]:
         return f"[{m.group(1)}]({target})" if target else m.group(1)
 
     def apply(text: str) -> str:
-        text = _MD_IMAGE.sub(repl_image, text)
-        text = _MD_LINK.sub(repl_link, text)
-        return _AUTOLINK.sub(r"\1", text)
+        text = MD_IMAGE.sub(repl_image, text)
+        text = MD_LINK.sub(repl_link, text)
+        return AUTOLINK.sub(r"\1", text)
 
-    return rewrite_outside_fences("\n".join(lines), apply), extra
+    return rewrite_outside_fences("\n".join(lines), apply), extra, toc
 
 
-def _render_body(md_text: str, base: str) -> str:
+def _render_body(md_text: str, base: str) -> tuple[str, list[tuple[int, str, str]]]:
     """Drop the document's ``# `` title — the hero carries it — and render
-    the rest, restoring ``<br>`` outside code blocks."""
-    text, extra = _preprocess(_H1.sub("", md_text, count=1), base)
+    the rest, restoring ``<br>`` outside code blocks. Returns the HTML and
+    the heading outline for the page TOC."""
+    text, extra, toc = _preprocess(_H1.sub("", md_text, count=1), base)
     html = _MD.render(text, {"extra_ids": extra})
     parts = _PRE.split(html)
     for i in range(0, len(parts), 2):
         parts[i] = parts[i].replace("&lt;br&gt;", "<br>").replace("&lt;br/&gt;", "<br>")
-    return "".join(parts)
+    return "".join(parts), toc
+
+
+def _toc_html(toc: list[tuple[int, str, str]], locale: str) -> str:
+    """A collapsible on-this-page list built from the heading tokens — never
+    scraped back out of rendered HTML."""
+    if len(toc) < 2:
+        return ""
+    import html as _html
+
+    items = "".join(
+        f'<li class="l{lvl}"><a href="#{_html.escape(hid)}">{_html.escape(title)}</a></li>'
+        for lvl, hid, title in toc
+    )
+    label = "On this page" if locale == "en" else "本页目录"
+    return f'<details class="toc"><summary>{label}</summary><ul class="toc-list">{items}</ul></details>'
 
 
 _STYLE = (
@@ -265,6 +317,13 @@ border-radius:9px;padding:12px 14px;margin:18px 0 0;font-size:.84rem;color:var(-
 .doc-note .ic{color:var(--accent);margin-top:2px}
 .doc-note strong{color:var(--fg)}
 .src{font:500 .74rem/1.7 var(--mono);color:var(--faint);margin:7px 0 0;overflow-wrap:anywhere}
+.toc{margin:14px 0 0;border:1px solid var(--border);border-radius:9px;background:var(--panel2);max-width:860px}
+.toc summary{cursor:pointer;padding:9px 14px;font-weight:600;font-size:.86rem;color:var(--fg)}
+.toc-list{margin:0;padding:4px 14px 10px;list-style:none;columns:2;column-gap:24px}
+.toc-list li{margin:.22em 0;break-inside:avoid;font-size:.84rem}
+.toc-list li.l4{padding-left:14px}
+.toc-list a{color:var(--muted);text-decoration:none}
+.toc-list a:hover{color:var(--accent)}
 .snav .subnav a{overflow-wrap:anywhere}
 .md{max-width:860px;font-size:.92rem;line-height:1.78;color:var(--fg);padding-top:22px}
 .md>*:first-child{margin-top:0}
@@ -322,9 +381,11 @@ def render(slug: str, locale: str = "zh", root: Path | None = None) -> str:
 
     relpath, zh_title, en_title = next((path, zh, eng) for s, path, zh, eng in _DOCS if s == slug)
     source = (root if root is not None else _default_root()) / relpath
+    body: str | None
+    toc: list[tuple[int, str, str]] = []
     try:
         text = source.read_text(encoding="utf-8")
-        body: str | None = _render_body(text, relpath.rsplit("/", 1)[0] if "/" in relpath else "")
+        body, toc = _render_body(text, relpath.rsplit("/", 1)[0] if "/" in relpath else "")
     except (OSError, UnicodeDecodeError):
         body = None
 
@@ -350,7 +411,7 @@ def render(slug: str, locale: str = "zh", root: Path | None = None) -> str:
 <style>{_STYLE}</style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">__ICON_SPRITE__</svg>
+__ICON_SPRITE__
 <div class="shell">
 <aside class="side">
 <div class="brand">
@@ -366,7 +427,7 @@ def render(slug: str, locale: str = "zh", root: Path | None = None) -> str:
 <div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
 <a href="{base}/sop">{p("SOP 全文", "SOP full text")}</a>
 <a href="{catalog}">{p("技能手册库", "Skills handbook")}</a>
-<a href="{base}/docs/readme" class="active">{p("仓库文档", "Repo docs")}</a>
+<a href="{base}/docs/readme"{' class="active"' if slug == "readme" else ""}>{p("仓库文档", "Repo docs")}</a>
 <div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
 <a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
 <div class="grp">{p("外部", "External")}</div>
@@ -410,6 +471,7 @@ the document text.</p>
 
     if body is not None:
         body_lang = ' lang="zh-Hans"' if en else ""
+        add(_toc_html(toc, locale))
         add(f'<div class="md"{body_lang}>{body}</div>')
     else:
         add(

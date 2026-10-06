@@ -9,6 +9,11 @@ emits:
 Run GTM/sync_log.py --lang zh --page index.html and
       GTM/sync_log.py --lang en --page en/index.html afterwards to fill the
 incident-log sentinels per language.
+
+Both outputs are served from inside the app at /GTM/, so every anchor points at
+an in-app route: tests/test_web.py fails the build if an external href or a
+target="_blank" appears in either artifact. Repo prose is linked through the
+in-app readers (/docs/readme, /sop, /docs/license) instead of github.com URLs.
 """
 
 from __future__ import annotations
@@ -40,12 +45,9 @@ STATE_ZH = {
     "BLOCKED": "阻断",
     "FLYWHEEL": "飞轮",
     "PROTOTYPE": "原型",
-    "DEMO DATA · 演示数据 · seeded by examples/seed_mock_engagements.py; every record engine-generated.":
-        "演示数据 · 由 examples/seed_mock_engagements.py 种入；每条门禁记录均由引擎生成。",
-    "VERIFIED BY: CI-green suite · contract pins tests/test_architecture_guard.py · evidence model docs/architecture-model/architecture-map.md":
-        "验证来源：CI 全绿套件 · 契约测试 tests/test_architecture_guard.py · 证据模型 docs/architecture-model/architecture-map.md",
-    "LIVE CAPTURE · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS window · $ ./appbuild/build_release.sh":
-        "实机截图 · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS 窗口 · $ ./appbuild/build_release.sh",
+    "DEMO DATA · 演示数据 · seeded by examples/seed_mock_engagements.py; every record engine-generated.": "演示数据 · 由 examples/seed_mock_engagements.py 种入；每条门禁记录均由引擎生成。",
+    "VERIFIED BY: CI-green suite · contract pins tests/test_architecture_guard.py · evidence model docs/architecture-model/architecture-map.md": "验证来源：CI 全绿套件 · 契约测试 tests/test_architecture_guard.py · 证据模型 docs/architecture-model/architecture-map.md",
+    "LIVE CAPTURE · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS window · $ ./appbuild/build_release.sh": "实机截图 · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS 窗口 · $ ./appbuild/build_release.sh",
     "COPY": "复制",
     "COPIED ✓": "已复制 ✓",
 }
@@ -95,10 +97,8 @@ B_LABELS = {
 
 # figure captions
 FIGCAP_ZH = {
-    "<b>ENGAGEMENT CONSOLE · 工作台</b><small>cross-project matrix · gates · recent skills</small>":
-        "<b>工作台</b><small>跨项目矩阵 · 门禁 · 最近技能</small>",
-    "<b>FUNCTIONAL OVERVIEW · 功能总览</b><small>18 phases · 4 zones · 10 gates · 10 connectors</small>":
-        "<b>功能总览</b><small>18 阶段 · 4 大区 · 10 门禁 · 10 连接器</small>",
+    "<b>ENGAGEMENT CONSOLE · 工作台</b><small>cross-project matrix · gates · recent skills</small>": "<b>工作台</b><small>跨项目矩阵 · 门禁 · 最近技能</small>",
+    "<b>FUNCTIONAL OVERVIEW · 功能总览</b><small>18 phases · 4 zones · 10 gates · 10 connectors</small>": "<b>功能总览</b><small>18 阶段 · 4 大区 · 10 门禁 · 10 连接器</small>",
 }
 FIGCAP_EN = {
     "<b>ENGAGEMENT CONSOLE · 工作台</b>": "<b>ENGAGEMENT CONSOLE</b>",
@@ -106,8 +106,7 @@ FIGCAP_EN = {
 }
 
 JS_ZH = {
-    "REFUSED · functional_safety: hazard analysis missing":
-        "拒绝推进 · functional_safety：缺少危害分析",
+    "REFUSED · functional_safety: hazard analysis missing": "拒绝推进 · functional_safety：缺少危害分析",
     "OK · phase 12 runbook": "OK · 第 12 阶段 · 运行手册",
     "advance → REFUSED<br>hazard analysis missing": "advance → 拒绝推进<br>缺少危害分析",
     "industrial-only · 工业专属，ticket 不适用": "工业专属 · ticket 不适用",
@@ -217,9 +216,7 @@ def split_labels(html: str, keep: str) -> str:
         en, zh = m.group(2), m.group(3)
         return f'<span class="{m.group(1)}">{(en if keep == "en" else zh).strip()}</span>'
 
-    return re.sub(
-        rf'<span class="({cls})">([^<]*?)\s*·\s*([^<]*?)</span>', fix, html
-    )
+    return re.sub(rf'<span class="({cls})">([^<]*?)\s*·\s*([^<]*?)</span>', fix, html)
 
 
 def zh_buttons(html: str) -> str:
@@ -237,12 +234,12 @@ def en_buttons(html: str) -> str:
 def nav_links(html: str, lang: str) -> str:
     if lang == "zh":
         html = html.replace(
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP DOCS</a>',
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/fde_sop_full.md" target="_blank" rel="noopener">SOP 文档</a>',
+            '<a href="/sop">SOP DOCS</a>',
+            '<a href="/sop">SOP 文档</a>',
         )
         html = html.replace(
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS · 技能库</a>',
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">技能手册库</a>',
+            '<a href="/catalog/index.html">SKILLS · 技能库</a>',
+            '<a href="/catalog/index.html">技能手册库</a>',
         )
         html = html.replace(
             '<a href="#pricing">PRICING · 定价</a>',
@@ -263,8 +260,8 @@ def nav_links(html: str, lang: str) -> str:
         html = html.replace("FDE SCOPE · GTM BOARD", "FDE SCOPE · GTM 看板")
     else:
         html = html.replace(
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS · 技能库</a>',
-            '<a href="https://github.com/ai-guru-global/fde-scope/blob/main/docs/skills-catalog/site/index.html" target="_blank" rel="noopener">SKILLS</a>',
+            '<a href="/catalog/index.html">SKILLS · 技能库</a>',
+            '<a href="/catalog/index.html">SKILLS</a>',
         )
         html = html.replace(
             '<a href="#pricing">PRICING · 定价</a>',
@@ -306,7 +303,9 @@ def build_zh(src: str) -> str:
     for en, zh in FIGCAP_ZH.items():
         html = html.replace(en, zh)
     html = zh_states(html)
-    html = html.replace("DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF")
+    html = html.replace(
+        "DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF"
+    )
     return html
 
 
@@ -319,7 +318,9 @@ def build_en(src: str) -> str:
     html = nav_links(html, "en")
     for en, en2 in FIGCAP_EN.items():
         html = html.replace(en, en2)
-    html = html.replace("DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF")
+    html = html.replace(
+        "DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF"
+    )
     html = rewrite_assets_for_en(html)
     return html
 

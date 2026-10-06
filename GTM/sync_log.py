@@ -141,8 +141,12 @@ def build_row(entry: dict, meta: dict, lang: str = "zh") -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kuba", help="path to kuba checkout")
-    parser.add_argument("--lang", choices=("zh", "en"), default="zh",
-                        help="output language for the shift-log rows (default: zh)")
+    parser.add_argument(
+        "--lang",
+        choices=("zh", "en"),
+        default="zh",
+        help="output language for the shift-log rows (default: zh)",
+    )
     parser.add_argument("--page", type=Path, default=Path(__file__).resolve().parent / "index.html")
     args = parser.parse_args()
 

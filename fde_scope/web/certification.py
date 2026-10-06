@@ -336,6 +336,7 @@ def render(locale: str = "zh") -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{p("FDE Scope · 认证中心", "FDE Scope · Certification")}</title>
+<link rel="icon" href="/static/favicon.svg">
 <script>(function(){{var t=null,q=null;try{{t=localStorage.getItem('fde-theme')}}catch(e){{}}try{{q=new URLSearchParams(location.search).get('theme')}}catch(e){{}}if(q==='dark'||q==='light'){{t=q}}else if(!t){{t='light'}}document.documentElement.dataset.theme=t}})();</script>
 <style>{_STYLE}</style>
 </head>

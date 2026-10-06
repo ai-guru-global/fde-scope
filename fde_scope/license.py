@@ -143,7 +143,7 @@ def issue_license(
     info = LicenseInfo(
         license_id=license_id or f"lic-{uuid.uuid4().hex[:12]}",
         customer=customer,
-        tier=tier,  # type: ignore[arg-type]
+        tier=tier,
         seats=seats,
         expires_at=expires_at,
         features=features or [],

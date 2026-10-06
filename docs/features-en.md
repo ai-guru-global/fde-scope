@@ -7,7 +7,7 @@
 > `manufacturing` profile). Built on AgentScope 2.0.
 >
 > This is the full feature list. Every item is executable code with test
-> coverage; the count-level promises (18 phases / 10 gates / 56 routes…) are
+> coverage; the count-level promises (18 phases / 10 gates / 69 routes…) are
 > pinned by the [architecture guard suite](../tests/test_architecture_guard.py).
 >
 > 中文版:[`docs/features.md`](features.md)
@@ -139,8 +139,8 @@ from a clean pass.
 | Surface | Form | What it does |
 |---|---|---|
 | CLI | `fde-scope` | 13 command groups: connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web console | FastAPI single page, 56 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, guided mode (plain-language phase guidance, deliverable checklists, blocker→next-step translation, catalog deep links, AI-drafted context, goal→task plan), six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser, certification centre (exam specs, public outlines, sample items and a channel due-diligence checklist for three platforms, every figure graded by provenance), glossary (every term grouped by theme on its own page, kept out of the prose), Level-1 course (all 25 course documents rendered from source on one page, in-text citations rewritten to in-app links), SOP full text (rendered locally from source, section navigation and tables), skills handbook (the generated portal mounted in-app), repo docs (README plus 20 docs/ pages rendered locally, GitHub-style anchors and images served in-app), GTM site (the finished landing page mounted in-app with every external link rewritten to in-app routes or plain text) — the rail no longer jumps off-site |
-| QwenPaw PawApp | Desktop plugin | 18 routes under `/api/fde-scope` + 2 agent tools + skill provider, same engine |
+| Web console | FastAPI single page, 69 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, guided mode (plain-language phase guidance, deliverable checklists, blocker→next-step translation, catalog deep links, AI-drafted context, goal→task plan), six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser, certification centre (exam specs, public outlines, sample items and a channel due-diligence checklist for three platforms, every figure graded by provenance), glossary (every term grouped by theme as same-page cards with instant search, kept out of the prose), Level-1 course (all 25 course documents rendered from source on one page, in-text citations rewritten to in-app links), SOP full text (rendered locally from source, section navigation and tables), skills handbook (the generated portal mounted in-app), repo docs (README plus 20 docs/ pages rendered locally, GitHub-style anchors and images served in-app), GTM site (the finished landing page mounted in-app with every external link rewritten to in-app routes or plain text) — the rail no longer jumps off-site |
+| QwenPaw PawApp | Desktop plugin | 18 routes under `/api/fde-scope` + 3 agent tools + skill provider, same engine |
 | macOS App | universal2 DMG | Double-click; same FastAPI object (127.0.0.1:8737), single-instance guard + health check + crash fallback |
 
 **Why it matters**: all four surfaces share one data root (`.fde_scope/`) and

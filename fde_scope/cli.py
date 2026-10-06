@@ -1,8 +1,10 @@
 """fde-scope CLI — the FDE's daily driver.
 
 Five subcommands mirror the FDE workflow: ``connect`` → ``corpus`` →
-``deploy`` → ``eval`` → ``flywheel``. Every command supports ``--dry-run``
-so the whole flow is walkable with zero data and zero extras installed.
+``deploy`` → ``eval`` → ``flywheel``. Scriptable output: ``deploy``, ``eval``,
+``kpi``, ``engage status``/``list``, ``skill list``, ``gate check`` and the
+``ontology`` read/validate commands accept ``--json`` (plain JSON on stdout,
+no rich markup). ``--version`` and ``--install-completion`` work app-wide.
 """
 
 from __future__ import annotations
@@ -20,8 +22,15 @@ from rich.table import Table
 from . import __version__, paths
 
 if TYPE_CHECKING:
-    from .config import TenantConfig
+    from .config import AgentSpec, TenantConfig
     from .skills.service import SkillService
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"fde-scope {__version__}")
+        raise typer.Exit()
+
 
 app = typer.Typer(
     name="fde-scope",
@@ -29,6 +38,28 @@ app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+@app.callback()
+def _root_callback(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the version and exit.",
+    ),
+) -> None:
+    """FDE Scope — 72h from raw data to a deployed agent. Built on AgentScope 2.0.
+
+    Logging is configured here (not in ``main()``) so both entry points —
+    ``fde-scope`` and ``python -m fde_scope.cli`` — behave identically."""
+    from .logutil import configure_logging
+
+    configure_logging()
+
+
 console = Console()
 
 
@@ -39,8 +70,11 @@ def _banner(title: str) -> None:
 # ---------------------------------------------------------------------------
 # LLM wiring (Xiaomi MiMo Token Plan — optional, env-configured)
 # ---------------------------------------------------------------------------
-def _maybe_llm(require: bool = False):
-    """Build the env-selected LLM client; exit cleanly when no key is configured."""
+def _maybe_llm(require: bool = False, quiet: bool = False):
+    """Build the env-selected LLM client; exit cleanly when no key is configured.
+
+    ``quiet`` suppresses the fallback notice — ``--json`` output must stay
+    parseable, and the manifest itself already carries the LLM state."""
     from .llm import get_llm_client
 
     client = get_llm_client()
@@ -52,10 +86,11 @@ def _maybe_llm(require: bool = False):
                 "FDE_SCOPE_LLM_API_KEY (OpenAI-compatible) to enable LLM mode."
             )
             raise typer.Exit(2)
-        console.print(
-            "[yellow]LLM disabled (FDE_SCOPE_MIMO_API_KEY / FDE_SCOPE_LLM_* not set)[/yellow] — "
-            "falling back to rule-based mode.\n"
-        )
+        if not quiet:
+            console.print(
+                "[yellow]LLM disabled (FDE_SCOPE_MIMO_API_KEY / FDE_SCOPE_LLM_* not set)[/yellow] — "
+                "falling back to rule-based mode.\n"
+            )
     return client
 
 
@@ -103,9 +138,11 @@ def connect(
         f"sample_size={len(sample)}"
     )
 
-    out = Path("samples/preview.json")
+    from .fsutil import atomic_write_text
+
+    out = paths.data_root() / "samples" / "preview.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(sample, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(out, json.dumps(sample, ensure_ascii=False, indent=2))
     console.print(f"\n✅ Sample extracted → [green]{out}[/green]")
 
 
@@ -176,23 +213,57 @@ def corpus(
     console.print(f"📊 Report → [green]{out}[/green] (+ {json_out})")
 
 
+def _read_input_text(path: str, what: str) -> str:
+    """Read an input file, turning OSError/UnicodeDecodeError into a clean
+    message + exit 2 instead of a traceback (C7)."""
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        console.print(f"[red]Cannot read {what}:[/red] {path} ({exc.strerror})")
+        raise typer.Exit(2) from None
+    except UnicodeDecodeError:
+        console.print(f"[red]{what} is not valid UTF-8:[/red] {path}")
+        raise typer.Exit(2) from None
+
+
+def _parse_agent_specs(specs: list[str] | None) -> list[AgentSpec]:
+    """Parse repeatable ``name:role[:model]`` options (C10: one implementation
+    for ``deploy`` and ``qwenpaw export`` — they used to be copy-pasted)."""
+    from .config import AgentSpec
+
+    agents: list[AgentSpec] = []
+    for a in specs or []:
+        parts = a.split(":")
+        if len(parts) == 2:
+            agent_name, agent_role, agent_model = parts[0], parts[1], None
+        elif len(parts) == 3:
+            agent_name, agent_role, agent_model = parts
+        else:
+            console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
+            raise typer.Exit(2)
+        agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
+    return agents
+
+
 def _load_rows(path: str) -> list[dict]:
     """Load raw rows from a JSON array, JSONL, or CSV (delegating to CSVConnector)."""
     p = Path(path)
-    if p.is_dir():
-        # treat as CSV dir
+    if p.is_dir() or p.suffix.lower() == ".csv":
         from .connectors.csv_fallback import CSVConnector
 
-        c = CSVConnector(str(p))
-        return c.extract_sample(100000)
-    if p.suffix.lower() == ".csv":
-        from .connectors.csv_fallback import CSVConnector
-
-        return CSVConnector(str(p)).extract_sample(100000)
-    text = p.read_text(encoding="utf-8").strip()
-    if p.suffix.lower() == ".jsonl" or (text and text[0] != "["):
-        return [json.loads(line) for line in text.splitlines() if line.strip()]
-    return json.loads(text)
+        try:
+            return CSVConnector(str(p)).extract_sample(100000)
+        except FileNotFoundError:
+            console.print(f"[red]CSV source not found:[/red] {path}")
+            raise typer.Exit(2) from None
+    text = _read_input_text(path, "input file").strip()
+    try:
+        if p.suffix.lower() == ".jsonl" or (text and text[0] != "["):
+            return [json.loads(line) for line in text.splitlines() if line.strip()]
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Input is not valid JSON/JSONL:[/red] {path} (line {exc.lineno})")
+        raise typer.Exit(2) from None
 
 
 # ---------------------------------------------------------------------------
@@ -219,23 +290,15 @@ def deploy(
         "--serve",
         help="Opt-in runtime: build the real AgentScope app and serve it (needs agentscope + Redis + a reachable model)",
     ),
+    as_json: bool = typer.Option(False, "--json", help="Print the manifest as plain JSON (no rich markup)"),
 ) -> None:
     """[Layer 3] Assemble (and optionally start) a multi-tenant agent."""
-    _banner(f"deploy · {tenant}")
-    from .config import AgentSpec, TenantConfig
+    if not as_json:
+        _banner(f"deploy · {tenant}")
+    from .config import TenantConfig
     from .deploy import TenantDeployer
 
-    agents = []
-    for a in agent_specs or []:
-        parts = a.split(":")
-        if len(parts) == 2:
-            agent_name, agent_role, agent_model = parts[0], parts[1], None
-        elif len(parts) == 3:
-            agent_name, agent_role, agent_model = parts
-        else:
-            console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
-            raise typer.Exit(2)
-        agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
+    agents = _parse_agent_specs(agent_specs)
     source_map = _parse_kv_list(sources, "--connector-source", "slug=value")
     cfg = TenantConfig(
         id=tenant, name=name, model=model, corpus_path=corpus, agents=agents or None, sources=source_map
@@ -249,12 +312,16 @@ def deploy(
         except (OSError, ValueError) as exc:
             console.print(f"[red]Cannot load corpus report:[/red] {corpus} ({exc})")
             raise typer.Exit(2) from exc
-    client = _maybe_llm()
+    client = _maybe_llm(quiet=as_json)
     deployer = TenantDeployer()
-    deployed = deployer.deploy(cfg, corpus_report=corpus_report, dry_run=dry_run)
+    with console.status("assembling deploy plan…"):
+        deployed = deployer.deploy(cfg, corpus_report=corpus_report, dry_run=dry_run)
     if client.available:
         deployed.manifest["llm"] = client.describe()
 
+    if as_json:
+        console.print_json(json.dumps(deployed.manifest, ensure_ascii=False, default=str))
+        return
     console.print(f"🔄 Sandbox: [bold]{deployed.manifest['sandbox']['backend']}[/bold]")
     console.print(f"🔄 Corpus collection: [bold]{deployed.corpus_collection}[/bold]")
     console.print(f"🔄 Model: [bold]{deployed.manifest['model']}[/bold]")
@@ -322,16 +389,18 @@ def _serve_app(cfg: TenantConfig) -> None:
 # ---------------------------------------------------------------------------
 # eval
 # ---------------------------------------------------------------------------
-@app.command()
-def eval(
+@app.command("eval")
+def eval_command(
     agent: str = typer.Option(
         "mock", "--agent", "-a", help="Agent: 'mock' (rule-based) or 'mimo' (MiMo LLM)"
     ),
     test_set: str = typer.Option(..., "--test-set", help="Path to eval cases (JSON/JSONL)"),
     accuracy: float = typer.Option(0.9, "--accuracy", help="Mock agent accuracy (0-1)"),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as plain JSON (no rich markup)"),
 ) -> None:
     """[Layer 4] Run the FDE benchmark over a test set."""
-    _banner(f"eval · {agent}")
+    if not as_json:
+        _banner(f"eval · {agent}")
     from .eval import FDEBenchmark, MiMoReplyFn, MockReplyFn, ReplyFn
     from .llm import LLMError
 
@@ -346,13 +415,17 @@ def eval(
         console.print(f"[red]Unknown agent:[/red] {agent!r} — use 'mock' (rule-based) or 'mimo' (MiMo LLM).")
         raise typer.Exit(2)
     try:
-        report = FDEBenchmark().run(reply_fn, cases)
+        with console.status(f"running {len(cases)} eval case(s)…"):
+            report = FDEBenchmark().run(reply_fn, cases)
     except LLMError as exc:
         # Mid-run endpoint failure: exit cleanly instead of a traceback that
         # discards all context (the benchmark has no rule path to fall back to).
         console.print(f"[red]MiMo eval failed:[/red] {exc}")
         raise typer.Exit(1) from exc
 
+    if as_json:
+        console.print_json(report.model_dump_json())
+        return
     table = Table(title="Metrics")
     table.add_column("metric", style="cyan")
     table.add_column("value", justify="right")
@@ -368,11 +441,15 @@ def eval(
 
 def _load_eval_cases(path: str) -> list:
     p = Path(path)
-    text = p.read_text(encoding="utf-8").strip()
-    if p.suffix.lower() == ".jsonl" or (text and text[0] != "["):
-        raw = [json.loads(line) for line in text.splitlines() if line.strip()]
-    else:
-        raw = json.loads(text)
+    text = _read_input_text(path, "test set").strip()
+    try:
+        if p.suffix.lower() == ".jsonl" or (text and text[0] != "["):
+            raw = [json.loads(line) for line in text.splitlines() if line.strip()]
+        else:
+            raw = json.loads(text)
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]Test set is not valid JSON/JSONL:[/red] {path} (line {exc.lineno})")
+        raise typer.Exit(2) from None
     from .eval import EvalCase
 
     return [EvalCase.model_validate(r) for r in raw]
@@ -383,7 +460,12 @@ def _load_eval_cases(path: str) -> list:
 # ---------------------------------------------------------------------------
 @app.command()
 def flywheel(
-    agent: str = typer.Option(..., "--agent", "-a", help="Agent ID"),
+    agent: str = typer.Option(
+        ...,
+        "--agent",
+        "-a",
+        help="Agent ID (recorded in the banner and summary; attaching to a live event stream needs the runtime)",
+    ),
     events: str | None = typer.Option(
         None, "--events", help="Path to a JSON array of concept events to replay"
     ),
@@ -399,17 +481,33 @@ def flywheel(
 
     wheel = DataFlywheel()
     if events:
-        for ev in json.loads(Path(events).read_text(encoding="utf-8")):
+        try:
+            events_raw = json.loads(_read_input_text(events, "events file"))
+        except json.JSONDecodeError as exc:
+            console.print(f"[red]Events file is not valid JSON:[/red] {events} ({exc})")
+            raise typer.Exit(2) from None
+        if not isinstance(events_raw, list):
+            console.print(f"[red]Events file must be a JSON array:[/red] {events}")
+            raise typer.Exit(2)
+        for ev in events_raw:
             handled = wheel.handle_concept_event(ev["concept"], ev.get("payload", {}))
             tag = "✓" if handled else "·"
             console.print(f"   [{ev['concept']}] {tag}")
     snap = wheel.snapshot()
     console.print(
-        f"\n🔄 Flywheel state: collected={snap['collected']} "
+        f"\n🔄 Flywheel state (agent={agent}): collected={snap['collected']} "
         f"(golden={snap['golden']}, labeling={snap['labeling_queued']}, "
         f"edge={snap['edge_cases']}, failures={snap['failures']})"
     )
-    console.print("🔄 weekly_retrain scheduled: next Mon 02:00")
+    # These are *descriptors* for an external orchestrator: nothing in this
+    # process fires them. The old line claimed "scheduled: next Mon 02:00" —
+    # a scheduler that does not exist; keep the panel honest too.
+    from .flywheel.retrain_scheduler import RetrainScheduler
+
+    sched = RetrainScheduler()
+    console.print("🔄 retrain jobs (descriptors only — no scheduler runs inside this CLI):")
+    for job in sched.jobs:
+        console.print(f"   {job.name}: cron={job.cron} min_new_samples={job.min_new_samples} kind={job.kind}")
 
 
 # ===========================================================================
@@ -469,10 +567,16 @@ def engage_init(
 @engage_app.command("status")
 def engage_status(
     engagement_id: str = typer.Argument(..., help="Engagement id"),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print the status dict as plain JSON (no rich markup)"
+    ),
 ) -> None:
     """Show engagement status: current phase, zone, gate state, progress."""
     eng = _load_engagement(engagement_id)
     st = eng.status()
+    if as_json:
+        console.print_json(json.dumps(st, ensure_ascii=False))
+        return
     _banner(f"engage status · {engagement_id}")
     console.print(f"customer: [bold]{st['customer']}[/bold] · profile: {st['profile']}")
     console.print(
@@ -537,24 +641,37 @@ def engage_rollback(
 
 
 @engage_app.command("list")
-def engage_list() -> None:
+def engage_list(
+    as_json: bool = typer.Option(False, "--json", help="Print the list as plain JSON (no rich markup)"),
+) -> None:
     """List all local engagements."""
-    _banner("engagements")
     eng_dir = paths.engagements_dir()
-    if not eng_dir.exists():
+    rows: list[dict] = []
+    for p in sorted(eng_dir.glob("*.json")) if eng_dir.exists() else []:
+        from .engagement import Engagement, EngagementContext
+
+        st = Engagement(EngagementContext.load(p)).status()
+        rows.append(
+            {
+                "id": st["engagement_id"],
+                "customer": st["customer"],
+                "profile": st["profile"],
+                "phase": st["current_phase"],
+                "zone": st["current_zone"],
+            }
+        )
+    if as_json:
+        console.print_json(json.dumps(rows, ensure_ascii=False))
+        return
+    _banner("engagements")
+    if not rows:
         console.print("[yellow]No engagements yet.[/yellow]")
         return
     table = Table(title="Engagements")
     for col in ("id", "customer", "profile", "phase", "zone"):
         table.add_column(col)
-    for p in sorted(eng_dir.glob("*.json")):
-        from .engagement import Engagement, EngagementContext
-
-        eng = Engagement(EngagementContext.load(p))
-        st = eng.status()
-        table.add_row(
-            st["engagement_id"], st["customer"], st["profile"], st["current_phase"], st["current_zone"]
-        )
+    for r in rows:
+        table.add_row(r["id"], r["customer"], r["profile"], r["phase"], r["zone"])
     console.print(table)
 
 
@@ -605,13 +722,13 @@ def gate_list(
     profile: str = typer.Option("manufacturing", "--profile", "-p"),
 ) -> None:
     """List gates applicable to a profile."""
-    from .engagement.engagement import _default_gate_registry
+    from .engagement.engagement import default_gate_registry
 
     _banner(f"gates · {profile}")
     table = Table(title="Gates")
     for col in ("slug", "name", "industrial_only"):
         table.add_column(col)
-    for slug, gate in _default_gate_registry().items():
+    for slug, gate in default_gate_registry().items():
         table.add_row(slug, gate.name, "🏭" if gate.industrial_only else "🏢")
     console.print(table)
 
@@ -687,6 +804,7 @@ def handoff(
 def kpi(
     engagement_id: str = typer.Argument(...),
     samples_file: str = typer.Option(..., "--samples", "-s", help="JSON/JSONL of sample records"),
+    as_json: bool = typer.Option(False, "--json", help="Print the KPIs as plain JSON (no rich markup)"),
 ) -> None:
     """Compute profile-specific KPIs over a sample set."""
     eng = _load_engagement(engagement_id)
@@ -697,6 +815,9 @@ def kpi(
     if not isinstance(samples, list):
         samples = [samples]
     kpis = profile.compute_kpis(samples)
+    if as_json:
+        console.print_json(json.dumps({"engagement_id": engagement_id, "kpis": kpis}, ensure_ascii=False))
+        return
     _banner(f"KPIs · {engagement_id} ({profile.slug})")
     table = Table(title=f"{profile.name} KPIs")
     table.add_column("KPI", style="cyan")
@@ -834,21 +955,11 @@ def qwenpaw_export(
 ) -> None:
     """[QwenPaw] 导出 tenant 拓扑 + published 技能 + corpus 说明为 QwenPaw 兼容产物."""
     _banner(f"qwenpaw export · {tenant}")
-    from .config import AgentSpec, TenantConfig
+    from .config import TenantConfig
     from .integrations.qwenpaw_exporter import QwenPawExporter
     from .skills.models import SkillStatus
 
-    agents = []
-    for a in agent_specs or []:
-        parts = a.split(":")
-        if len(parts) == 2:
-            agent_name, agent_role, agent_model = parts[0], parts[1], None
-        elif len(parts) == 3:
-            agent_name, agent_role, agent_model = parts
-        else:
-            console.print(f"[red]Invalid agent spec:[/red] {a} (expected name:role[:model])")
-            raise typer.Exit(2)
-        agents.append(AgentSpec(name=agent_name, role=agent_role, model=agent_model))
+    agents = _parse_agent_specs(agent_specs)
     cfg = TenantConfig(id=tenant, name=name, model=model, agents=agents or None)
 
     corpus_report = None
@@ -974,6 +1085,7 @@ def skill_list(
     concept: str | None = typer.Option(
         None, "--concept", help="按本体概念检索（含 narrower 扩展，schema=fde-core）"
     ),
+    as_json: bool = typer.Option(False, "--json", help="Print the list as plain JSON (no rich markup)"),
 ) -> None:
     """列出/检索技能。"""
     _banner("skill list")
@@ -1009,6 +1121,9 @@ def skill_list(
         concept=concept,
         ontology_schema=schema,
     )
+    if as_json:
+        console.print_json(json.dumps([r.model_dump(mode="json") for r in rows], ensure_ascii=False))
+        return
     if not rows:
         console.print("[yellow]无匹配技能[/yellow]")
         return
@@ -1185,10 +1300,17 @@ def _print_report(prefix: str, report) -> None:
 
 
 @ontology_app.command("list")
-def ontology_list() -> None:
+def ontology_list(
+    as_json: bool = typer.Option(False, "--json", help="Print schemas/stores as plain JSON (no rich markup)"),
+) -> None:
     """[Ontology] 列出内置 + 工作区 schema 与实例库."""
-    _banner("ontology list")
     store = _ontology_store()
+    if as_json:
+        console.print_json(
+            json.dumps({"schemas": store.list_schemas(), "stores": store.list_stores()}, ensure_ascii=False)
+        )
+        return
+    _banner("ontology list")
     schemas = store.list_schemas()
     stores = store.list_stores()
     console.print(f"[bold]schemas[/bold] ({len(schemas)})")
@@ -1207,9 +1329,9 @@ def ontology_list() -> None:
 @ontology_app.command("validate")
 def ontology_validate(
     schema_id: str = typer.Argument(..., help="Schema id，如 fde-core"),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as plain JSON (no rich markup)"),
 ) -> None:
     """[Ontology] 校验 TBox（含 overlay 的 import 合并视图）. exit 1 = 校验失败."""
-    _banner(f"ontology validate · {schema_id}")
     store = _ontology_store()
     schema = store.load_schema(schema_id)
     if schema is None:
@@ -1217,8 +1339,14 @@ def ontology_validate(
         raise typer.Exit(2)
     from .ontology.validation import validate_schema
 
-    report = validate_schema(schema, loader=store.load_schema)
-    _print_report(f"{schema_id}@{schema.version}", report)
+    with console.status(f"validating {schema_id}…"):
+        report = validate_schema(schema, loader=store.load_schema)
+    if as_json:
+        console.print_json(
+            json.dumps({"target": f"{schema_id}@{schema.version}", **report.model_dump()}, ensure_ascii=False)
+        )
+    else:
+        _print_report(f"{schema_id}@{schema.version}", report)
     if not report.ok:
         raise typer.Exit(1)
 
@@ -1226,17 +1354,25 @@ def ontology_validate(
 @ontology_app.command("check")
 def ontology_check(
     store_id: str = typer.Argument(..., help="Instance store id"),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as plain JSON (no rich markup)"),
 ) -> None:
     """[Ontology] 校验 ABox 实例库（对 ontology_ref 指向的 TBox）. exit 1 = 校验失败."""
-    _banner(f"ontology check · {store_id}")
     inst = _ontology_store().load_store(store_id)
     if inst is None:
         console.print(f"[red]Unknown store:[/red] {store_id}")
         raise typer.Exit(2)
     from .ontology.validation import validate_store
 
-    report = validate_store(inst, loader=_ontology_store().load_schema)
-    _print_report(f"{store_id} ({inst.ontology_ref})", report)
+    with console.status(f"checking {store_id}…"):
+        report = validate_store(inst, loader=_ontology_store().load_schema)
+    if as_json:
+        console.print_json(
+            json.dumps(
+                {"target": f"{store_id} ({inst.ontology_ref})", **report.model_dump()}, ensure_ascii=False
+            )
+        )
+    else:
+        _print_report(f"{store_id} ({inst.ontology_ref})", report)
     if not report.ok:
         raise typer.Exit(1)
 
@@ -1293,9 +1429,11 @@ def ontology_diff(
     old_id: str = typer.Argument(..., help="旧 schema id"),
     new_id: str = typer.Argument(..., help="新 schema id"),
     store_id: str | None = typer.Option(None, "--store", help="附带 ABox 影响面（个体证据清单）"),
+    as_json: bool = typer.Option(False, "--json", help="Print the diff as plain JSON (no rich markup)"),
 ) -> None:
     """[Ontology] TBox 版本 diff：D1-D4 破坏性变更 + 可选 ABox 影响面. exit 1 = 有破坏性变更."""
-    _banner(f"ontology diff · {old_id} → {new_id}")
+    if not as_json:
+        _banner(f"ontology diff · {old_id} → {new_id}")
     store = _ontology_store()
     old = store.load_schema(old_id)
     new = store.load_schema(new_id)
@@ -1305,22 +1443,47 @@ def ontology_diff(
     from .ontology.diff import diff_schemas, store_impact
 
     diff = diff_schemas(old, new)
-    console.print(f"{old_id}@{diff.from_version} → {new_id}@{diff.to_version}")
-    if diff.ok:
-        console.print("✅ [green]NO BREAKING CHANGES[/green]")
-    for c in diff.breaking:
-        console.print(f"  [red]{c.kind}[/red] {c.subject}: {c.detail}")
-    for c in diff.info:
-        console.print(f"  [dim]{c.kind} {c.subject}: {c.detail}[/dim]")
+    impact: list = []
     if store_id is not None:
         inst = store.load_store(store_id)
         if inst is None:
             console.print(f"[red]Unknown store:[/red] {store_id}")
             raise typer.Exit(2)
         impact = store_impact(inst, diff)
-        console.print(f"[bold]ABox impact[/bold] ({store_id}): {len(impact)} individual(s)")
-        for c in impact:
-            console.print(f"  {c.subject}: {c.detail}")
+
+    from dataclasses import asdict as _asdict
+
+    from .ontology.diff import Change as _Change
+
+    def _change(c: _Change) -> dict:
+        return _asdict(c)
+
+    if as_json:
+        console.print_json(
+            json.dumps(
+                {
+                    "from": f"{old_id}@{diff.from_version}",
+                    "to": f"{new_id}@{diff.to_version}",
+                    "ok": diff.ok,
+                    "breaking": [_change(c) for c in diff.breaking],
+                    "info": [_change(c) for c in diff.info],
+                    "impact": [_change(c) for c in impact],
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        console.print(f"{old_id}@{diff.from_version} → {new_id}@{diff.to_version}")
+        if diff.ok:
+            console.print("✅ [green]NO BREAKING CHANGES[/green]")
+        for c in diff.breaking:
+            console.print(f"  [red]{c.kind}[/red] {c.subject}: {c.detail}")
+        for c in diff.info:
+            console.print(f"  [dim]{c.kind} {c.subject}: {c.detail}[/dim]")
+        if store_id is not None:
+            console.print(f"[bold]ABox impact[/bold] ({store_id}): {len(impact)} individual(s)")
+            for c in impact:
+                console.print(f"  {c.subject}: {c.detail}")
     if not diff.ok:
         raise typer.Exit(1)
 

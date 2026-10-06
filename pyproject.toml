@@ -93,9 +93,23 @@ Homepage = "https://github.com/ai-guru-global/fde-scope"
 
 [tool.hatch.build.targets.wheel]
 packages = ["fde_scope"]
+# /course reads the Level-1 lessons at runtime from a repo-root directory, which
+# a wheel would not otherwise contain. Ship it as package data so an installed
+# app serves the same 25 chapters; web/course.py prefers the repo checkout (the
+# source of truth while developing) and falls back to this copy.
+force-include = { "course-level-1" = "fde_scope/_data/course-level-1" }
 
 [tool.hatch.build.targets.sdist]
-include = ["fde_scope", "README.md", "pyproject.toml"]
+include = ["fde_scope", "course-level-1", "README.md", "pyproject.toml"]
+
+[tool.coverage.run]
+source = ["fde_scope"]
+
+[tool.coverage.report]
+# Q1 gate: 92% today; keep 2 points of headroom so routine churn does not flip CI.
+fail_under = 90
+show_missing = true
+skip_covered = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

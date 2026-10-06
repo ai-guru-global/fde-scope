@@ -23,7 +23,7 @@ from .types import CorpusItem
 
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
-    from fde_scope.llm import MiMoClient
+    from fde_scope.llm import LLMClient
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ class QualityGate:
         - pure redaction residue
     """
 
-    def __init__(self, min_score: float = 3.0, llm: MiMoClient | None = None) -> None:
+    def __init__(self, min_score: float = 3.0, llm: LLMClient | None = None) -> None:
         self.min_score = min_score
         self.llm = llm
         self.dropped_count = 0
@@ -265,7 +265,7 @@ class SchemaNormalizer:
 
 # Convenience factory: build all stages from a CorpusConfig in one call.
 def build_stages(
-    config: CorpusConfig, llm: MiMoClient | None = None
+    config: CorpusConfig, llm: LLMClient | None = None
 ) -> tuple[PIIScrub, Deduplication, QualityGate]:
     """Instantiate the three post-normalization stages from a config."""
     return (

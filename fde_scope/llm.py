@@ -250,14 +250,15 @@ class OpenAICompatClient(_ChatCompletionsClient):
         return {"Authorization": f"Bearer {self.api_key or ''}"}
 
 
-def get_llm_client() -> LLMClient:
+def get_llm_client() -> _ChatCompletionsClient:
     """Build the LLM client selected by the environment.
 
     ``FDE_SCOPE_LLM_BASE_URL`` + ``FDE_SCOPE_LLM_API_KEY`` both set →
     :class:`OpenAICompatClient`; otherwise the MiMo default (unchanged
     behaviour for existing deployments). The returned client may still be
     ``available == False`` when no credential is configured — callers fall
-    back to rule-based paths as before.
+    back to rule-based paths as before. ``LLMClient`` remains the structural
+    contract for callers; both concrete classes satisfy it.
     """
     if _env(_ENV_OAI_BASE_URL) and _env(_ENV_OAI_KEY):
         return OpenAICompatClient()
