@@ -57,7 +57,7 @@ Zone D · Handoff/Exit        ⑯ ops-handoff  ⑰ knowledge-transfer  ⑱ disen
 |---|---|---|---|---|
 | 16 | ops_handoff | — | — | 所有权转交 Customer Success / 客户运维。 |
 | 17 | knowledge_transfer | — | — | 文档包：runbook + eval 报告 + SLO + 模型卡 + 培训材料。 |
-| 18 | disengage | handoff_signoff | — | 上线后 ≤120d 转交。**无限 pilot 是反模式。** |
+| 18 | disengage | handoff_signoff | — | 上线后 ≤120d 转交。**无限 pilot 是反模式。** 四件套缺任一件 = blocker；适用边界（G7③）/ 终止条件（G7④）缺 = ⚠️ 不阻塞。 |
 
 ## 工业 Overlay（manufacturing/robotics profile 启用）
 
@@ -82,7 +82,8 @@ SaaS FDE 不需要、但工业 FDE 必须的并行 gate：
 5. Sponsor Collapse — 唯一发起人离职即死。
 6. Burnout Death Spiral — 高级 IC 先走。
 7. Probabilistic Degradation — 无飞轮，线上退化无人知。
-8. Infinite Pilots — 没人定义 done，飘过 180 天。
+8. Infinite Pilots — 没人定义 done，飘过 180 天。`handoff --termination` 把"什么时候停"
+   记进移交包，但 gate 只判**有没有**——写「待定」也算有；能不能据此真停手仍是人判。
 9. Data Quality Surprises — 假设数据已集中。
 10. Scope Creep — 无时间盒 SLA。
 11. No HITL — 缺人机协作。
@@ -94,6 +95,12 @@ SaaS FDE 不需要、但工业 FDE 必须的并行 gate：
 推进由 `Engagement.advance()` 强制当前阶段的 gate 通过；
 gate 在 `fde_scope/engagement/gates/` 是 `Gate.check(ctx) -> GateResult`。
 Web UI 和 CLI 都消费同一套状态机。
+
+`GateResult` 分 **blockers / warnings** 两栏，只有 blockers 让 `passed=false`、
+只有 blockers 改 `gate check` 的退出码；**10 个 gate 全都有 warning 路径**
+（`slo` 缺告警路由、`functional_safety` 记了 PLr 没记达成 PL、`handoff_signoff`
+缺 G7③④……）。所以「这一关绿了」读作「没有 blocker」，不读作「这一屏没有该
+读的警告」。脚本里要判干净用 `--json` 看 `warnings` 数组，别只看退出码。
 
 ## 来源（真实依据）
 

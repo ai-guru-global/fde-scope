@@ -1,0 +1,36 @@
+<!-- fde-scope mirror · repo: global-fde/awesome-fde-resources · license: CC-BY-4.0 · commit: 27e98772e8e5f28c75c1abf5f508c869fb27740d
+     upstream path: members/README.zh-CN.md · retrieved: 2026-10-06 · verbatim; report issues upstream. -->
+
+# Global FDE 会员网络
+
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+这个目录帮助企业与从业者找到具备可验证 FDE 能力的个人或团队。
+
+## 会员资料可以包含
+
+- FDE 能力与可交付范围；
+- 擅长行业、服务地区和工作语言；
+- 公开项目与经过脱敏的交付证据；
+- 书籍、指南、工具、课程或其他可复用资料；
+- 当前合作状态与公开联系方式；
+- 任职、投资、推荐费或其他商业利益披露。
+
+## 会员类型
+
+- **FDE 从业者**：实际参与 FDE 或生产级 AI 交付的个人；
+- **交付团队**：能够完成需求梳理、实施、部署和持续支持的公司或团队；
+- **行业专家**：能够支持业务发现、流程设计、验证或采用的领域专家；
+- **技术伙伴**：具备真实交付支持经验的基础设施或工具提供方。
+
+## 会员目录
+
+| 会员 | 身份 | 可提供能力 | 公开资源 |
+| --- | --- | --- | --- |
+| [David（李样兵）](profiles/david-li.zh-CN.md) | Global FDE 发起人；SandBase AI 创始人 | 企业 AI 需求发现、Agent 基础设施、生态连接 | [Global FDE](https://github.com/global-fde)、[SandBase AI](https://www.sandbase.ai/) |
+
+如需增加会员，请使用[会员资料模板](PROFILE_TEMPLATE.md)并提交 Pull Request。
+
+## 审核规则
+
+会员资料强调公开证据，不是广告位。涉及能力和项目的描述应尽可能提供公开链接；不接受客户机密、无法验证的排名、价格承诺或泛化宣传文案。被收录不代表 Global FDE 对个人、团队或服务作出背书。

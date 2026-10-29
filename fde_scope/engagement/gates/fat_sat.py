@@ -10,7 +10,7 @@ floor."
 from __future__ import annotations
 
 from ..context import EngagementContext
-from .base import Gate, GateResult
+from .base import Gate, GateResult, asset_record
 
 
 class FatSatGate(Gate):
@@ -21,10 +21,12 @@ class FatSatGate(Gate):
     def check(self, ctx: EngagementContext) -> GateResult:
         blockers: list[str] = []
         warnings: list[str] = []
-        fat = ctx.assets.get("fat")
-        sat = ctx.assets.get("sat")
+        fat, fat_invalid = asset_record(ctx.assets, "fat")
+        sat, sat_invalid = asset_record(ctx.assets, "sat")
 
-        if not fat:
+        if fat_invalid:
+            blockers.append(fat_invalid)
+        elif not fat:
             blockers.append("FAT (Factory Acceptance Test) 未执行或未记录")
         else:
             if not fat.get("passed"):
@@ -32,7 +34,9 @@ class FatSatGate(Gate):
             if not fat.get("signed_off_by"):
                 warnings.append("FAT 缺少签字")
 
-        if not sat:
+        if sat_invalid:
+            blockers.append(sat_invalid)
+        elif not sat:
             blockers.append("SAT (Site Acceptance Test) 未执行或未记录")
         else:
             if not sat.get("passed"):

@@ -121,6 +121,34 @@ def test_next_steps_matches_by_substring() -> None:
     assert "sponsor" in steps[0]["advice"].lower()
 
 
+def test_handoff_advisory_warnings_get_their_own_advice() -> None:
+    """G7③/④ surface as *warnings*, and warnings feed next steps too.
+
+    ``next_steps_for`` walks ``blockers + warnings`` through the same needle
+    table, so two things have to hold: the advisory texts must match their own
+    rules (not ``_FALLBACK_ADVICE``), and the wording must not collide with the
+    blocker needles — ``移交包缺失`` vs ``移交包未记录`` is the only thing keeping
+    a boundary warning from matching the missing-deliverable rule first.
+    """
+    from fde_scope.engagement.gates.base import GateResult
+
+    result = GateResult(
+        slug="handoff_signoff",
+        passed=True,
+        blockers=[],
+        warnings=[
+            "移交包未记录适用边界（G7③）：用 --boundary 写明，否则接手方无人知道边界与停手条件",
+            "移交包未记录终止条件（G7④）：用 --termination 写明，否则接手方无人知道边界与停手条件",
+        ],
+    )
+    steps = next_steps_for("handoff_signoff", result)
+    assert len(steps) == 2
+    assert [s["target"] for s in steps] == ["tab:handoff", "tab:handoff"]
+    assert "--boundary" in steps[0]["advice"] and "--termination" not in steps[0]["advice"]
+    assert "停用" in steps[1]["advice"]
+    assert all("重新校验" not in s["advice"] for s in steps), steps
+
+
 def test_guided_view_surfaces_plan_from_assets() -> None:
     ctx = EngagementContext(id="eng-p", customer="Acme", profile="ticket")
     ctx.assets["guided_plan"] = {"goal": "g", "items": []}

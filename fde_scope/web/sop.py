@@ -37,7 +37,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 from markdown_it.renderer import RendererHTML
 
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, side_nav
 
 _SOP_DIRNAME = "docs"
 _SOP_FILENAME = "fde_sop_full.md"
@@ -96,6 +96,22 @@ def _rail_label(heading: str) -> str:
     return heading.split("（", 1)[0].strip() or heading
 
 
+def _rail_subnav(sections: list[tuple[str, str]], en: bool) -> tuple[str, ...]:
+    """The ``##`` outline as :func:`~.layout.side_nav` leaf entries.
+
+    An EN heading the table does not know keeps its zh title: a wrong
+    translation on the rail is worse than an untranslated one, because the
+    reader has no way to tell which is which.
+    """
+    return tuple(
+        (
+            f"#{anchor}",
+            _RAIL_EN.get(heading, _rail_label(heading)) if en else _rail_label(heading),
+        )
+        for anchor, heading in sections
+    )
+
+
 def _sections_from_tokens(md_text: str) -> list[tuple[str, str]]:
     """The ``##`` outline as ``(anchor, title)``, read from the markdown token
     stream — the ids match exactly what the renderer assigns (``s01``…), and
@@ -127,39 +143,24 @@ def _render_body(md_text: str) -> str:
 
 _STYLE = (
     BASE_CSS
+    + PROSE_CSS
     + """
-.sop-note{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--border);
-border-radius:9px;padding:12px 14px;margin:18px 0 0;font-size:.84rem;color:var(--muted);max-width:860px;line-height:1.7}
+.sop-note{display:flex;gap:var(--sp2);align-items:flex-start;
+background:var(--layer-02);border:1px solid var(--border);border-radius:var(--r2);
+padding:var(--sp3);margin:var(--sp3) 0 0;font-size:var(--fs-sm);color:var(--muted);
+max-width:860px;line-height:1.7}
 .sop-note .ic{color:var(--accent);margin-top:2px}
 .sop-note strong{color:var(--fg)}
-.src{font:500 .74rem/1.7 var(--mono);color:var(--faint);margin:7px 0 0;overflow-wrap:anywhere}
+/* the source line is provenance, not decoration: it carries the document's path
+   and hash, so it gets ``--muted`` (6.3:1 and up on every layer) rather than
+   ``--faint``, which falls under AA at 12px. */
+.src{font:500 var(--fs-xs)/1.7 var(--mono);color:var(--muted);margin:var(--sp2) 0 0;
+overflow-wrap:anywhere}
 .snav .subnav a{overflow-wrap:anywhere}
-.md{max-width:860px;font-size:.92rem;line-height:1.78;color:var(--fg);padding-top:22px}
-.md>*:first-child{margin-top:0}
-.md h3,.md h4,.md h5,.md h6{margin:1.7em 0 .55em;font-weight:650;letter-spacing:-.008em;line-height:1.35;overflow-wrap:anywhere}
-.md h3[id]{scroll-margin-top:20px}
-.md h3{font-size:1.13rem;padding-bottom:7px;border-bottom:1px solid var(--border)}
-.md h4{font-size:1rem}
-.md h5,.md h6{font-size:.93rem;color:var(--muted)}
-.md p{margin:.7em 0}
-.md ul,.md ol{margin:.6em 0;padding-left:1.5em}
-.md li{margin:.28em 0}
-.md li>ul,.md li>ol{margin:.28em 0}
-.md a{overflow-wrap:anywhere}
-.md strong{font-weight:650}
-.md code{font:.82em/1.6 var(--mono);background:var(--code);border:1px solid var(--border);border-radius:5px;
-padding:1px 5px;overflow-wrap:anywhere}
-.md pre{background:var(--code);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin:.95em 0;
-overflow-x:auto}
-.md pre code{background:none;border:0;padding:0;font-size:.79rem;line-height:1.68;overflow-wrap:normal}
-.md blockquote{margin:.95em 0;padding:2px 0 2px 14px;border-left:3px solid var(--accent);color:var(--muted)}
-.md blockquote p{margin:.4em 0}
-.md hr{border:0;border-top:1px solid var(--border);margin:1.7em 0}
-.md table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:.95em 0;font-size:.84rem}
-.md th,.md td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
-.md th{background:var(--panel2);font-weight:600;white-space:nowrap}
-.md tbody tr:nth-child(even) td{background:color-mix(in oklab,var(--panel2) 42%,transparent)}
-@media(max-width:640px){.md{font-size:.88rem}}
+/* The note and the source line above the document both close their own bottom
+   margin, so the article opens its own gap. 22px was off the grid; --sp4 is
+   the nearest step. */
+.prose{padding-top:var(--sp4)}
 """
     + SHELL_CSS
 )
@@ -208,7 +209,6 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
     other = "/sop" if en else "/en/sop"
     lang_label = "中文" if en else "EN"
     base = "/en" if en else ""
-    catalog = "/catalog/en/index.html" if en else "/catalog/index.html"
 
     out: list[str] = []
     add = out.append
@@ -232,27 +232,7 @@ __ICON_SPRITE__
 <span class="tag">{p("完整 SOP · 4 Zones / 18 阶段", "full SOP · 4 zones / 18 phases")}</span>
 </div>
 <nav class="snav">
-<div class="grp">{p("FDE 学习者", "FDE learners")}</div>
-<a href="{base}/">{p("功能总览", "Overview")}</a>
-<a href="{base}/course">{p("入门课程", "Intro course")}</a>
-<a href="{base}/glossary">{p("名词解释", "Glossary")}</a>
-<a href="{base}/certification">{p("认证中心", "Certification")}</a>
-<div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
-<a href="{base}/sop" class="active">{p("SOP 全文", "SOP full text")}</a>"""
-    )
-    if sections:
-        add('<div class="subnav">')
-        for anchor, heading in sections:
-            label = _RAIL_EN.get(heading, _rail_label(heading)) if en else _rail_label(heading)
-            add(f'<a href="#{anchor}">{label}</a>')
-        add("</div>")
-    add(
-        f"""<a href="{catalog}">{p("技能手册库", "Skills handbook")}</a>
-<a href="{base}/docs/readme">{p("仓库文档", "Repo docs")}</a>
-<div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
-<a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
-<div class="grp">{p("外部", "External")}</div>
-<a href="{"/GTM/en/index.html" if en else "/GTM/index.html"}">{p("GTM 官网", "GTM site")}</a>
+{side_nav("sop", en=en, subnav=_rail_subnav(sections, en))}
 </nav>
 <div class="side-foot">
 <a class="lang" href="{other}">{lang_label}</a>
@@ -308,7 +288,7 @@ labels in the rail.</p>
     if body is not None:
         # the body is Chinese on both locales
         body_lang = ' lang="zh-Hans"' if en else ""
-        add(f'<div class="md"{body_lang}>{body}</div>')
+        add(f'<div class="prose"{body_lang}>{body}</div>')
     else:
         add(
             f"""<div class="sop-note">

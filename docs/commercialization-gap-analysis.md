@@ -19,7 +19,19 @@
 
 `fde_scope/web/app.py` 全部 36 条路由无任何认证授权：创建 engagement（app.py:107）、推进状态机（app.py:138）、文件上传（app.py:249）、skill 发布——任何能访问端口的人都能操作客户项目。默认绑 `127.0.0.1` 是唯一防线，`--host 0.0.0.0` 即失守；Form 端点无 CSRF 防护。全库无 APIKeyHeader/JWT/session。
 
+> 本节正文是 **2026-09-27 调研快照**，计数与 `file:line` 会漂移：2026-10-06 复测为声明 72 条
+> verb+path、`app.openapi()` 实暴露 69 条（差值 = 3 条安装态资产兜底路由；按 verb 口径
+> 写操作 24 条），逐条对照见
+> [`docs/api-reference.md`](api-reference.md)；行号请以函数名为准定位。结论本身（零鉴权）当时成立，
+> 但「默认回环是唯一防线」已被下面的两层门取代。
+
 **修复状态**：P0 已修复（2026-09-28），见 `docs/commercialization-roadmap.md`。
+2026-10-06 又收紧了默认值：`FDE_SCOPE_ALLOW_REMOTE=1` 单独不再等价于「关掉认证」——
+CLI 在非回环绑定缺 token 时 exit 2，`ApiTokenAuthMiddleware` 还会逐请求兜底，
+未设 token 时从非回环地址到达的请求直接 403（回环路径不受影响）。同机反向代理
+落在回环上、不被这层拦，代理需自行鉴权。Form 端点无 CSRF token：设了 API token
+时认证只走 `Authorization`/`X-API-Key` 头，跨站表单请求带不上，打不到数据路由；
+免 token 的回环模式下本机浏览器仍可被诱导 POST，所以控制台本就只应在回环上使用。
 
 ### B2. 无多租户/多用户/RBAC
 

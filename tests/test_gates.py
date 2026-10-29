@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from fde_scope.engagement import Engagement, EngagementContext, SafetyPosture, SiteInfo
 from fde_scope.engagement.engagement import _default_gate_registry
 
@@ -189,6 +191,69 @@ def test_slo_template_error_budget_arithmetic() -> None:
 
     availability = next(s for s in build_slo_template() if s["name"] == "availability")
     assert availability["error_budget"] == "1.68h / 14d"
+
+
+# -- malformed asset records: fail closed, never crash -------------------------
+# ctx.assets is free-form dict[str, Any] fed straight from client JSON (POST
+# …/context merges it with no per-key schema), so a gate can be handed
+# "fat": "done". Each gate read it with .get(), which raised AttributeError out
+# of Engagement.advance — mid-phase, after the earlier gates had already been
+# recorded — and surfaced as a 500 in the web layer.
+_MALFORMED = [
+    ("fat_sat", "fat", {}),
+    ("air_gap", "air_gap_plan", {"air_gapped": True}),
+    ("shift_handover", "shift_handover", {"shift_count": 3}),
+    ("works_council", "works_council_approval", {"works_council_represented": True}),
+]
+
+
+@pytest.mark.parametrize("slug,key,site_flags", _MALFORMED)
+@pytest.mark.parametrize("shape", ["done", 42, 3.5, ["gpu"], True])
+def test_malformed_asset_yields_a_blocker_not_a_crash(slug, key, site_flags, shape) -> None:
+    eng = _eng(site=SiteInfo(**site_flags))
+    eng.ctx.assets[key] = shape
+    result = eng.evaluate_gate(slug)
+    assert not result.passed
+    assert any(f"assets.{key}" in b and shape.__class__.__name__ in b for b in result.blockers)
+
+
+def test_missing_asset_is_still_the_gates_own_blocker() -> None:
+    """None and {} are absent-shaped, not malformed: the gate's domain wording
+    must survive, with no format complaint on top."""
+    for shape in (None, {}):
+        eng = _eng()
+        if shape is not None:
+            eng.ctx.assets["fat"] = shape
+        result = eng.evaluate_gate("fat_sat")
+        assert not result.passed
+        assert any("未执行或未记录" in b for b in result.blockers)
+        assert not any("assets.fat" in b for b in result.blockers)
+
+
+def test_valid_mapping_record_still_passes() -> None:
+    """Failing closed on shapes must not tighten the bar for real records —
+    including Mapping types a caller may hand over that are not dict."""
+    from types import MappingProxyType
+
+    eng = _eng()
+    eng.ctx.assets["fat"] = MappingProxyType({"passed": True, "signed_off_by": "integrator"})
+    eng.ctx.assets["sat"] = {"passed": True, "signed_off_by": "client"}
+    assert eng.evaluate_gate("fat_sat").passed
+
+
+def test_advance_reports_bad_asset_and_still_sweeps_the_phase() -> None:
+    """deploy runs fat_sat → functional_safety → conformity. A crash in the
+    first used to abort the sweep and leave the rest with no record; a bad
+    asset must block while every gate of the phase is still evaluated."""
+    from fde_scope.engagement.engagement import AdvanceBlocked
+
+    eng = _eng(current_phase="deploy")
+    eng.ctx.assets["fat"] = "signed off by email"
+    with pytest.raises(AdvanceBlocked) as exc:
+        eng.advance()
+    assert "assets.fat" in str(exc.value)
+    assert eng.ctx.current_phase == "deploy"
+    assert {"fat_sat", "functional_safety", "conformity"} <= set(eng.ctx.gate_records)
 
 
 def test_all_gates_registered() -> None:

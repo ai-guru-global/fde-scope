@@ -6,7 +6,7 @@ lesson edit lands on the next restart with nothing to keep in sync. The same
 directory is also shipped inside the wheel as package data
 (``fde_scope/_data/course-level-1``, see ``pyproject.toml``'s
 ``force-include``), and :func:`_default_root` falls back to that copy when the
-repo-root directory is absent — an installed app serves the same 25 chapters.
+repo-root directory is absent — an installed app serves the same chapter set.
 If neither is readable the route still renders, with an in-page notice instead
 of a broken page.
 
@@ -41,7 +41,8 @@ import re
 from pathlib import Path
 from urllib.parse import unquote
 
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from ..course.catalog import LABS as _LAB_REGISTRY
+from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, side_nav
 from .mdrender import (
     AUTOLINK as _AUTOLINK,
 )
@@ -58,6 +59,98 @@ from .mdrender import (
 from .mdrender import (
     normalize_path as md_normalize,
 )
+
+#: The day chips' English chrome (registry titles are zh-authored; the EN page
+#: translates the chrome, not the book — same policy as the chapter titles).
+_LAB_TITLE_EN = {
+    "D1": "Day 1 · Run the chain end to end",
+    "D2": "Day 2 · Define success · the brief",
+    "D3": "Day 3 · Site and data health check",
+    "D4": "Day 4 · Corpus and customer script",
+    "D5": "Day 5 · Validation and evaluation",
+    "D6": "Day 6 · Operationalisation",
+    "D7": "Day 7 · Handover and distillation",
+    "D8": "Day 8 · Monetise · portfolio and defence",
+}
+_LAB_DELIVERABLE_EN = {
+    "D1": "mini-chain evidence pack (connect sample + corpus report + 3-sentence read)",
+    "D2": "customer brief (≤1 page: ≥3 measurable success criteria + dual sponsors + abandon criteria)",
+    "D3": "data health report (field table + PII handling + site facts + ≥3 quality risks)",
+    "D4": "corpus report + one customer script (jargon-free, synthesis ratio honestly labelled)",
+    "D5": "prototype evidence + eval results + top-3 bad cases + one-page validation log",
+    "D6": "SLO card (3 + error budget + alert route) + runbook + on-call handover card",
+    "D7": "handover pack (four artefacts) + skill card + exit plan",
+    "D8": "portfolio in three wrappers (job / briefing / freelance) + closing defence",
+}
+
+#: Grading calls only; every user-visible label arrives via the container's
+#: data-* attributes (server-rendered, bilingual), so the script stays locale-free.
+_LAB_JS = """
+<script>
+(function(){
+  'use strict';
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+  function call(url, opts){
+    return fetch(url, opts).then(function(r){
+      var denied = r.status === 401 || r.status === 403;
+      return r.json().catch(function(){ return {}; }).then(function(d){
+        if (!r.ok) {
+          var err = new Error(d && d.detail ? d.detail : ('HTTP ' + r.status));
+          err.denied = denied; throw err;
+        }
+        return d;
+      });
+    });
+  }
+  var out = document.getElementById('lab-out');
+  function label(key){ return out.getAttribute('data-t-' + key) || key; }
+  /* The verdict marks are the console's dots, not emoji: ✅❌✋ render in an
+     arbitrary system font at text weight, pick up no colour from the ramp, and
+     reach a screen reader as a glyph name. ``role="img"`` plus the localized
+     word keeps the state in the accessibility tree, which the emoji never were. */
+  var MARK = {pass:'d-ok', fail:'d-bad', manual:'d-warn'};
+  function mark(st){
+    var word = st === 'pass' ? label('ok') : st === 'fail' ? label('fail') : label('manual');
+    return '<span class="dot ' + (MARK[st] || '') + '" role="img" aria-label="' + esc(word) + '"></span>';
+  }
+
+  window.labDoctor = function(){
+    var box = document.getElementById('lab-doctor');
+    box.textContent = '…';
+    call('/api/course/doctor').then(function(d){
+      box.innerHTML = d.ok
+        ? mark('pass') + ' G0 · ' + (d.summary ? ('ok ' + d.summary.ok + ' / warn ' + d.summary.warn) : '')
+        : mark('fail') + ' G0' + (d.blockers && d.blockers.length ? ' · ' + esc(d.blockers.join(', ')) : '');
+    }).catch(function(e){ box.textContent = label('error') + ': ' + e.message; });
+  };
+
+  window.labGrade = function(day){
+    out.innerHTML = '<div class="labres">' + esc(label('working')) + '</div>';
+    call('/api/course/labs/' + encodeURIComponent(day) + '/grade', {method:'POST'})
+      .then(function(d){
+        var rows = (d.checks || []).map(function(c){
+          return '<tr><td>' + mark(c.status) + ' <b>' + esc(c.id) + '</b></td>' +
+            '<td>' + esc(c.ask) + '</td>' +
+            '<td>' + esc(c.detail || '') +
+              (c.hint && c.status === 'fail' ? '<br><span class="hint">' + esc(c.hint) + '</span>' : '') +
+            '</td></tr>';
+        }).join('');
+        out.innerHTML = '<div class="labres">' +
+          '<div class="labsum">' + esc(d.day) + ' · ' + esc(d.gate) + ' — ' +
+            mark(d.ok ? 'pass' : 'fail') + ' ' + d.passed + '/' + d.score + ' ' + esc(label('scored')) +
+            (d.manual ? ' · ' + d.manual + ' ' + esc(label('manual')) : '') + '</div>' +
+          (rows ? '<table><tbody>' + rows + '</tbody></table>' : '') +
+          '</div>';
+      })
+      .catch(function(e){
+        out.innerHTML = '<div class="labres">' + mark('fail') + ' ' +
+          esc(label('error')) + ': ' + esc(e.denied ? label('deny') : e.message) + '</div>';
+      });
+  };
+})();
+</script>
+"""
 
 _COURSE_DIRNAME = "course-level-1"
 
@@ -264,6 +357,14 @@ _CHAPTERS: list[tuple[str, str, str, str, str, str]] = [
         "23 D8 变现",
         "23 D8 Monetise",
     ),
+    (
+        "24",
+        "24-开源对标与来源清单.md",
+        "24 · 开源对标与来源清单：GitHub 上的 FDE 教学内容，我们站在哪儿",
+        "24 · Open-source benchmark and source list: where we stand among the FDE teaching repos",
+        "24 开源对标",
+        "24 Benchmark",
+    ),
 ]
 
 #: Repo-relative lesson file → chapter anchor key. Public because the docs
@@ -289,12 +390,38 @@ _GROUPS: list[tuple[str, str, list[str]]] = [
         "Lesson plans (D1–D8)",
         ["16", "17", "18", "19", "20", "21", "22", "23"],
     ),
+    # 24 is a trailing 附卷: it is not a D-day lesson, so it does not join the
+    # block above, but it still sits at the tail of _CHAPTERS order and therefore
+    # stays a contiguous run.
+    (
+        "附卷 · 对标与来源",
+        "Appendix · benchmark & sources",
+        ["24"],
+    ),
 ]
 
 #: key → (zh rail label, en rail label); the rail renders through ``_GROUPS``.
 _CHAPTER_RAIL: dict[str, tuple[str, str]] = {
     key: (rail_zh, rail_en) for key, _fn, _zh, _eng, rail_zh, rail_en in _CHAPTERS
 }
+
+
+def _rail_subnav(en: bool) -> tuple[str, ...]:
+    """The chapter outline as ``side_nav`` entries.
+
+    A bare ``str`` is a group caption and an ``(href, label)`` pair is a leaf,
+    so one tuple carries the three-level tree the course page needs — the same
+    ``_GROUPS``/``_CHAPTER_RAIL`` data that builds the body, never a second
+    hand-copied list.
+    """
+    out: list[str | tuple[str, str]] = []
+    for cap_zh, cap_en, keys in _GROUPS:
+        out.append(cap_en if en else cap_zh)
+        for key in keys:
+            rail_zh, rail_en = _CHAPTER_RAIL[key]
+            out.append((f"#doc-{key}", rail_en if en else rail_zh))
+    return tuple(out)
+
 
 _H1 = re.compile(r"^#\s+.*(?:\n|$)", re.M)
 _TASK_ITEM = re.compile(r"^(\s*)- \[ \] ", re.M)
@@ -430,54 +557,42 @@ def _structured_stats(markdown_sources: list[str]) -> tuple[int, int, int]:
 
 _STYLE = (
     BASE_CSS
+    + PROSE_CSS
     + """
-.course-note{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--border);
-border-radius:9px;padding:12px 14px;margin:20px 0 0;font-size:.84rem;color:var(--muted);max-width:820px;line-height:1.7}
+.course-note{display:flex;gap:var(--sp2);align-items:flex-start;
+background:var(--layer-02);border:1px solid var(--border);border-radius:var(--r2);
+padding:var(--sp3);margin:var(--sp3) 0 0;font-size:var(--fs-sm);color:var(--muted);
+max-width:820px;line-height:1.7}
 .course-note .ic{color:var(--accent);margin-top:2px}
 .course-note strong{color:var(--fg)}
-.stats{margin-top:24px}
-.chap{padding-top:46px}
-.crbar-row{display:flex;align-items:center;gap:10px;margin:14px 0 0;max-width:860px}
-.crbar{flex:1;height:6px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
-.crbar>div{height:100%;width:0;background:var(--accent);transition:width .25s}
-.csearch{display:flex;gap:10px;align-items:center;margin:10px 0 0;max-width:860px}
-.csearch input{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;
-padding:8px 12px;font-size:.9rem;color:var(--fg)}
-.csearch input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.readbtn{margin-left:auto;font:600 .72rem/1.4 inherit;color:var(--muted);background:none;
-border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer}
-.readbtn.on{color:var(--good);border-color:var(--good)}
-.readbtn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.stats{margin-top:var(--sp4)}
+.chap{padding-top:var(--sp6)}
+.crbar-row{display:flex;align-items:center;gap:var(--sp2);margin:var(--sp3) 0 0;max-width:860px}
+/* a meter is a data mark: square ends, radius 0. Stadium caps on a 6px bar read
+   as decoration, the same call made for the certification meters. */
+.crbar{flex:1;height:6px;background:var(--layer-02);border:1px solid var(--border);
+border-radius:var(--r0);overflow:hidden}
+/* the one place a slower duration earns its keep: a fill sweeping 860px at
+   110ms reads as a jump, not as progress. The curve stays the system's. */
+.crbar>div{height:100%;width:0;background:var(--accent);transition:width 240ms var(--ease)}
+.csearch{display:flex;gap:var(--sp2);align-items:center;margin:var(--sp2) 0 0;max-width:860px}
+/* the field's own metrics live in the canonical ``input`` rule in ``THEME_CSS`` */
+.csearch input{flex:1;min-width:0}
+/* no pills: 999px on a 24px-tall toggle was the capsule the rest of the app
+   already refused. On-state is a fill, matching every other selected thing. */
+.readbtn{margin-left:auto;font:600 var(--fs-xs)/1.4 var(--font);color:var(--muted);
+background:none;border:1px solid var(--border-strong);border-radius:var(--r1);
+padding:var(--sp1) var(--sp2);cursor:pointer;transition:background-color var(--dur) var(--ease),
+border-color var(--dur) var(--ease),color var(--dur) var(--ease)}
+.readbtn:hover{color:var(--fg)}
+.readbtn.on{color:var(--good);background:var(--good-fill);border-color:var(--good)}
 .chap.read>.sec-head h2{color:var(--muted)}
 li.task{list-style:none;margin-left:-1.2em}
 li.task .taskbox{accent-color:var(--accent);margin-right:6px}
-.src{font:500 .74rem/1.7 var(--mono);color:var(--faint);margin:7px 0 0;overflow-wrap:anywhere}
-.md{max-width:860px;font-size:.92rem;line-height:1.78;color:var(--fg)}
-.md>*:first-child{margin-top:0}
-.md h3,.md h4,.md h5,.md h6{margin:1.7em 0 .55em;font-weight:650;letter-spacing:-.008em;line-height:1.35;overflow-wrap:anywhere}
-.md h3{font-size:1.13rem;padding-bottom:7px;border-bottom:1px solid var(--border)}
-.md h4{font-size:1rem}
-.md h5,.md h6{font-size:.93rem;color:var(--muted)}
-.md p{margin:.7em 0}
-.md ul,.md ol{margin:.6em 0;padding-left:1.5em}
-.md li{margin:.28em 0}
-.md li>ul,.md li>ol{margin:.28em 0}
-.md a{overflow-wrap:anywhere}
-.md strong{font-weight:650}
-.md code{font:.82em/1.6 var(--mono);background:var(--code);border:1px solid var(--border);border-radius:5px;
-padding:1px 5px;overflow-wrap:anywhere}
-.md pre{background:var(--code);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin:.95em 0;
-overflow-x:auto}
-.md pre code{background:none;border:0;padding:0;font-size:.79rem;line-height:1.68;overflow-wrap:normal}
-.md blockquote{margin:.95em 0;padding:2px 0 2px 14px;border-left:3px solid var(--accent);color:var(--muted)}
-.md blockquote p{margin:.4em 0}
-.md hr{border:0;border-top:1px solid var(--border);margin:1.7em 0}
-.md table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:.95em 0;font-size:.84rem}
-.md th,.md td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
-.md th{background:var(--panel2);font-weight:600;white-space:nowrap}
-.md tbody tr:nth-child(even) td{background:color-mix(in oklab,var(--panel2) 42%,transparent)}
+.src{font:500 var(--fs-xs)/1.7 var(--mono);color:var(--muted);margin:var(--sp2) 0 0;
+overflow-wrap:anywhere}
 @media(max-width:960px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.md{font-size:.88rem}}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 """
     + SHELL_CSS
 )
@@ -588,7 +703,6 @@ def render(locale: str = "zh", root: Path | None = None) -> str:
     lang = "en" if en else "zh"
     other = "/course" if en else "/en/course"
     lang_label = "中文" if en else "EN"
-    base = "/en" if en else ""
 
     out: list[str] = []
     add = out.append
@@ -612,28 +726,7 @@ __ICON_SPRITE__
 <span class="tag">{p("入门课程 · Level 1", "intro course · level 1")}</span>
 </div>
 <nav class="snav">
-<div class="grp">{p("FDE 学习者", "FDE learners")}</div>
-<a href="{base}/">{p("功能总览", "Overview")}</a>
-<a href="{base}/course" class="active">{p("入门课程", "Intro course")}</a>
-<div class="subnav">"""
-    )
-    for cap_zh, cap_en, keys in _GROUPS:
-        add(f'<div class="sgrp">{cap_en if en else cap_zh}</div>')
-        for key in keys:
-            rail_zh, rail_en = _CHAPTER_RAIL[key]
-            add(f'<a href="#doc-{key}">{rail_en if en else rail_zh}</a>')
-    add(
-        f"""</div>
-<a href="{base}/glossary">{p("名词解释", "Glossary")}</a>
-<a href="{base}/certification">{p("认证中心", "Certification")}</a>
-<div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
-<a href="{base}/sop">{p("SOP 全文", "SOP full text")}</a>
-<a href="{"/catalog/en/index.html" if en else "/catalog/index.html"}">{p("技能手册库", "Skills handbook")}</a>
-<a href="{base}/docs/readme">{p("仓库文档", "Repo docs")}</a>
-<div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
-<a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
-<div class="grp">{p("外部", "External")}</div>
-<a href="{"/GTM/en/index.html" if en else "/GTM/index.html"}">{p("GTM 官网", "GTM site")}</a>
+{side_nav("course", en=en, subnav=_rail_subnav(en))}
 </nav>
 <div class="side-foot">
 <a class="lang" href="{other}">{lang_label}</a>
@@ -685,7 +778,7 @@ __ICON_SPRITE__
 <svg class="ic" aria-hidden="true"><use href="#i-book"/></svg>
 <p>{
             p(
-                "整门课就是这一页：25 篇文档按顺序排在下面，左侧章节栏随滚动高亮，每章末尾的"
+                f"整门课就是这一页：{len(_CHAPTERS)} 篇文档按顺序排在下面，左侧章节栏随滚动高亮，每章末尾的"
                 "文件名指向仓库里的源文件（<code>course-level-1/</code>）。",
                 "These lessons are authored in Chinese and are served as authored; this page "
                 "translates the chapter titles, the rail and the chrome, not the lesson text. "
@@ -702,7 +795,7 @@ __ICON_SPRITE__
 <div class="csearch">
 <input id="cr-q" type="search" aria-label="{p("搜索课程内容", "Search the course")}"
  placeholder="{
-            p("在 25 篇课程文档中搜索…", "Search across the 25 chapters…")
+            p(f"在 {len(_CHAPTERS)} 篇课程文档中搜索…", f"Search across the {len(_CHAPTERS)} chapters…")
         }" oninput="courseFilter(this.value)">
 <span id="cr-count" class="meta" aria-live="polite"></span>
 </div>
@@ -712,6 +805,77 @@ __ICON_SPRITE__
     for num, label in stats:
         add(f'<div class="stat"><div class="num">{num}</div><div class="lab">{label}</div></div>')
     add("""</div>""")
+
+    # -- 实验判分面板：学习页与执行引擎共用一个真相 -----------------------------
+    # 芯片在这里服务端渲染（双语走 p()）；判分按钮的 JS 只调
+    # /api/course/labs/{day}/grade，与 CLI `fde-scope course check` 同一 run_lab。
+    chips: list[str] = []
+    for lab in _LAB_REGISTRY:
+        chips.append(
+            f"""<div class="labchip">
+<div class="labhead"><b>{lab.day}</b> <span class="tag">{lab.gate}</span> {p(lab.title, _LAB_TITLE_EN[lab.day])}</div>
+<div class="labmeta">{p("产出：", "Deliverable: ")}{p(lab.deliverable, _LAB_DELIVERABLE_EN[lab.day])}
+ · {p("判分项", "checks")} {len(lab.checks)}</div>
+<button class="btn ghost" type="button" data-day="{lab.day}"
+ onclick="labGrade(this.dataset.day)">{p("判分", "Grade")}</button>
+</div>"""
+        )
+    add(
+        f"""
+<section class="chap lab-sec" id="lab-grading">
+<style>
+.labbar{{display:flex;gap:var(--sp2);align-items:center;margin:var(--sp2) 0;flex-wrap:wrap}}
+/* no .labbtn rule: 判分 and 环境自检 are secondary actions, so they take the
+   system's ``btn ghost`` pair rather than a fork with hex fallbacks that pinned
+   light-mode borders and a stale #2563eb hover onto this block in dark mode. */
+.lablist{{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--sp2);margin:var(--sp3) 0}}
+.labchip{{border:1px solid var(--border);border-radius:var(--r2);padding:var(--sp2) var(--sp3);
+ display:flex;flex-direction:column;gap:var(--sp2)}}
+.labmeta{{color:var(--muted);font-size:var(--fs-xs)}}
+.labres{{border:1px solid var(--border);border-radius:var(--r2);padding:var(--sp3);margin-top:var(--sp3)}}
+.labres table{{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}}
+.labres td,.labres th{{text-align:left;padding:var(--sp1) var(--sp2);border-bottom:1px solid var(--border);
+ vertical-align:top}}
+.labsum{{font-weight:600;margin-bottom:var(--sp2)}}
+</style>
+<div class="sec-head">
+<svg class="ic" aria-hidden="true"><use href="#i-bulb"/></svg>
+<h2>{p("实验判分 · 在真实引擎里过关", "Lab grading · clear the gate on the real engine")}</h2>
+<span class="n">LAB</span>
+</div>
+<p class="src">fde_scope/course/verifier.py · POST /api/course/labs/{{day}}/grade</p>
+<div class="prose">
+<p>{
+            p(
+                "每一天的「过关」不是自评：判分在一次性工作区里对<strong>真实 CLI</strong> 跑这一天门禁的全部"
+                "检查——命令不存在、输出不对、报告缺字段都过不去；你的真实 engagement 永远不被触碰"
+                "（判分用独立的 FDE_SCOPE_HOME）。人工评分项单独列出，不进分母。",
+                "A day's gate is not self-assessed: grading runs every check for that day against the "
+                "<strong>real CLI</strong> inside a throwaway workspace — a missing command, wrong output "
+                "or an absent report field fails. Your real engagements are never touched (grading uses a "
+                "private FDE_SCOPE_HOME). Manually-scored items are listed separately and never enter "
+                "the denominator.",
+            )
+        }</p>
+<div class="labbar">
+<button class="btn ghost" type="button" onclick="labDoctor()">{p("G0 环境自检", "G0 environment check")}</button>
+<span id="lab-doctor" class="meta" aria-live="polite"></span>
+</div>
+<div class="lablist">{"".join(chips)}</div>
+<div id="lab-out" aria-live="polite"
+ data-t-working="{p("判分中…（真实命令，可能要几秒）", "Grading… (real commands, may take seconds)")}"
+ data-t-ok="{p("通过", "passed")}" data-t-fail="{p("未过", "failed")}"
+ data-t-manual="{p("人工评分", "manual")}" data-t-scored="{p("机器项", "machine-checked")}"
+ data-t-deny="{
+            p(
+                "需要 API token（本页是公开页，判分接口不是）：设置 FDE_SCOPE_API_TOKEN 后再试。",
+                "This needs the API token (the page is public; the grading API is not): set FDE_SCOPE_API_TOKEN and retry.",
+            )
+        }"
+ data-t-error="{p("判分失败", "Grading failed")}"></div>
+</div>
+</section>"""
+    )
 
     for chapter, body in bodies:
         key, filename, zh_title, en_title, *_ = chapter
@@ -744,7 +908,7 @@ __ICON_SPRITE__
             )
             continue
         lang = ' lang="zh-Hans"' if en else ""  # the body is Chinese on both locales
-        add(f'<div class="md"{lang}>{body}</div>\n</section>')
+        add(f'<div class="prose"{lang}>{body}</div>\n</section>')
 
     if not served:
         add(
@@ -755,11 +919,11 @@ __ICON_SPRITE__
                 p(
                     "这台机器上读不到课程文件：仓库根目录和已安装的包数据里都没有 "
                     f"<code>{_COURSE_DIRNAME}/</code> 目录。课程全文是仓库里 "
-                    f"<code>{_COURSE_DIRNAME}/</code> 下的 25 篇 Markdown；"
+                    f"<code>{_COURSE_DIRNAME}/</code> 下的 {len(_CHAPTERS)} 篇 Markdown；"
                     "克隆仓库后重启本页，或重新安装 fde-scope，即可在这里阅读。",
                     "The course files are not on this machine: there is no "
                     f"<code>{_COURSE_DIRNAME}/</code> directory at the repo root, and none in the "
-                    f"installed package data. The lessons are 25 Markdown files in "
+                    f"installed package data. The lessons are {len(_CHAPTERS)} Markdown files in "
                     f"<code>{_COURSE_DIRNAME}/</code> in the repository; clone it and reopen this "
                     "page — or reinstall fde-scope — to read them here.",
                 )
@@ -784,6 +948,7 @@ __ICON_SPRITE__
 </div>
 <script>{_THEME_SCRIPT}</script>
 <script>{SHELL_JS}</script>
+{_LAB_JS}
 </body>
 </html>
 """

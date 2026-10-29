@@ -1,0 +1,860 @@
+<!-- fde-scope mirror · repo: suboss87/FDEOps · license: MIT · commit: ed184c84b0a39c8138a25b83bf54abdb5f5ed2ce
+     upstream path: CHANGELOG.md · retrieved: 2026-10-06 · verbatim; report issues upstream. -->
+
+# Changelog
+
+## 5.2.0 - 2026-10-05
+
+- State the expected result at the entry to each of the 35 independently installable task skills. Keep supplied-context work independent of engagement setup.
+- Load customer-record procedures only when needed by the coordinator, while retaining privacy, authority and continuity requirements.
+- Make PR guidance explicit about observed evidence, affected scope and recovery limits.
+
+## 5.1.24 - 2026-10-05
+
+- Refuse hyphenated AI-provider keys, including Anthropic-style keys, and short nonempty password, secret and API-key assignments before guarded record writes. Mask the same assignment forms in CLI views.
+- Clarify that private notes remain plaintext in local files and Git history, and that undo/redact does not erase historical credentials.
+
+## 5.1.23 - 2026-10-05
+
+- Adapt engagement guidance to uncertainty, dependencies, risk and customer constraints rather than duration or a mandatory phase sequence.
+- Let bounded tasks proceed directly to implementation or a brief single-slice plan; reserve fuller planning and coordination for work that needs them. Preserve acceptance, data and release authority checks.
+
+## 5.1.22 - 2026-10-01
+
+- Keep approvals limited to API compatibility, budget or release scope from becoming general engagement signer proposals; preserve the original notes and sources for review.
+- Preserve automatic signer proposals for singular and plural acceptance-test sign-off.
+
+## 5.1.21 - 2026-09-25
+
+- Keep diagnosis and review useful when customer access is limited: request the smallest permitted observation, excerpt or owner-run check needed to resolve uncertainty.
+- Add fictional evaluation cases for ambiguous timeouts, partial-diff reviews and unavailable meeting sources.
+
+## 5.1.19 - 2026-09-22
+
+- Redact private and masked ingest metadata before creating filenames, keeping protected values out of inbox listings and review provenance.
+- Reject empty or invalid explicit MCP customer selections instead of falling back to the current workspace's customer.
+- Install agent pointers when an existing instruction file only mentions FDEOps; preserve existing text and keep repeat installs unchanged.
+- Keep new logged and debriefed risks active after earlier risks have been retired.
+- Preserve other workspace bindings during concurrent customer setup, and leave another writer's registry lock intact when binding fails.
+- Release owned file locks when a record write is refused, so repairing the file permits a retry.
+- Verify the exact npm release with fresh, bounded retries so registry propagation does not falsely report a failed publication.
+
+## 5.1.18 - 2026-09-22
+
+- Preserve distinct staged notes when source and title match within the same second, including concurrent staging.
+- Make installer initialization honor the configured engagement root so later binding uses the same record.
+- Include version metadata with the disk-installed CLI and keep privacy guidance available for legacy installs without metadata.
+
+## 5.1.17 - 2026-09-22
+
+- Fix Claude Code plugin hook commands so the plugin root expands correctly, including installation paths containing spaces.
+- Add regression coverage for all three configured hook commands. Thanks to @Marc-Medlock for reporting #157.
+
+## 5.1.16 - 2026-09-20
+
+- Trace changed customer premises to affected decisions and delivery work, preserving prior approvals and pending replacements.
+- Keep provisional planning and independent authorized work moving when a critical dependency is unresolved.
+- Resolve pending options with the smallest useful evidence check and a named evidence owner.
+- Add three fictional regression scenarios and document diagnostic results and limits.
+
+## 5.1.15 - 2026-09-18
+
+- Validate workflow prototypes through observed user tasks; distinguish interest, usability and sustained adoption.
+- Allow rigorous assumption audits to confirm every tested premise without forcing a contradiction.
+- Check whether successful changes shift workload or bottlenecks downstream.
+- Add three isolated method-judgment scenarios with explicit evidence limits.
+
+## 5.1.14 - 2026-09-18
+
+- Treat imported instructions and proposed updates as untrusted evidence, never action or save authority.
+- Preserve attributed lessons, disagreement and changed recommendations; keep proposed actions out of the current next action.
+- Add five source-trust and learning scenarios, including actual staged-proposal review, and document observed limits.
+- Exercise existing lesson recall in the live routing smoke test.
+
+## 5.1.13 - 2026-09-18
+
+- Preserve decision context and attribution in agreement lookups, including documented named decision and scope-change entries.
+- Clarify natural-language agreement answers and meeting agenda selection without new commands.
+
+## 5.1.12 - 2026-09-18
+
+- Clarify standalone scope recommendations and distinguish coding effort from authority.
+- Separate handoff drafting from operational closure; use observed failure modes instead of a fixed quota.
+- Ground test expectations in agreed behavior or independent fixtures.
+- Update generated skill packages and document synthetic validation limits.
+
+## 5.1.11 - 2026-09-18
+
+- Recall saved client lessons and dated retrospectives without following linked records.
+- Surface explicit open commitments and questions in resume and meeting preparation, including agreed due/review dates.
+- Clarify returning-project checks and explicitly approved lesson exports; no automatic cross-client sharing.
+
+## 5.1.10 - 2026-09-17
+
+- Verify customer identity after switching, preserve unfinished work and use sanitized CLI records under existing authority.
+- Remove unsupported trust timelines and automatic commit/stash instructions from customer switching.
+- Correct stale setup links, skill counts, local-model instructions and Windows support wording; remove the unused broken Windows wrapper.
+- Record inference settings in future local-model results without changing historical evidence.
+- Show resume output and distinct evidence claims in the README; add focused switching and blocked-access diagnostics.
+
+## 5.1.9 - 2026-09-17
+
+- Add optional Codex display names, short descriptions and starting prompts to self-contained skill packages.
+- Keep automatic selection and stable installation paths unchanged.
+- Clarify debugging before reproduction and implementation of internal customer systems in task descriptions.
+- Add concise contributor guidance for clear triggers, useful supporting files and evidence-based completion.
+
+## 5.1.8 - 2026-09-17
+
+- Explain individual skills, project coordination and customer records through a shorter, problem-led README.
+- Restructure build, debug, integrate and QA instructions around clear actions and completion evidence, with fictional examples.
+- Preserve existing authority, privacy, investigation and uncertain-write requirements in both coordinated and standalone use.
+
+## 5.1.7 - 2026-09-17
+
+- Preserve agreed acceptance checks, ticket identifiers and blocked dependencies as work moves into implementation.
+- Keep pending access actionable without blocking independent work or requesting unnecessary permissions.
+- Compare rollout metrics under comparable conditions; retain absolute safety limits and distinguish improvement evidence from release gates.
+- Add fictional planning and release diagnostics for scope pressure, valid prior evidence and unmatched baselines.
+
+## 5.1.6 - 2026-09-17
+
+- Surface optional implementation checkpoints in bounded resume without opening linked task files; retain nested headings, ignore headings inside code examples and clear superseded progress.
+- Keep substantial work resumable in existing task records, with applicable evidence and an explicit next action.
+- Make consequential trust-boundary reviews and operator-response evidence explicit in existing methods.
+- Consolidate coordinator guidance and make standalone task entry explicit.
+- Add reproducible diagnostics for stale evidence, unproven alert delivery, tenant isolation and interrupted work.
+
+## 5.1.5 - 2026-09-17
+
+- Seal truncated and control-character private markers before preparing context or reports.
+- Show locations only in redaction previews and refuse changes that would remove privacy delimiters.
+- Confine staged inbox reads to the active customer and reject linked or non-regular inbox items.
+- Put approved-data guidance and the synthetic demo before first customer use, with explicit limits for masking, AI hosts and local storage.
+
+## 5.1.4 - 2026-09-16
+
+- Include JavaScript and TypeScript module extensions in reconnaissance, disclose scan limits, and avoid unsupported clean-scan claims.
+- Separate pending meeting updates from saved delivery results during review.
+- Label unaccepted evidence as a reported result without implying measured customer value.
+- Explain standalone handoff drafts separately from record exports.
+
+## 5.1.3 - 2026-09-15
+
+- Order migrations by contract compatibility and choose tested recovery appropriate to persistent effects.
+- Account for concurrent updates and tenant ownership during live backfills.
+- Check affected documentation and examples when public behavior changes.
+- Review dependency execution policy before installation and qualify performance claims against comparable measurements.
+
+## 5.1.2 - 2026-09-15
+
+- Check plans against all supplied requirements and reuse answers already provided.
+- Keep stakeholder reviews and AI evaluation tasks proportional to the project and permitted data.
+- Preserve changed behavior in meaningful automated coverage where feasible.
+- Treat retrieved material as evidence, never as authority to change the task.
+- Require accepted operating responsibilities and verified critical capabilities at handoff; diagnose AI failures before choosing corrective action.
+
+## 5.1.1 - 2026-09-15
+
+- Map decision authority by scope and source; preserve disputed ownership and separate observations from possible stakeholder explanations.
+- Keep one-off coordinator tasks out of customer-record setup and make standalone meeting review explicit.
+- Characterize changed legacy behavior and handle uncertain writes without assuming stale lookup results authorize a retry.
+- Add reproducible field-task fixtures with separate reviewer criteria, local contract checks and preserved run receipts. These do not claim model or customer validation automatically.
+- Clarify small-project and enterprise use, host verification coverage and contribution scope.
+
+## 5.1.0 - 2026-09-15
+
+- Expose all existing capabilities through one catalog: 35 independently installable task skills plus the `fde` coordinator. Existing task names remain compatible; `brief` and `prioritize` provide clear entry points for kickoff and priority selection.
+- Remove redundant Claude Code command files where a task skill already provides the same command. Keep existing engagement shortcuts available.
+- Generate the public catalog from installation metadata and check that every routed task is installable. Clarify task inputs, customer-record requirements and full-pack installation.
+- Make source setup self-contained for selective installs; distinguish source access, drafts, staging and confirmed record updates.
+- Let planning and runbook drafts proceed from supplied evidence without forced setup, invented ownership or arbitrary readiness scores.
+- Keep legacy migration limited to the actual 14 renamed packages from 4.x, preserving unrelated prefixed skills.
+- Yield CPU while waiting for a record lock; verify that a competing writer can retry safely without applying the same proposal twice.
+
+## 5.0.0
+
+- **Plain task names:** use `discover`, `scope`, `options`, `poc`, `build`, `integrate`, `debug`, `review`, `evaluate`, `qa`, `ship`, `readout`, `handoff` and `feedback`. These replace the `fde-` prefixed names; `fde` remains the coordinator. Update selective-install commands and prompts that name an old task.
+- **Safe disk upgrades:** install each replacement before archiving its old managed directory. Preserve personal additions and report generic-name conflicts or unmarked old installs instead of deleting them.
+- **Clear first use:** the README explains individual tasks, ongoing customer projects and local records with concrete examples. Host installation, name conflicts and upgrade details live in the installation guide.
+- **Proportionate discovery:** notes-only discovery returns sourced findings and unknowns without mandatory code scans, named approvers or workshops. Explicit confirmation replaces assumed agreement.
+- **Consistent shortcuts:** discovery, release and sponsor-update shortcuts follow the same task contract as individual skills, without requiring an unrelated customer-record setup.
+
+## 4.1.1 - 2026-09-15
+
+- Make standalone sponsor readouts and handoffs explicitly use supplied context without engagement-only CLI gates.
+- Synchronize obsolete generated skill files and retired entries safely, while keeping validation read-only and protecting unowned files.
+
+## 4.1.0 - 2026-09-15
+
+- Make existing field workflows available as selective, self-contained task skills alongside the `@fde` coordinator, generated from one canonical source.
+- Include implementation, integration, debugging and journey QA methods; another coding skill pack is optional.
+- Support standalone tasks without mandatory engagement initialization. Preserve bounded, sanitized context and confirmed judgments for bound work.
+- Clarify evidence, bounded automation authority, operating ownership, cost assumptions and reusable field lessons.
+- Preserve reintroduced managed skills and personal additions across installation upgrades; verify generated packages and selective reference closure.
+
+
+## 4.0.4 - 2026-09-15
+
+- Reserve active engagement identity before allocating compact context excerpts; preserve the output cap and private masking.
+- Report whether a failed debrief actually retained a pending proposal, with an actionable recovery step.
+- Show multiple explicit sources on short decision receipts and omit untouched template scaffold from evidence searches.
+
+## 4.0.3 - 2026-09-15
+
+- Reuse a fresh same-engagement context packet already supplied for the current entry by the session hook or CLI. Refresh on new tasks or turns, missing or uncertain context, changed records or settings, and explicit update requests.
+- Make slash commands and adapters follow the same entry rules; remove the separate Cursor triage entry and conflicting raw-context instructions.
+- Add startup checks for large packets, private-block exclusion, changed records and client rebinding.
+
+**Upgrade:** Run `npx fdeops@4.0.3 install` to refresh managed skill copies; updating the npm package alone does not refresh those copies. Existing workspace adapters are preserved: merge their FDEOps entry instructions from `adapters/` if needed, retaining your own project guidance. Plugin users should update FDEOps through their host.
+
+## 4.0.2 - 2026-09-14
+
+- Keep complete context packets intact when they fit the requested budget, including compact mode. Oversized packets still retain their byte ceiling and omission warnings.
+- Recognize measurable acceptance checks phrased with “observe” while retaining structural checks for a concrete test, result and named signer.
+- Show the exact existing reality record fields when formatting needs repair, and point audit guidance to the initialized template.
+
+## 4.0.1 - 2026-09-14
+
+- Make consequential interpretations and reversed instructions visible within the existing debrief review, without adding another approval step.
+- Add targeted history checks for unfamiliar code and task-based clarity checks for handoffs and sponsor updates. Keep uncertain rationale and simulated reader feedback distinct from verified evidence.
+
+## 4.0.0 - 2026-09-13
+
+**Migration:** Combined `fde debrief --smart --apply` is no longer accepted. Run `fde debrief --smart notes.md`, review the proposal with `fde debrief --review`, then confirm with `fde debrief --apply`. Existing engagement files need no migration.
+
+- Keep context output within its byte limit even when many sections need truncation. Large-history checks cover policy, signer and recent sourced decisions.
+- Require separate `debrief --smart` and `debrief --apply` commands so a proposal can be reviewed before saving. Approval stamps without sources remain CLAIM in REVIEW. Tentative or generic signers stay notes; named signers retain source attribution.
+- Clarify the messy-notes walkthrough and make engineering guidance proportionate to risk: reuse applicable verification, compare total outcome costs, and choose rollout and recovery checks for the workload. Human confirmation and release authority remain required.
+
+## 3.31.0
+
+- Personal setup now asks how you work, what would help first, and what to mask. Work style shapes the overview and ownership guidance; the starting need points the agent to land, triage or audit without overriding current client evidence.
+- Custom masking adds locally supplied names and terms to the existing identifier protection. Literal, case-insensitive matches become reversible aliases in agent-facing text; confirmed writes preserve originals. Setup inspection shows only a count. Terms can be replaced later or disabled without deleting the saved list.
+- Existing display, context and report settings remain available through `fde setup --settings`. Re-running personal setup preserves technical choices unless work style changes the default overview.
+- Mask custom terms before JSON/HTML encoding, diagnostic clipping and derived metric extraction. Exclude private preferences from engagement commits. Git history lookups now pass delivery text as arguments instead of interpolating it into shell commands.
+
+## 3.30.0
+
+- First-use setup asks three choices: current-client or portfolio overview, standard or compact context, and masking for agent context alone or also new reports. The agent asks once per engagements folder; terminal users can run `fde setup`. Settings save only after explicit answers and can be changed anytime.
+- Compact context defaults to a 4 KiB ceiling. `status` and `dashboard` follow the selected scope; `--current`, `--all` and explicit context budgets still override defaults without rebinding a workspace.
+- Optional report masking preserves original records and acceptance classification, including identifiers in report titles and metadata. It does not anonymize names, rewrite old exports, or configure an AI provider.
+- Expose `setup` and the existing `privacy` capability check through `npx fdeops` without triggering installation.
+
+## 3.29.0 - 2026-09-11
+
+- Mask common structured identifiers locally in CLI responses, smart proposals, handoff packets, and ingest MCP results. Keep stable reversible aliases in private local state; confirmed writes restore originals. Preserve explicit private-block handling and refuse unsafe legacy reviews. This does not intercept raw file tools or detect every kind of personal information.
+
+- Simplify public documentation and evaluation navigation; consolidate verification results and remove one-off development reports and designer instructions.
+
+- Let the agent reconcile messy debrief and ingest notes into one human review, preserving sources, corrections, current actions, and explicit save confirmation. Verify saved facts instead of asking users to maintain routing syntax.
+
+- Clarify discovery of the remaining customer gap, consequences of inaction, future operational ownership, and evidence checkpoints for promised dependencies using existing engagement records.
+
+## 3.28.0 - 2026-09-10
+
+- Keep explicitly withdrawn or conflicting delivery assertions out of accepted summaries, with the reason visible in CLI and fieldbook. Preserve history and flag scope mismatches for human review.
+- Save a structured delivery row through the same confirmed debrief; reject malformed row fields and reopen pending reviews with `debrief --review`. Warn before an exact sourced replay can duplicate records or replace a newer next action.
+- Include operational handoff notes in bounded successor exports and targeted recall. Share open-risk interpretation across summaries, excluding template examples and explicitly closed risks.
+- Retain recent and early evidence in long receipt searches; keep takeover investigations bounded.
+- Recognize concrete success checks without domain-specific verb ceremony, with an explicit Input / Pass when format when needed.
+
+
+## 3.27.1 - 2026-09-10
+
+- Preserve pending debrief reviews until applied or explicitly replaced with `--replace-proposal`, including their private notes after caught replacement failures.
+- Acquire record locks before applying a debrief and restore prior records after caught write errors, so ordinary contention retries do not duplicate partial updates. Serialize concurrent applies of one proposal.
+- Cap long debrief and ingest previews while keeping the complete proposal on disk. Say “not detected” when phrase recognition misses details rather than claiming the notes never stated them.
+- Include missing success criteria and acceptance owners in early handoff/readout gaps. Clarify that ledger summaries do not include every prose delivery note.
+- Refuse dashboard exports into record directories and clarify how to refresh a portfolio or custom report.
+- Document independent daily-use simulations, browser checks, effort counts, and remaining recovery/model limits.
+
+## 3.27.0 - 2026-09-10
+
+- Keep unsourced decisions and delivery numbers as CLAIM. A log date is not a source; pending evidence cannot produce accepted value, including legacy ledger rows. Existing files are not rewritten.
+- Add bounded, redacted `defend` and `handoff` Markdown readouts. Explicit file exports create a new destination outside engagement records.
+- Put constraints first in the agent packet and include the classified value ledger. Make CLI triage and Today share one recommended first action with its reason and source.
+- Separate requests, scope and reported delivery in REVIEW; preserve explicit source references without inventing acceptance. Expand the fictional messy-notes demo.
+- Add `doctor --ready` for observable acceptance checks and a named signer before planning or building. Support revised multiline criteria.
+- Default the fieldbook to dark while preserving saved theme choices. Clarify the README around the delivery loop; retain the original poster and dark fieldbook. Add three thin workflow checklists, improve POC-to-production guidance and remove obsolete maintainer documentation.
+- Route `recall`, `defend` and `handoff` through the npm entry point.
+
+## 3.26.0 - 2026-09-10
+
+- Bound complete resume output to 16 KiB by default, with explicit truncation and a smaller-output option. Add client-scoped `recall` for sanitized source excerpts, including policy and nearby decision context.
+- Preserve current policy at entry and retrieve recent changes alongside older constraints. Byte limits do not claim a host-wide token limit.
+- Prevent lost updates in record transforms; release nested locks after contention or write errors. Add full ingest MCP lifecycle and client-isolation regressions.
+- Continue the next action directly from the fieldbook, return to the overview on mobile, and clarify snapshot freshness. Restore the original README poster and show a real dark fieldbook preview.
+- Replace unsupported local-model claims with explicit prerequisites, a reproducible local tool-loop smoke, and observed verification results.
+
+## 3.25.0 - 2026-09-10
+
+A clearer fieldbook, with safer setup and consistent acceptance records.
+
+### Improved
+
+- Search and attention filters now apply to both the client list and the overview. Clear filters without losing the current engagement.
+- Embedded font data now lives outside renderer logic and carries its redistribution notice into offline reports.
+- Mobile navigation opens when needed, keeps client work visible, and supports keyboard search. Print remains available through the command palette.
+- Prompt actions report copy success immediately. Reports show their snapshot time and explain where to review changes.
+- README and installation guidance distinguish skill discovery, hook registration, direct CLI writes, and offline use. Added website update instructions for the designer.
+
+### Fixed
+
+- Startup context now consumes the CLI's sanitized, bounded output. Removed the duplicate shell redactor and terminal escape interpretation; unavailable runtime fails closed.
+- Pending requests, denials, revocations, and bare approval words no longer count as a customer-side signer. Status, dashboard, and vault exports share classification.
+- Optional `Acceptance status` makes recorded status explicit: only accepted rows with a signer, measurement, and evidence display as accepted. Legacy named rows remain readable; recorded acceptance does not authenticate consent.
+- Installer and adapter writes refuse unsafe linked destinations. Ordinary macOS system temporary paths remain supported.
+- Engagement initialization preserves existing client-folder files and refuses linked destinations rather than writing outside the intended directory.
+
+## 3.24.0 - 2026-09-09
+
+The daily fieldbook is the review screen. Evidence stays evidence. People stay people.
+
+- Fieldbook: delivery evidence now shows promised, measured, acceptance, and evidence. Today surfaces missing measurements, evidence, next actions, and stale trust records.
+- Copy meeting-prep, debrief, and outcome prompts into your coding agent; the fieldbook remains an offline, read-only snapshot with a generation timestamp.
+- Accessible command dialogs, searchable evidence, browser back/forward navigation, responsive tables, and print view.
+- Fix an empty Working theory field reading the next template heading as the actual problem.
+- Clearer first-run demo and daily-use documentation; flagship skills emphasize reuse, evidence quality, and explicit acceptance. Added a customer-delivery evaluation protocol without claiming measured superiority.
+- Routing smoke checks report agent-only cases as not evaluated instead of attempting an undefined CLI command.
+- People rows no longer treat articles or weekdays as names (`the` / `Friday` from signal prose).
+- Skip-to-content no longer poisons fieldbook hash routing; empty engagements stay `new`.
+- `evals/delivery/setup.js` materializes fictional D1-D5 fixtures without copying scoring notes. No model trial has been run.
+- Skills and docs: empty trust is `new` not green; day-1 ship waits on a signer; `fde scan` is the first code move after the Question; dashboard `--open` / `--out` are in CLI help.
+
+## 3.23.0 - 2026-09-09
+
+Follow-up you can confirm in two minutes. No state machine.
+
+- `debrief --smart` / ingest propose: a one-screen REVIEW first (decided, asked, open, next, signer). File-routing still prints underneath. Confirm once, then `--apply`.
+- Optional `[approved: Name YYYY-MM-DD]` on a decision line. RECORD marks missing approval as `(unconfirmed)`. The CLI does not infer a yes from prose.
+- `doctor`: a dated decision after the last committed delivery line, or a signer change while a measured number is still unaccepted, asks for a review. No dependency graph.
+
+## 3.22.2 - 2026-09-08
+
+Kickoff English fills the signer. Receipts stop calling a dated line defensible. `--help` is help.
+
+- `debrief --smart`: "Finance controller (Helena) signs off" and "Anand Mehta has final say" become `signer:` lines. RECORD no longer prints `(none)` after a real kickoff sentence.
+- `fde receipts`: header is `ON RECORD (dated):`. Dated is retrieval, not verified customer approval.
+- `fde debrief --help`, `fde prep --help`, `fde log --help`: print usage. They no longer try to read a file named `--help` or prep a meeting called `--help`.
+- Value ledger: "not yet measured" / "pending" is not a claimed number.
+- `fde log decision "AI in scope: …"` (the line scan already prints) turns the eval gate on.
+
+## 3.22.1 - 2026-09-07
+
+Three engagements run end to end on the published package showed the gates reading a different fieldbook than the CLI writes. Same six stages. Same 30 skills.
+
+- `resume` / `triage`: a read-only RECORD block - who signs off, what was promised, the last decisions. The signer is `success.md` **Stakeholder who signs off** (the line 3.22.0's `signer:` fills), never guessed out of `stakeholders.md`, and prints `signer: (none)` when nobody is named. Monday's first screen no longer needs a second command to name the sponsor. Sealed notes stay sealed.
+- `doctor`: a filled section appended below its empty template heading counts as filled, and the duplicate heading is reported instead of silently shadowing the work.
+- `doctor` (ship/close): when the bound repo calls a model but nothing in the record says AI is in scope, the eval gate says so rather than passing green. AI in scope is now read from the brief, success, risks and assumptions too, not just delivery and decisions.
+- `scan`: a model finding says how to get it onto the record, because the ship gate reads the record and not the scan.
+- `log delivery`: says what it did not do - a dated line is not a value ledger row, and nothing has an **Accepted by**.
+- Triage / status / dashboard: with no `[signal:]` on record an engagement reads `new`, not green. Prose can still raise an amber; nothing earns a green except somebody being asked. A day-1 template calling someone a "champion" no longer prints a colour.
+- `fdeops init`: names the one command that binds a workspace, and stops printing a clone-only path an npm user cannot run.
+
+## 3.22.0 - 2026-09-03
+
+Skip is loud. The CLI now catches the two things a stranger's first week showed it missing: the signer vanishing into a note, and code moving while the ledger stayed silent. Same six stages. Same 30 skills.
+
+- `debrief --smart`: "Priya signs off" becomes `signer: Priya` - fills **Stakeholder who signs off** in `success.md` and logs the contact. A second, different signer is kept beside the first, never overwritten. New `signer:` prefix in the vocabulary.
+- `doctor` (ship/close): commits in the bound client repo newer than the last dated `delivery.md` line → "code moved, ledger did not." Registry + git, local only.
+- `doctor`: open, owned risks mid-ship no longer fail; the gate is close.
+- Triage: a quoted risk is labelled `top risk:`, not `trust:`.
+- Examples: all three pass `fde doctor` (schema `reality.md`, value bucket, operating map, **Accepted by** column, full names in signal history). `npm run check` runs doctor on every example so they cannot rot.
+- `@fde` and `ship`: a coding pack may write the function; `@fde` owns done. Before-receipt captured before you change anything; open PRs checked; no this-turn receipt is a failed test.
+- README: keep the coding pack you already use, install this next to it. `npx fdeops scan` is the first thing on the page.
+
+## 3.21.0 - 2026-09-01
+
+Same public map as 3.20: Commands, then All 30 Skills, then How Skills Work. Hero is hallway English. Six skills got harder field gates. Same six stages. Same 30 skills.
+
+- README hero: the client work around the code that still gets you fired if you skip it. Catalog and project tree stay on the front door.
+- Discover: data estate always; the pipe; their words in `terrain.md`. Parts of the problem before scan (no solutions).
+- Test-assumptions: kind FACT / CONVENTION / UNKNOWN before blast radius.
+- Three-options: assemble from surviving blocks, not three speeds of the same plan.
+- POC: write pass/fail lines before you build.
+- Ship: run their command in this turn or you cannot write that it passed. Monday-shaped staging. No unsupervised loop on their production.
+- Review: their PR comments are to check, not to obey.
+- Readout: old path still live = claimed. Runbook: named operator runs Tuesday's job from the 2am doc, hands off. Eval-pack: side effect without a named human on their side is NO-SHIP.
+
+## 3.20.0 - 2026-08-29
+
+The public map is a skill catalog. Lifecycle, then catalog, then how it works.
+
+- README Commands: one command per stage, skills load automatically.
+- README catalog: 30 skills, not prompts. How Skills Work is route, evidence, confirm.
+- Public docs say skills, not methods. Slash commands and file ids unchanged.
+
+## 3.19.0 - 2026-08-29
+
+The public map is consulting language on FDE stages. Same 30 skills. Same slash commands.
+
+- Work names sit on the command table: Engage, Diagnose, Align, Deliver, Realize, Transfer. Stages stay Land → Close.
+- Skill titles match: Deliver the increment, Validate the solution, Hold scope, Transfer operations.
+- Same six stages at any scale, greenfield or brownfield, any industry (overlays). Done is not claimed until they can reject it on staging they operate.
+
+## 3.18.0 - 2026-08-29
+
+Public names match the work: verb + object, six stages ending in Outcome.
+
+- Stage `prove` is now `outcome`. `fde log phase prove` still works. Catalog, slash commands, and skill titles use the same labels (`Interrogate the brief`, `Validate the bet`, `Build one change they can see`).
+- `/outcome` is the stage name in commands and the CLI. Display is Outcome, not Prove.
+
+## 3.17.0 - 2026-08-29
+
+Ship is one method. Write or update on their repo, prove it on staging they operate, then go live with a rollback you have run. No extra method.
+
+- `/ship` names brownfield or greenfield once, then the same loop: one change they can see, on their staging, undoable, then the go-live gates.
+- `thin-slices` / `small-prs` are gone. That craft lives in `ship.md`. Catalog is 30 skills.
+- A same-day throwaway that kills an assumption stays `poc`. Outcome stays promised → measured → accepted.
+
+## 3.16.1 - 2026-08-28
+
+The CLI no longer volunteers a false statement to a sponsor. Signals key on the person, redact does not reprint the secret in `git log`, and the dashboard fails loud when `reality.md` is not the schema.
+
+- Trust signals key on the person in the bullet, not `words[0]`. `INCIDENT:` / `recovery` no longer become phantom stakeholders that pin the engagement RED.
+- `fde redact --apply` commit subject is `redact N line(s)` - never the search term. `log` also refuses `postgresql://user:pass@host` and `api_key=` assignments.
+- Dashboard fails loud when `reality.md` is not the schema. It will not label the inherited brief as "what's actually true".
+- `debrief --smart` prints the `decision:` / `risk:` / `delivery:` / `contact:` / `next:` vocabulary. Preview gate unchanged.
+- `fde log delivery "slice | bucket | …"` writes a value-ledger row. `fde log risk --retire <text>` moves matching open risks. `fde tidy --apply` can bless hand-written dirty files.
+- `status` and `dashboard` print doctor issues. README check allows the GitHub poster `<img>` (`user-attachments`).
+- Command map and slash descriptions use plain verbs (`Ship to their production`, `Prep before the meeting`). Craft words stay in the method, not the button.
+- Discover frames Situation / Complication / Question / Answer-space before any scan (same spine as readout, aimed at the floor). Plan copies the kill observation onto each Now slice as `Kill if`.
+
+## 3.16.0 - 2026-08-28
+
+Skill and command names are the job, in the language of the embed. You can read the filename and know what it is: `who-decides`, `hold-scope`, `thin-slices`, `readout`. Slash tells match how you ask: `/trust` `/receipts` `/readout`. CLI verbs stay (`fde status`, `fde receipts`).
+
+## 3.15.2 - 2026-08-28
+
+`/got` is now `/outcome`. Why is the product reason: agents forget the client; this is the record you take on site. Commands carry the tells. How Skills Work is the router. Project Structure lists every reference and slash command. Em dashes removed from copy.
+
+**Ground loop.** `@fde` stays from discovery to signed outcome: POC, slice, on-site proof, eval when a model judges, promised → measured → accepted. A throwaway typo in an unbound repo can skip; a client slice cannot.
+
+## 3.15.1 - 2026-08-28
+
+Public copy uses the standard skill-pack words: **skills**, Commands, Quick Start, All 31 Skills, How Skills Work, Why FDEOps. `@fde` is still the one skill a host loads; the 31 remain references it routes to. No invented glossary on the front door.
+
+Public tree: `.agents/` (the contributor `testing-fieldbook` skill) is gone from git, so a bare `npx skills add` only sees `skills/fde`. Attack notes live in `evals/testing-fieldbook.md`. Methodology moved to `docs/methodology.md`.
+
+## 3.15.0 - 2026-08-28
+
+Production front door: command map, 30-second install, method catalog (Use when), then why it exists. README is text - no gif. Stages are LAND → CLOSE everywhere. Unused SDLC archive and staged mock media removed. Leftover `build` phase name aliases to `ship`. Coding stays in the host agent.
+
+## 3.14.1 - 2026-08-28
+
+### Changed
+- **Front-door map is the embed** - LAND → DISCOVER → PLAN → SHIP → PROVE → CLOSE, with `/brief` `/discover` `/plan` `/ship` `/got` `/close` under the boxes. Commands table is the job, left to right.
+
+## 3.14.0 - 2026-08-28
+
+### Changed
+- **Command map on the front door** - four situations as a map, then slash commands as method cards. `/prep` and `/status` added. The 31 methods stay in a details block.
+
+## 3.13.2 - 2026-08-28
+
+### Changed
+- **Category line** - Forward deployed engineering skills for AI coding agents.
+- **One skill, tighter router** - `@fde` is the brain; slash commands are the menu; methods stay references. The human never picks a skill.
+
+## 3.13.1 - 2026-08-28
+
+Slash commands for the four situations, and the nickname “four days” is gone from the front door.
+
+### Added
+- **Claude Code slash commands** - `/brief` `/quiet` `/agreed` `/got` `/debrief` load `@fde`. Same skill; a menu, not a second method pack.
+
+### Changed
+- **README week table** names the situation, the chat, and the slash command. “Why this exists” is four numbered problems, not land→build→close.
+- **Plugin** declares `skills` + `commands` in `.claude-plugin/plugin.json`.
+- **Dropped the “four days” nickname** on the public surface. The product is still those four situations; we just say them.
+
+## 3.13.0 - 2026-08-28
+
+Four-day front: the skill is the engagement record, not a land-to-close operating system.
+
+### Changed
+- **Four days first** - the brief is wrong, they went quiet, when did we agree, what did they get. `@fde` leads with those moments; the six-domain router stays behind them.
+- **First chat binds** - name the client (`@fde this is Acme`); the agent runs `fde resume --init`. The FDE never types the CLI. Terminal `--init` remains the fallback.
+- **Generic SDLC left the router** - `build`, `debug`, `observability`, `qa-live`, `security-audit`, and `test-on-legacy` live in `skills/fde/archive/sdlc/`. Routed count is 31 methods + 5 overlays. Coding, tests, and commits stay in the host agent.
+- **Friday status leads with the value ledger** - promised → measured → accepted, then trust. A number nobody signed is claimed, not delivered.
+- **README** teaches the job, then a 30-second install (plugin or `npx skills add --skill fde`). Method catalog is a details block.
+
+## 3.12.0 - 2026-08-27
+
+Vocabulary: standard words on the outside, so nothing has to be learned before it works.
+
+### Changed
+- **The skill fires on client work, not on a password.** The frontmatter `description` - the only text a host reads before loading a skill - triggered on `@fde` plus a list of our own nouns ("hygiene", "receipts"), so an FDE who simply talked about their client got no memory. It now names the intents in the standard `Use when …` form: mentioning a client or sponsor, debriefing a meeting, asking what was agreed, prepping a readout, opening a session in a client workspace. `@fde` remains, as one trigger among several rather than the gate.
+- **`fde tidy` is the verb; `fde garden` still works.** "Garden" was a metaphor only we used. Nothing is removed - the old name routes to the same code, and the alias is covered by a test.
+- **`capture` and `preserve` left the human help.** Only hooks call them; listing them invited an FDE to run a snapshot by hand.
+- **"Engagement memory for AI coding agents"** replaces "second brain" in the npm, plugin and marketplace descriptions - the phrase someone would actually search, and an accurate one.
+
+### Added
+- **One glossary.** The six words that carry the method (fieldbook, brief vs reality, terrain, trust signal, receipts, vault) are defined once in the README instead of being met scattered and guessed. A gate keeps it in place, and a second gate keeps the description triggering on intent.
+
+## 3.11.1 - 2026-08-27
+
+Adoption: one skill, and the CLI is never missing.
+
+### Fixed
+- **A skill-only install had no hands.** `npx skills add` copies the method but not the CLI, and the router's only fallback was `~/.claude/fdeops/fde.js` - absent on Cursor/Codex/anything that is not a Claude Code install - so the agent dropped to writing `.fde/` by hand and lost the dating, gates and `<private>` redaction the CLI enforces. It now reaches for `npx --yes fdeops <verb>` before any manual path; "CLI unavailable" means no Node or no network, not "not installed".
+- **The advertised install pulled a contributor skill.** A bare `npx skills add suboss87/fdeops` also installs `testing-fieldbook`, which is for people working on this repo. The documented command is `--skill fde`, and a gate keeps it that way.
+
+## 3.11.0 - 2026-08-27
+
+One window over every client, without a second memory to maintain.
+
+### Added
+- **`fde vault`** - a derived Obsidian vault of the whole portfolio: a `Portfolio` page across all clients, a page per engagement (phase, trust, next action, timeline, people), a `Questions` page (gone quiet, value nobody accepted, stale signals, no next action), plus frontmatter and `[[wikilinks]]` so search and graph view work in a stock Obsidian with no plugins. Obsidian ignores dot-paths, so `~/fde-engagements` as a vault shows nothing - the record lives inside `.fde/`.
+- **`fde vault --redacted`** - the same vault with the political layer removed (`stakeholders.md`, `trust-profile.md`, people pages, trust signals, contact notes, `[signal:x]`/`[@owner]` tokens), on top of the `<private>` redaction every output already does. The first version of a fieldbook that is safe on a shared screen.
+
+### Notes
+- The vault is **derived and disposable**: `.fde/` stays the only source of truth, the folder is deleted and rebuilt on every run, it is gitignored, and nothing in it is ever parsed back. Authoritative `.fde/` files gain no frontmatter and no wikilinks - they stay plain markdown a client can read.
+- It refuses to build over `$HOME`, the engagements root, anything inside a `.fde/`, a symlink, or any directory it did not write itself (proved by its `.fdeops-vault` stamp). `--out <dir>` for anywhere else.
+
+## 3.10.4 - 2026-08-20
+
+The same refusal in the automatic paths: hooks no longer capture one client's session into another.
+
+### Fixed
+- **The `hooks/` layer honored the refusal only in `bin/fde.js`.** With an unresolvable `FDEOPS_ENGAGEMENT`, `session-start` injected the registry-bound client's context, `session-stop` ran `capture`/`dashboard` and `pre-compact` ran `preserve` against it - unattended, so worse than the manual case 3.10.3 fixed. All three now exit without touching memory, and they accept the same bare-slug / engagement-folder forms as the CLI.
+- **A relative `FDEOPS_ENGAGEMENT` is refused.** `FDEOPS_ENGAGEMENT=..` resolved against whatever directory the agent started in and initialised memory outside the engagements root. Absolute path, `~` path, or bare slug only.
+- **A fifo (or any non-regular file) in a memory slot no longer hangs the CLI.** `doctor`, `resume` and `triage` blocked forever on open; reads now skip anything that is not a regular file, and `doctor` still reports it.
+- **A value that slugifies to nothing no longer names an engagement.** `slugify()` defaults to the literal `engagement`, so `FDEOPS_ENGAGEMENT='???'` resolved onto a client slugged `engagement` - exit 0, no warning, reads and writes both.
+- **Every non-regular memory file is refused on the write side too, and the remaining unguarded reads are closed** (`stakeholders.md` via `stakeholdersMemoryHealth()`, `.registry`, the append target): a fifo in a slot hung `doctor`/`resume`/`triage`/`log` forever.
+- **An unbindable `.registry` explains itself once, whatever its shape,** and no longer leaves a stale `.registry.lock` (the refusal used to `process.exit()` from inside the lock).
+- **A whitespace-only `FDEOPS_ENGAGEMENT` refuses too** - an empty expansion (`export FDEOPS_ENGAGEMENT="$CLIENT"`) read as unset and filed the note under the workspace binding.
+- **`fde resume --init` fails loudly when it cannot bind.** An unwritable `.registry` left the workspace silently unbound with exit 0, so every later command said `NO ENGAGEMENT` for no stated reason.
+
+## 3.10.3 - 2026-08-20
+
+Stability pass: an override that cannot be honored now refuses instead of filing the note under another client.
+
+### Fixed
+- **`FDEOPS_ENGAGEMENT` no longer falls through.** A typo'd or stale value silently resolved via the registry, so `fde log` appended to whichever engagement the workspace was bound to. Every verb now refuses, names the value, and says where it looked.
+- **`FDEOPS_ENGAGEMENT` accepts a bare slug and the engagement folder.** Pointing at `~/fde-engagements/<client>` used to create a second, git-less memory beside the real `.fde/` - same client, split record.
+- **Unparseable `.registry` lines are reported, not parsed into nonsense.** A line without a space produced a workspace path missing its last character, so valid bindings vanished behind `NO ENGAGEMENT`. Re-binding rewrites the file without the junk.
+- **`doctor` flags a memory file that is a directory or a symlink** - both read as empty and reject every append, and doctor used to call that healthy.
+
+### Changed
+- The recorded session may live in `README.md` or `docs/USAGE.md`; the gate now enforces reachable-and-reproducible instead of front-door-only (the README lost its embed in 3.10.2, which left `npm run check` red on `Main`).
+
+## 3.10.2 - 2026-08-13
+
+Launch README: honest cold start (hooks vs `@fde`), denser front door.
+
+### Changed
+- Week table states Claude Code auto-loads; Cursor/Codex need `@fde` / `resume`. Fieldbook is on disk either way.
+- README tightened: followable, not a tutorial. Method matrix stays behind details.
+
+## 3.10.1 - 2026-08-13
+
+Launch usability: pull is optional and CLI-first; MCP sink can bind an engagement without env.
+
+### Added
+- **Slack pull recipe** - read a thread as text; never post or sync.
+- **`engagement` argument** on ingest MCP tools - pass the `.fde/` path from `fde resume --bind` when the MCP process is not in a bound workspace.
+
+### Changed
+- Daily path is paste/debrief; connect wires a **source** MCP only. `fde ingest` in the open workspace is the sink.
+- README week table and "won't build" line no longer contradict (pull via your MCP ≠ we ship connectors).
+
+## 3.10.0 - 2026-08-04
+
+Everything published since 3.9.20: the installer can no longer touch skills it did not create, `<private>` holds under adversarial input, a first run costs nothing, and the front door shows a real session.
+
+### Added
+- **`fdeops demo`** - the whole land→close loop on a fake client in one command, then `fdeops demo --clean`. Nothing of yours is touched.
+- **Agent Plugins 1.0.0 conformance** - root `plugin.json` + `mcp.json` alongside the existing `.claude-plugin/`, so non-Claude hosts can load the same skill.
+- **Worked examples on 12 field methods** (one Acme thread across land→close), a gaming check per success metric, "measured ≠ accepted" gating on the value ledger enforced by `doctor`, and pre-wire/pre-mortem in `stakeholder-radar`.
+- **`media/session.gif` + `media/session.cast`** - a recorded real session in the README, reproducible via `media/record-session.sh`.
+- **`SECURITY.md`** with a reporting channel that does not depend on a repo setting.
+
+### Fixed
+- **Installer only removes or overwrites skill directories it created** (#8) - verified by a marker, no writing through symlinks, no partial install reporting success.
+- **`<private>` never reaches a model** - redacted from debrief/ingest dry-run previews, HTML comments stripped before routing, apply refuses when the sealed sidecar is gone, an unclosed marker cannot swallow later notes, and MCP results carry no sealed text.
+- **MCP ingest server speaks newline-delimited stdio**, as the transport requires - it could not have worked with any client before.
+- **A typo'd or flag-only `fdeops` command no longer installs** - `fdeops dmeo` exits 1 with a suggestion; `--help`/`--version` answer and touch nothing.
+- **Each logged contact renders once** in the fieldbook LOG, with its trust signal; `doctor` reports unbalanced `<private>` markers.
+- **`media/record-session.sh` is reproducible** - `doctor`'s expected non-zero exit no longer aborts it, `--session` stays in a throwaway workspace, and a missing `gifsicle` is not fatal.
+
+### Changed
+- Advertised method count is gated against `skills/fde/references/`, so docs cannot drift (37 methods + 5 overlays).
+- Launch hygiene: drop `docs/plans/` and the Devin `.agents/` testing skill from the public tree.
+
+### Fixed
+- **mcp.json server-path gate** uses the `${PLUGIN_ROOT}` arg (joining all args was blind on empty args and wrong with extra flags).
+
+## 3.9.20 - 2026-07-31
+
+Ingest connect UX - wire any source MCP in plain language; recipes + capability check.
+
+### Added
+- **`@fde` connect flow** - "connect Granola/Notion / a new MCP" / "what can you pull?" → `references/ingest-connect.md` (config snippet, host save/reload, verify; no silent install).
+- **`mcp/recipes/`** - file, granola-shaped, notion-shaped recipes into the ingest sink.
+- **Capability check** before pull - list available sink/source tools; never pretend a source exists.
+
+### Changed
+- README / USAGE clarify: FDEOps is the sink; sources are user MCPs; connect once then pull in natural language.
+
+## 3.9.19 - 2026-07-29
+
+Ingest sink - pull large artifacts from user-configured source MCPs; same confirm loop as debrief.
+
+### Added
+- **`fde ingest` CLI** - `stage`, `list`, `propose`, `apply` verbs. Raw pulls land in `<engagement>/.inbox/`; apply routes dated facts into `.fde/` (wraps debrief `--smart` / `--apply`). Optional `via:<source>` provenance.
+- **`mcp/fdeops-ingest`** - thin stdio MCP mirroring ingest verbs. Source MCPs (Granola, Gmail, Notion, custom) stay user-configured outside fdeops.
+- **Skill + docs** - `@fde` routing for "make sure we're up to date" / pull-from-source; `references/ingest.md` method card; cross-links in debrief, USAGE, schema, PRIVACY, README.
+
+### Changed
+- Explicit non-goals restated: no bundled OAuth/connectors, no ambient sync, no unreviewed writes to `.fde/`.
+
+## 3.9.18 - 2026-07-29
+
+Failure-path + stakeholder identity hygiene - Veric-style depth without the platform.
+
+### Added
+- **`fde doctor` operating map** - from `plan` onward, empty `terrain.md` ## Operating map (exception-led) is a hygiene fail (break → who notices → workaround). Discover may still be empty; land only seeds.
+- **`fde doctor` stakeholder identity clusters** - flags Denise vs Denise Chen style name forks so trust keys don't split.
+
+### Changed
+- Discover / stakeholder-radar / templates note doctor enforcement and one-name-per-person.
+
+## 3.9.17 - 2026-07-23
+
+Dogfood round: honest `--smart` contract + fix duplicate `## Next action` trap. Session digest: share thinking via `.fde/`, not transcript sync.
+
+### Fixed
+- **Duplicate `## Next action`** - triage/status/dashboard read the last non-empty section (template empty + agent-appended second heading no longer reports `next: (none set)`). `fde doctor` flags duplicates. `next:` / `setNextAction` collapses to one section.
+
+### Changed
+- **`--smart` honesty** - skill + debrief reference + USAGE state clearly: CLI is prefix/keyword gate + writer; the agent rewrites `.debrief-propose` with type prefixes. Editing the propose file means rewriting lines with prefixes, not annotating.
+- **Session digest (On exit / before PR)** - memory contract captures TL;DR, decisions & why, pivot, scope/verification, gotchas into existing `.fde/` files; review/build gates require it before merge. Explicitly not agent-transcript sync into the product repo.
+
+## 3.9.16 - 2026-07-21
+
+Intent vs diff gate - scope-creep detector fitted into ship/review (not a new skill).
+
+### Added
+- **Intent vs diff** on ship (before pre-blast): KEEP / JUSTIFY / SPLIT / DROP every path against the stated slice; SPLIT/DROP still in tree = fix-first; receipt in `delivery.md`.
+- **Review Stage 1** uses the same verdict table; JUSTIFY needs a written sentence or it fails.
+- Router phrases for “diff grew / scope creep in the PR” → review (+ ship if going live). Distinct from stakeholder `scope-defense`.
+
+### Changed
+- Build review gate names intent vs diff explicitly; skills-reference ship/review rows updated.
+
+## 3.9.15 - 2026-07-21
+
+Input hygiene from the ugly edge-case round.
+
+### Fixed
+- **ANSI / control-char smuggling** - strip C0/C1 (except tab/LF/CR) on write and on readClean so triage/prep/status cannot paint fake trust colors.
+- **Binary debrief** - refuse mostly-nonprintable notes on file *and* stdin (null bytes or control/noise density).
+- **`.fde` as a file** - resolve refuses loudly (no fake green TRIAGE); ENOTDIR messages point at repair.
+
+## 3.9.14 - 2026-07-21
+
+Field validation follow-ups: shout when the memory ledger dies silently; tighten receipts/debrief/garden.
+
+### Fixed
+- **Silent ledger death** - corrupt `.fde/.git` is a loud `fde doctor` issue (UNVERSIONED + repair hint); `fde garden` stops claiming reversibility and refuses `--apply` while broken.
+- **Receipts dirty caveat** - ON RECORD hits in hand-edited files are marked dirty.
+- **Smart debrief** - preview lines capped; `Decided:` routes to decisions.md.
+- **Garden risk dedupe** - proposes and applies consolidating identical open-risk echoes into `## Retired`.
+
+## 3.9.13 - 2026-07-21
+
+Audit → eval → deploy loop hardened in method + doctor (no schema break).
+
+### Added
+- **Exception-led operating map** in `terrain.md` + land/discover method (exceptions, workarounds, who holds knowledge).
+- **Engagement eval pack** - optional `evals.md`, `references/eval-pack.md`, AI overlay + ship gate (non-AI stays `n/a`).
+- **Value + receipts gates** on ship/close - cost-save / risk-mitigation / revenue-uplift + audit/eval receipts.
+- **`fde doctor`** warns on ship/close missing value bucket; warns for missing eval receipt only when AI is in scope.
+
+### Changed
+- `success.md` / `delivery.md` templates: primary value bucket + Ship receipts; ledger gains Bucket column.
+
+## 3.9.12 - 2026-07-21
+
+Honest privacy wording for `<private>` tags.
+
+### Changed
+- Document `<private>` as CLI/dashboard/hook redaction plus an operational rule: do not open raw private blocks with file tools or paste them into prompts.
+- Remove overclaims that tags never enter model context by themselves.
+
+## 3.9.11 - 2026-07-20
+
+Minimal field hardening for integrity and privacy without schema or workflow changes.
+
+### Fixed
+- Private signal-ledger content is redacted before prep and dashboard extraction.
+- Secret detection now applies to `next:` debrief entries.
+- Dashboard output replaces the existing fieldbook atomically.
+- Hooks delegate capture and preserve through the explicitly resolved engagement.
+- Mutation hooks prefer PATH `fde`, then plugin copies - same discovery order as session-start.
+- Preserve keeps daily deduplication atomic and commits only local memory changes.
+- Session capture derives its date and time from one consistent local timestamp.
+
+### Added
+- Focused regressions for privacy, locking, atomic replacement, hook delegation (including PATH fallback), upgrade-shaped fixtures, deduplication, and timestamps.
+
+## 3.9.10 - 2026-07-20
+
+Skill routing clarity + switch-tools docs + cheap skill eval pack.
+
+### Added
+- **Switch coding agents** - README / install / adapters state plainly: fieldbook stays on disk; install `@fde` + bind; Claude hooks are fullest; elsewhere load on demand.
+- **`evals/skill-routing/`** - contract check + live CLI smoke for happy `@fde` verbs (`npm run test:skill-routing`).
+
+### Changed
+- **Skill description** - when to use + explicit *do not use for ordinary code edits, tests, refactors, or git commits*.
+- **`fde redact`** documented in the skill CLI routing table.
+- **Trust signal** - if the human already named the color, that is the confirm.
+
+## 3.9.9 - 2026-07-19
+
+Proactive fieldbook hygiene at high-value moments only.
+
+### Added
+- **TRIAGE `hygiene:` line** - session-start / `fde triage` / `fde resume` surface doctor issues when the fieldbook has real work and gaps. Silent when clean or brand-new (day-1 templates).
+- **Phase → ship/close warn** - stderr if open risks still live.
+- **`@fde clean up the fieldbook`** - skill routes to `fde doctor`; nothing auto-rewrites.
+
+### Changed
+- **Doctor** skips day-1 empty-template nagging (phase unset / empty success / empty next action with no dated work).
+
+## 3.9.8 - 2026-07-17
+
+Launch funnel hardenings from the v3.9.7 field run.
+
+### Fixed
+- **First-run git identity noise** - memory commits pass `-c user.name` / `-c user.email` (and set local repo identity) so clean laptops with `user.useConfigOnly` never print "Please tell me who you are."
+
+### Added
+- **`fde redact <term> [--apply]`** - preview/remove buried lines (secrets noticed hours later). Undo stays last-write-only; redact commits the scrub to the ledger.
+- **`fde doctor`** - warns when phase is `ship`/`close` with open risks, and when open risks look like duplicate echoes.
+
+## 3.9.7 - 2026-07-17
+
+Defensible memory: stop laundering manual edits into the next write's commit.
+
+### Fixed
+- **Tamper laundering** - `commitMemory` stages only the files for that write (`opts.files`). Hand-edits to past records stay dirty, are warned on write, and surface in `triage` / `status` / `resume`. Init remains a full-tree commit.
+- **Memory warn on green** - unreadable / corrupt stakeholders still print when trust resolves green from the signal ledger.
+- **Receipts header** - `ON RECORD (dated - defensible):` (was `AGREED`, which mislabeled DECLINED entries).
+
+### Changed
+- **`bin/fde.js` split** - `bin/lib/memory.js` (scoped git commits), `bin/lib/trust.js` (signals / triage), `bin/lib/render.js` (dashboard). CLI entry stays command routing.
+- **`examples/fieldbook.html`** - untracked (generated; regenerate with `fde dashboard`).
+
+## 3.9.6 - 2026-07-17
+
+Adoption contract in code: human speaks natural language; agent runs the CLI.
+
+### Changed
+- **`@fde` skill** - explicit Human surface vs agent plumbing; never ask the FDE to type `fde …`; route walk-in prep to `fde prep`; prefer `fde debrief --smart` → confirm → `--apply`.
+- **`references/debrief.md`** - smart path first; agent owns the CLI.
+- **Session-start pointer + Cursor adapter** - same contract.
+- **README** - week as what you say; CLI reframed as under-the-hood map.
+
+## 3.9.5 - 2026-07-17
+
+Token discipline: SessionStart matches progressive-disclosure L1.
+
+### Changed
+- **`hooks/session-start`** no longer `cat`s the full `SKILL.md` (~24KB) into every session. Injects a one-line `@fde` pointer + TRIAGE + bounded `context.md` only. Skill body loads when `@fde` triggers.
+- check.js asserts the lean inject; CLI test covers the hook output.
+
+## 3.9.4 - 2026-07-17
+
+Revert packaging-only 3.9.3 (week-loop README / Next: line / skills-add elevate). Restore 3.9.2 docs and skill wording.
+
+## 3.9.3 - 2026-07-17
+
+Yanked from product surface - packaging clarity experiment; superseded by 3.9.4.
+
+## 3.9.2 - 2026-07-17
+
+Field judgment hardenings blended into existing methods - no new skills, no imported skill names.
+
+### Added
+- **Brief interrogation** in `land` / `discover` - one Q + GUESS + confidence when the brief is thin; never invent stakeholders to fill gaps.
+- **Anti-invention gates** in `@fde` - when not to invent, over-route, grill, or ship on vibes.
+- **Pre-blast challenge** in `ship` / `red-team` - CLAIM → CHALLENGE → VERDICT before irreversible client moves.
+
+## 3.9.1 - 2026-07-14
+
+Field-sim closeout: prep and smart debrief match how FDEs actually write memory (logs, not only tables).
+
+### Fixed
+- **`fde prep` reads log-shaped memory** - stakeholders from Signal history / ledger when the table is empty; risks from dated bullets as well as the table.
+- **`fde debrief --smart`** - infers `[signal:amber|green|red]` from contact language; person lines like “Randy opened the sheet…” route as contacts; open questions → risks; `next:` / “Next action:” updates `## Next action`.
+- Worst-of trust still holds when smart apply lands Denise amber + Randy green in one pass.
+
+## 3.9.0 - 2026-07-14
+
+Defensible memory + frictionless debrief loop. Still a field kit - not a coworker shell. Zero telemetry; CLI stays offline.
+
+### Added
+- **Versioned `.fde/`** - `git init` inside engagement memory; every log/debrief/capture/phase/garden write auto-commits. Tamper-evident receipts (`@hash` on writes). No new dependencies.
+- **Owner attribution** - `.owner` + `[@author]` on dated entries; `fde owner` / `fde owner set`.
+- **`fde triage`** - same TRIAGE block as `fde resume`; session-start hook and Cursor adapter load it on entry.
+- **`fde doctor`** - deterministic lint (stale signals, unset phase, empty success, missing next action).
+- **`fde debrief --smart` / `--apply`** - heuristic propose from messy notes → review → confirm. Prefix router unchanged for air-gap.
+- **`fde prep [label]`** - grounded walk-in brief from existing `.fde/` only (no invention).
+- **`fde garden [--apply]`** - contract: no new facts, no deleted substance, git-reversible; mechanical archive of 60d+ session-end blocks.
+- **`evals/`** - attack-our-own-tool notes shipped in-repo.
+
+### Fixed
+- Session-start now injects TRIAGE (not only raw `context.md`), matching `fde resume`.
+
+## 3.8.3 - 2026-07-14
+
+Real field-use fixes: trust colors that cannot lie at 5pm, Monday resume that earns its keep, honest phase.
+
+### Fixed
+- **Worst-of-stakeholder trust** - latest `[signal:x]` is kept per person, then the worst active color wins. A green about Randy no longer clears Denise’s sponsor amber/red.
+- **`fde resume` leads with TRIAGE** - trust, phase, open risks, next action, then engagement memory.
+- **Phase is honest** - template defaults to `unset` (not fake `land`); `fde log phase <land|discover|plan|build|ship|close>` advances it.
+
+## 3.8.2 - 2026-07-14
+
+Filesystem last-mile hardenings from brutal edge-case report v2.
+
+### Fixed
+- **Human fs errors** - permission denied / disk full / lock failures print one line and exit 1; no Node stack dumps on the field path.
+- **Atomic `resume --init`** - new engagements build in a staging dir and rename into place; partial failures clean up instead of leaving a half-built tree.
+- **Symlink write guard** - `lstat` refuses appends/writes when a memory file is a symlink (would escape the engagement tree).
+
+## 3.8.1 - 2026-07-14
+
+Field edge-case follow-ups from live multi-client / hostile-handoff review.
+
+### Fixed
+- **Secret hygiene** - `fde log` / routed `fde debrief` lines that look like credentials (AKIA…, `ghp_…`, PEM keys, etc.) are refused; pass `--force` only if intentional. `fde log --undo` removes the last CLI write.
+- **Corrupt memory ≠ green** - binary or unparseable `stakeholders.md` (or invalid `**Trust:**` value) surfaces as amber with `memory unreadable - verify`, not a healthy green.
+- **Status reason** - non-green rows prefer the triggering signal / memory warning over a random latest risk line.
+
+## 3.8.0 - 2026-07-14
+
+Trust + hygiene cut for the field kit (second brain), not an OS.
+
+### Fixed
+- **Unknown commands exit 1** - typos in scripts/hooks no longer look like success (`fde help` still exits 0).
+- **Basename match is read-only** - `log` / `debrief` / `capture` require a workspace bind, `FDEOPS_ENGAGEMENT`, pointer, or in-repo `.fde/`. A folder that merely shares a client name cannot write into that client's memory.
+- **Memory write locking** - exclusive `.lock` + atomic rename on append/rewrite paths so parallel agent sessions (or hook + CLI) do not interleave the same markdown file.
+- **Signal ledger** - CLI `[signal:x]` lines also append to `.signal-ledger` so trust colors survive an agent rewrite that drops `## Signal history`.
+
+### Docs
+- Dropped leftover “writes itself” / “never cross-contaminated” claims; clarified bind-before-write and Windows Git Bash need for bash hooks.
+
+## 3.7.8 - 2026-07-13
+
+- Adapters install places the skill pointer files reference.
+- Stakeholder signal tokens land under `## Signal history` regardless of writer/token position.
+## 5.1.20 - 2026-09-22
+
+- Make the state of an engagement change explicit across the coordinator, debrief, readout and handoff methods: on record, proposed, or customer accepted.
+- Keep saving an FDE record update separate from customer acceptance, which still requires the named acceptance owner and evidence.

@@ -1,0 +1,67 @@
+<!-- fde-scope mirror · repo: LowyShin/giip-fde-agent · license: Apache-2.0 · commit: 83d1dd0090a39b08de67f3dfa079e795b945bef6
+     upstream path: CLAUDE.md · retrieved: 2026-10-06 · verbatim; report issues upstream. -->
+
+# Claude Code Rules
+
+You are an intelligent agentic AI working on this project.
+
+## CORE INSTRUCTIONS
+1. **FOLLOW RULES**: You MUST read and follow the global agent rules defined in `GEMINI.md` and `.agent/rules/`.
+2. **USE SKILLS**: For complex coding tasks, you MUST use the skills located in `.agent/skills/`.
+   - Use `subagent-driven-development` for multi-step features.
+   - Use `writing-plans` to create `implementation_plan.md` before coding.
+   - Use `test-driven-development` (TDD) for reliability.
+   - Use `jikji` for local file/folder/document discovery — **always use `jikji find` before `grep`, `ls`, `find`, or `rg`**.
+3. **SCRIPTS**: Prefer using scripts in `.agent/scripts/` over raw commands.
+
+## GIIP PRODUCT SCOPE — HARD RULE
+
+Changes to the giip product repositories (`giipv3`, `giipdb`, `giipfaw`, `giipprj`,
+`giipAgentWin`, `giipAgentLinux`, `giipAgentAdmLinux`) must be registered and handled
+**under CSN 47 only**. This repository runs under CSN 70424 and is therefore subject to
+that rule: if a task here asks you to change a giip product repository, do not change it —
+register a new issue under CSN 47, link that issue number back in a comment on the original
+issue, and only then close the original. Never drop the request silently.
+
+`giip-fde-agent` itself is **not** a giip product repository; normal work on this repo continues
+under CSN 70424.
+
+→ `.agent/rules/51_giip_product_changes_csn47_only.md`
+
+## PROJECT RESPONSE LANGUAGE — AUTO-RESOLVED FROM CSN
+
+A project's (channel's) AI response language is resolved automatically from that project's
+CSN giipdb info (`tCorp.cLang`), not hardcoded per project. `resolveLangForProject` tries the
+CSN-based cache first, then the manual `project-lang.json` map, then `DEFAULT_LANG`, in that
+order — this is existing, working behavior, not something to reimplement.
+
+→ `.agent/rules/52_project_language_from_csn.md`
+
+## SOURCE CODE CHANGE DISCIPLINE — MANDATORY
+
+**Whenever source code changes (app code, config, templates), push immediately after that step completes.**
+
+- Do NOT accumulate changes until task end — push per step
+- 1 step = 1 commit + 1 push
+- Changes not pushed are invisible to others and cannot be deployed or reviewed
+
+```bash
+git add {changed files}
+git commit -m "{message per 11_structured_commit.md}"
+git push
+```
+
+## KARPATHY BEHAVIORAL GUIDELINES
+Follow `.agent/rules/10_karpathy_guidelines.md` for all coding tasks:
+1. **Think Before Coding** — State assumptions explicitly. Ask if uncertain. Surface tradeoffs.
+2. **Simplicity First** — Minimum code that solves the problem. Nothing speculative.
+3. **Surgical Changes** — Touch only what you must. Don't improve unrelated code.
+4. **Goal-Driven Execution** — Define success criteria. Loop until verified.
+
+## CONTEXT
+The full agent context is stored in the `.agent` directory. Always check there for project-specific conventions.
+
+## DOCKER INSTANCE — 시작할 때 부트스트랩 (giip #3535)
+docker 인스턴스에서 작업을 시작하면 먼저 `bash scripts/bootstrap-instance.sh` 를 실행하고 출력의 MISSING/WARN 을 해결한다(멱등, 비밀값 미출력).
+스크립트가 Linux 에서 안 돌면 환경을 먼저 맞추고, 그래도 안 되는 것만 스크립트를 고친다(`$env:TEMP`→`[System.IO.Path]::GetTempPath()`, 백슬래시→`Join-Path`, Windows 전용 호출→`$IsLinux` 분기).
+정본: `docs/60-operations/docker-instance-setup-rules.md` §8, 허브 `giipprj-hub` 의 `KNOW-096`.

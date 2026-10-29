@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 
 from .. import paths
-from ..fsutil import atomic_write_text
+from ..fsutil import atomic_write_text, safe_child
 from .models import SkillRecord
 
 
@@ -25,7 +25,10 @@ class SkillStore:
 
     # -- 路径 ---------------------------------------------------------------
     def _dir_for(self, skill_id: str) -> Path:
-        return self.root / skill_id
+        # Every read/write/delete funnels through here, so this is the one
+        # place that can guarantee a caller-supplied id stays a *single*
+        # segment inside ``root`` (fsutil.safe_child; see A3 / R4 review).
+        return safe_child(self.root, skill_id)
 
     def _meta_path(self, skill_id: str) -> Path:
         return self._dir_for(skill_id) / "meta.json"
@@ -39,8 +42,8 @@ class SkillStore:
         d = self._dir_for(record.id)
         d.mkdir(parents=True, exist_ok=True)
         meta = record.model_dump(exclude={"body_md"}, mode="json")
-        self._atomic_write(self._meta_path(record.id), json.dumps(meta, ensure_ascii=False, indent=2))
-        self._atomic_write(self._body_path(record.id), record.body_md)
+        atomic_write_text(self._meta_path(record.id), json.dumps(meta, ensure_ascii=False, indent=2))
+        atomic_write_text(self._body_path(record.id), record.body_md)
         self._touch_index(record)
 
     def delete(self, skill_id: str) -> None:
@@ -94,7 +97,7 @@ class SkillStore:
             for r in self.load_all()
         ]
         self.root.mkdir(parents=True, exist_ok=True)
-        self._atomic_write(self._index_path, json.dumps(entries, ensure_ascii=False, indent=2))
+        atomic_write_text(self._index_path, json.dumps(entries, ensure_ascii=False, indent=2))
 
     def _touch_index(self, record: SkillRecord) -> None:
         entries = [e for e in self.index_entries() if e["id"] != record.id]
@@ -108,9 +111,4 @@ class SkillStore:
                 "updated_at": record.updated_at.isoformat(),
             }
         )
-        self._atomic_write(self._index_path, json.dumps(entries, ensure_ascii=False, indent=2))
-
-    # -- 原子写 --------------------------------------------------------------
-    @staticmethod
-    def _atomic_write(path: Path, content: str) -> None:
-        atomic_write_text(path, content)
+        atomic_write_text(self._index_path, json.dumps(entries, ensure_ascii=False, indent=2))

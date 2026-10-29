@@ -18,6 +18,7 @@ from typing import Any
 
 from fde_scope.config import AgentSpec, TenantConfig
 from fde_scope.corpus.types import CorpusReport
+from fde_scope.fsutil import atomic_write_text
 from fde_scope.skills.models import SkillRecord
 
 
@@ -90,7 +91,7 @@ class QwenPawExporter:
                 "Answer customer tickets using only the tenant corpus. "
                 "Never access other tenants' data."
             )
-            (ws / "AGENTS.md").write_text(f"# {s.name}\n\n{prompt}\n", encoding="utf-8")
+            atomic_write_text(ws / "AGENTS.md", f"# {s.name}\n\n{prompt}\n")
             bundle.written.append(f"workspaces/{aid}/AGENTS.md")
 
         # skills/ — published 技能包（qwenpaw 格式）
@@ -98,9 +99,7 @@ class QwenPawExporter:
             from fde_scope.skills.exporters import export_many
 
             for f in export_many(skills, "qwenpaw"):
-                p = out / "skills" / f.name
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text(f.content, encoding="utf-8")
+                atomic_write_text(out / "skills" / f.name, f.content)
                 bundle.written.append(f"skills/{f.name}")
 
         # corpus.json — collection 说明
@@ -125,6 +124,5 @@ class QwenPawExporter:
 
     @staticmethod
     def _write(path: Path, data: dict[str, Any], bundle: ExportBundle) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_text(path, json.dumps(data, ensure_ascii=False, indent=2))
         bundle.written.append(str(path.relative_to(bundle.out_dir)))

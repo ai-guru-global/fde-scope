@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from html import escape
 from pathlib import Path
 
 import pytest
@@ -286,7 +287,9 @@ def test_course_rail_groups_cover_every_chapter(client) -> None:
     assert zh.count('<div class="sgrp">') == len(_GROUPS)
     en = client.get("/en/course").text
     for _zh, eng, _keys in _GROUPS:
-        assert f'<div class="sgrp">{eng}</div>' in en
+        # side_nav html-escapes captions, so "Overview & foundation" reaches the
+        # page as "&amp;" — comparing the raw label would fail on a correct page.
+        assert f'<div class="sgrp">{escape(eng)}</div>' in en
 
 
 def test_course_links_are_rewritten(client) -> None:
@@ -366,11 +369,13 @@ def test_course_task_items_become_checkboxes(client) -> None:
 
 def test_course_has_progress_and_search(client) -> None:
     """Read-progress toggles per chapter, a progress bar, and an in-page
-    filter across the 25 chapters — all client-side, zero backend
+    filter across every chapter — all client-side, zero backend
     (plan §5.4/§5.5)."""
+    from fde_scope.web.course import _CHAPTERS
+
     html = client.get("/course").text
     assert "toggleRead" in html and "refreshProgress" in html
-    assert 'class="readbtn"' in html and html.count('data-ch="') == 25
+    assert 'class="readbtn"' in html and html.count('data-ch="') == len(_CHAPTERS)
     assert 'id="cr-bar"' in html and 'id="cr-lab"' in html
     assert 'id="cr-q"' in html and "courseFilter" in html
     assert 'id="cr-empty"' in html
@@ -710,6 +715,57 @@ def test_eng_path_rejects_traversal_eid(client) -> None:
     assert exc_info.value.status_code == 400
 
 
+#: ``%2e%2e`` survives routing as one path segment (a literal ``..`` in the URL
+#: is normalised away before it ever reaches a handler) and used to resolve to
+#: the skills store's *parent* directory.
+_TRAVERSAL_SID = "%2e%2e"
+
+
+@pytest.mark.parametrize(
+    ("method", "url", "kw"),
+    [
+        ("get", "/api/skills/{sid}", {}),
+        ("patch", "/api/skills/{sid}", {"json": {"title": "x"}}),
+        ("post", "/api/skills/{sid}/publish", {}),
+        ("post", "/api/skills/{sid}/archive", {}),
+        ("post", "/api/skills/{sid}/export", {"json": {"format": "agentscope"}}),
+    ],
+)
+def test_skill_routes_refuse_traversal_sid(client, tmp_path, method, url, kw) -> None:
+    """Every ``{sid}`` route refuses instead of reading/writing outside the store."""
+    r = getattr(client, method)(url.format(sid=_TRAVERSAL_SID), **kw)
+    assert r.status_code == 400, r.text
+    assert "unsafe identifier" in r.json()["detail"]
+    # the parent of the skills dir (.fde_scope/) was not populated or emptied
+    assert not (tmp_path / ".fde_scope" / "meta.json").exists()
+    assert not (tmp_path / "meta.json").exists()
+
+
+def test_skill_delete_of_traversal_sid_leaves_the_store_intact(client, tmp_path) -> None:
+    """The pre-fix damage case: ``delete("..")`` unlinked the store's parent."""
+    created = client.post(
+        "/api/skills",
+        json={"title": "keep me", "category": "research", "tags": [], "body_md": "body"},
+    )
+    assert created.status_code == 200
+    sid = created.json()["id"]
+    assert client.patch(f"/api/skills/{_TRAVERSAL_SID}", json={"title": "x"}).status_code == 400
+    assert client.get(f"/api/skills/{sid}").status_code == 200
+
+
+@pytest.mark.parametrize("target", ["%2e%2e", "%2e%2e%2f.."])
+def test_ontology_read_routes_refuse_traversal(client, target) -> None:
+    """The ontology routes resolve ids the same way and must 400, not 500."""
+    for url in (
+        f"/api/ontology/schema/{target}",
+        f"/api/ontology/store/{target}",
+        f"/api/ontology/export/{target}",
+        f"/api/ontology/schema/{target}/diagram",
+    ):
+        r = client.get(url)
+        assert r.status_code in (400, 404), (url, r.status_code, r.text)
+
+
 def test_forge_sanitizes_upload_filename(client, tmp_path, sample_csv_bytes: bytes) -> None:
     """An upload named ../../x.csv must not escape the uploads dir."""
     r = client.post(
@@ -722,6 +778,50 @@ def test_forge_sanitizes_upload_filename(client, tmp_path, sample_csv_bytes: byt
     assert not (tmp_path / "x.csv").exists()
 
 
+def test_forge_refuses_a_dotdot_filename(client, tmp_path, sample_csv_bytes: bytes) -> None:
+    """``Path("..").name`` is still ``..``, so taking the basename is not a
+    guard on its own. Before safe_child this resolved onto the uploads dir
+    itself and died as a 500."""
+    r = client.post(
+        "/api/forge",
+        files={"file": ("..", sample_csv_bytes, "text/csv")},
+        data={"min_samples": "5", "synth_per_gap": "2"},
+    )
+    assert r.status_code == 400, r.text
+    assert "unsafe identifier" in r.json()["detail"]
+    assert not list((tmp_path / ".fde_scope" / "uploads").iterdir())
+
+
+def test_forge_upload_is_owner_readable_only(client, tmp_path, sample_csv_bytes: bytes) -> None:
+    """The uploaded CSV is customer data that has *not* passed the scrub stage
+    yet, so it must not land world-readable: fsutil's mkstemp creates 0600,
+    ``Path.write_text`` created 0644."""
+    r = client.post(
+        "/api/forge",
+        files={"file": ("tickets.csv", sample_csv_bytes, "text/csv")},
+        data={"min_samples": "5", "synth_per_gap": "2"},
+    )
+    assert r.status_code == 200
+    up = tmp_path / ".fde_scope" / "uploads" / "tickets.csv"
+    assert up.stat().st_mode & 0o077 == 0
+
+
+def test_evidence_refuses_a_dotdot_name(client, tmp_path) -> None:
+    """Evidence (signed FAT/SAT scans) is the same customer-derived class of
+    file; ``name=..`` must be refused instead of replacing a directory."""
+    r = client.post("/api/engagements", data={"customer": "CritCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.post(
+        f"/api/engagements/{eid}/evidence",
+        data={"name": ".."},
+        files={"file": ("whatever.txt", b"scan", "text/plain")},
+    )
+    assert r.status_code == 400, r.text
+    assert "unsafe identifier" in r.json()["detail"]
+    stored = list((tmp_path / ".fde_scope" / "evidence" / eid).iterdir())
+    assert stored == []
+
+
 def test_update_context_rejects_string_success_criteria(client) -> None:
     """success_criteria must be a list of strings; a bare string is 422 and
     must not corrupt the persisted engagement."""
@@ -731,6 +831,22 @@ def test_update_context_rejects_string_success_criteria(client) -> None:
     assert r.status_code == 422
     # the engagement is still intact and loadable afterwards
     r = client.get(f"/api/engagements/{eid}")
+    assert r.status_code == 200
+
+
+def test_update_context_rejects_a_non_object_assets_container(client) -> None:
+    """Asset *values* stay free-form, but the container has to be an object:
+    ``assets`` as a string or number reached ``dict.update`` directly and
+    surfaced as a 500, and a list of pairs merged silently as keys."""
+    r = client.post("/api/engagements", data={"customer": "CritCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    for bad in ("kv", 7, ["k", "v"]):
+        r = client.post(f"/api/engagements/{eid}/context", json={"assets": bad})
+        assert r.status_code == 422, f"assets={bad!r} → {r.status_code}"
+    # nothing half-merged, and the engagement still loads
+    assert client.get(f"/api/engagements/{eid}").json()["engagement_id"] == eid
+    # an odd value shape is *not* rejected here — gates interpret assets
+    r = client.post(f"/api/engagements/{eid}/context", json={"assets": {"fat": "done"}})
     assert r.status_code == 200
 
 
@@ -1598,6 +1714,7 @@ DETAIL_TAB_NAMES = (
     "evidence",
     "handoff",
     "audit",
+    "retro",
 )
 
 
@@ -1621,7 +1738,10 @@ def test_console_detail_tab_strip_and_panes_line_up(client) -> None:
 def test_console_evidence_handoff_audit_load_lazily(client) -> None:
     """The three P1 tabs fetch on open, keeping selectEng at its 3 blocking calls."""
     html = client.get("/console").text
-    assert "const LAZY_TABS = {evidence: loadEvidence, handoff: renderHandoff, audit: loadAudit};" in html
+    assert (
+        "const LAZY_TABS = {evidence: loadEvidence, handoff: renderHandoff, audit: loadAudit, retro: loadRetro};"
+        in html
+    )
     assert "const lazy = LAZY_TABS[name];" in html
     # tab() must be callable without an element argument, or the #t:<name> hash
     # restore path cannot activate a pane
@@ -1997,7 +2117,7 @@ def test_engineer_rail_links_stay_in_app(client) -> None:
     repo docs and the GTM site are all local pages, and no anchor anywhere on
     these shells jumps off-site. (The certification page's provenance URLs are
     deliberately plain text, so they pass this too.)"""
-    zh_pages = ("/", "/console", "/course", "/glossary", "/certification", "/sop")
+    zh_pages = ("/", "/console", "/course", "/glossary", "/certification", "/sop", "/resources")
     for path in zh_pages:
         page = client.get(path).text
         assert _SOP_GITHUB not in page, path
@@ -2005,9 +2125,18 @@ def test_engineer_rail_links_stay_in_app(client) -> None:
         assert ">SOP 全文</a>" in page, path
         assert '<a href="/catalog/index.html">技能手册库</a>' in page, path
         assert '<a href="/docs/readme">仓库文档</a>' in page, path
+        assert ">GitHub 资源</a>" in page, path  # matches plain and active form
         assert '<a href="/GTM/index.html">GTM 官网</a>' in page, path
         assert 'href="http' not in page, path  # nothing jumps off-site at all
-    en_pages = ("/en/", "/en/console", "/en/course", "/en/glossary", "/en/certification", "/en/sop")
+    en_pages = (
+        "/en/",
+        "/en/console",
+        "/en/course",
+        "/en/glossary",
+        "/en/certification",
+        "/en/sop",
+        "/en/resources",
+    )
     for path in en_pages:
         page = client.get(path).text
         assert _SOP_GITHUB not in page, path
@@ -2015,8 +2144,64 @@ def test_engineer_rail_links_stay_in_app(client) -> None:
         assert ">SOP full text</a>" in page, path
         assert '<a href="/catalog/en/index.html">Skills handbook</a>' in page, path
         assert '<a href="/en/docs/readme">Repo docs</a>' in page, path
+        assert ">GitHub resources</a>" in page, path
         assert '<a href="/GTM/en/index.html">GTM site</a>' in page, path
         assert 'href="http' not in page, path
+
+
+def test_resources_page_zh_renders_the_harvest(client) -> None:
+    """/resources renders every packaged record as a card and keeps each
+    upstream GitHub URL inert. Fields are read from ``resources.yaml`` rather
+    than hardcoded, so the assertion survives a re-harvest (plan step 7: the
+    zh fetch test)."""
+    import html as html_mod
+
+    from fde_scope.resources.repo import load_resources
+
+    r = client.get("/resources")
+    assert r.status_code == 200
+    assert '<html lang="zh">' in r.text
+    assert "__ICON_SPRITE__" not in r.text  # placeholder filled by app.py
+    assert 'id="res-q"' in r.text and 'oninput="resFilter()"' in r.text
+
+    records = load_resources()
+    assert r.text.count('<div class="card rcard"') == len(records)
+
+    probe = sorted(records, key=lambda x: x.slug)[0]
+    esc_url = html_mod.escape(probe.url, quote=True)
+    assert f"<code>{esc_url}</code>" in r.text  # URL shown as inert text
+    assert f'href="{esc_url}"' not in r.text  # ...never as a live link
+    assert 'href="http' not in r.text  # nothing jumps off-site at all
+
+    mirrored = next((x for x in records if x.mirror and x.files), None)
+    assert mirrored is not None
+    assert f"docs/github-resources/mirror/{mirrored.mirror_dir}" in r.text
+
+
+def test_resources_page_en_keeps_chinese_out(client) -> None:
+    """/en/resources is rendered from ``render('en')``, not a to_en pass, so our
+    own UI chrome must not leak Chinese — above all the stored licence decision
+    (translated via ``_DECISION_CLAUSES_EN``). Two things are source-language on
+    purpose and are stripped first, exactly as the glossary strips its source
+    ``alias``: the ``data-t`` search haystacks (machine-read, they carry the zh
+    summary) and the ``.r-up`` blocks (the upstream description verbatim, which
+    GitHub authors may write in Chinese)."""
+    import re
+
+    from fde_scope.web.resources import _DECISION_CLAUSES_EN
+
+    r = client.get("/en/resources")
+    assert r.status_code == 200
+    assert '<html lang="en">' in r.text
+    assert "permissive licence" in r.text  # a translated clause really rendered
+
+    stripped = r.text.replace('<a class="lang" href="/resources">中文</a>', "")
+    stripped = re.sub(r'data-t="[^"]*"', "", stripped)  # machine-read haystack
+    stripped = re.sub(r'<p class="r-up">.*?</p>', "", stripped)  # upstream verbatim
+    leaked = [ln for ln in stripped.splitlines() if re.search(r"[一-鿿]", ln)]
+    assert leaked == []
+    for zh_clause in _DECISION_CLAUSES_EN:
+        assert zh_clause not in stripped
 
 
 def test_reading_pages_are_public() -> None:
@@ -2027,12 +2212,18 @@ def test_reading_pages_are_public() -> None:
     for path in (
         "/sop",
         "/en/sop",
+        "/showcase",
+        "/en/showcase",
+        "/resources",
+        "/en/resources",
         "/catalog/index.html",
         "/catalog/en/index.html",
         "/GTM/",
         "/GTM/index.html",
         "/GTM/en/",
         "/GTM/en/index.html",
+        "/gh-resources/site/index.html",
+        "/gh-resources/site/en/index.html",
         "/docs/images/overview.png",
         "/docs/images/console.png",
     ):
@@ -2407,3 +2598,83 @@ def test_fallback_notices_are_wellformed(client) -> None:
             for name in names:
                 notice = getattr(webapp, name, None)
                 assert notice is not None and "DOCTYPE" in notice and "/static/favicon.svg" in notice, name
+
+
+# ---------------------------------------------------------------------------
+# course lab grading（实验判分：学习页与执行引擎共用 run_lab）
+# ---------------------------------------------------------------------------
+def test_course_labs_registry_endpoint(client) -> None:
+    labs = client.get("/api/course/labs").json()
+    assert [lab["day"] for lab in labs] == ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"]
+    assert all(lab["gate"] and lab["deliverable"] and lab["checks"] > 0 for lab in labs)
+    assert labs[0]["gate"] == "G1" and labs[-1]["gate"].startswith("G8")
+
+
+def test_course_doctor_endpoint(client) -> None:
+    body = client.get("/api/course/doctor").json()
+    assert body["gate"] == "G0"
+    assert body["exit_code"] == 0  # a healthy checkout grades nothing but passes G0
+    assert body["ok"] is True
+    assert body["items"] and all("id" in item for item in body["items"])
+
+
+def test_course_lab_grade_unknown_day_404(client) -> None:
+    r = client.post("/api/course/labs/D9/grade")
+    assert r.status_code == 404
+
+
+def test_course_lab_grade_d1_is_green_cold(client) -> None:
+    """D1 grades no writing, so the API path must be green on a cold machine —
+    same oracle the verifier's own ``run_all`` test pins (81/10/9 overall)."""
+    body = client.post("/api/course/labs/D1/grade").json()
+    assert body["ok"] is True, body
+    assert body["failed"] == 0
+    assert body["passed"] > 0
+    assert all(c["status"] in ("pass", "manual") for c in body["checks"])
+
+
+def test_course_page_carries_the_grading_panel(client) -> None:
+    html = client.get("/course").text
+    assert 'id="lab-grading"' in html
+    assert "labGrade" in html and "labDoctor" in html
+    assert 'data-day="D1"' in html
+    en = client.get("/en/course").text
+    assert "Lab grading" in en and "Day 8 · Monetise" in en
+
+
+# ---------------------------------------------------------------------------
+# retrospective（复盘：SLA 时钟 + 时间线 + gate 统计）
+# ---------------------------------------------------------------------------
+def test_retrospective_endpoint_after_web_create(client) -> None:
+    r = client.post("/api/engagements", data={"customer": "RetroCo", "profile": "ticket"})
+    eid = r.json()["engagement_id"]
+    r = client.get(f"/api/engagements/{eid}/retrospective")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["engagement_id"] == eid
+    assert body["start_source"] == "engagement.create"
+    assert body["advances_ok"] == 0
+    assert body["advances_blocked"] == 0
+    assert body["timeline_consistent"] is True
+    assert [m["key"] for m in body["sla"]] == ["first_integration", "production", "disengage"]
+    assert body["data_sources"][0].startswith("audit.jsonl")
+
+
+def test_retrospective_endpoint_unknown_engagement_404(client) -> None:
+    r = client.get("/api/engagements/eng-ghost/retrospective")
+    assert r.status_code == 404
+
+
+def test_retrospective_after_advance_and_gate(client) -> None:
+    eid = client.post("/api/engagements", data={"customer": "FlowCo", "profile": "ticket"}).json()[
+        "engagement_id"
+    ]
+    assert client.post(f"/api/engagements/{eid}/advance").json()["advanced"] is True
+    gate_r = client.post(f"/api/engagements/{eid}/gate/success_criteria").json()
+    assert gate_r["passed"] is False  # 无 sponsor / 无标准 → 被拦
+    body = client.get(f"/api/engagements/{eid}/retrospective").json()
+    assert body["advances_ok"] == 1
+    sc = next(g for g in body["gates"] if g["slug"] == "success_criteria")
+    assert sc["source"] == "audit"
+    assert sc["first_pass"] is False
+    assert body["gate_first_pass_rate"] == 0.0

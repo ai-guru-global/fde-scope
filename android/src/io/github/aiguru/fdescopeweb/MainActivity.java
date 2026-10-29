@@ -170,10 +170,9 @@ public class MainActivity extends Activity {
         card.setPadding(dp(24), dp(26), dp(24), dp(22));
         GradientDrawable cardBg = new GradientDrawable();
         cardBg.setColor(getColor(R.color.fde_panel));
-        cardBg.setCornerRadius(dp(10));
+        cardBg.setCornerRadius(dp(4));
         cardBg.setStroke(dp(1), getColor(R.color.fde_border));
         card.setBackground(cardBg);
-        card.setElevation(dp(3));
 
         TextView title = new TextView(this);
         title.setText("连接 FDE Scope");
@@ -252,7 +251,7 @@ public class MainActivity extends Activity {
         b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         b.setTextColor(getColor(R.color.fde_accent_ink));
         b.setPadding(dp(14), dp(12), dp(14), dp(12));
-        b.setBackground(fillBg(getColor(R.color.fde_accent), getColor(R.color.fde_accent_2), dp(7)));
+        b.setBackground(fillBg(getColor(R.color.fde_accent), getColor(R.color.fde_accent_2), dp(4)));
         b.setOnClickListener(onClick);
         return b;
     }
@@ -267,7 +266,7 @@ public class MainActivity extends Activity {
         b.setPadding(dp(14), dp(12), dp(14), dp(12));
         GradientDrawable content = new GradientDrawable();
         content.setColor(getColor(R.color.fde_panel));
-        content.setCornerRadius(dp(7));
+        content.setCornerRadius(dp(4));
         content.setStroke(dp(1), getColor(R.color.fde_border));
         b.setBackground(rippleWith(content, getColor(R.color.fde_panel2)));
         b.setOnClickListener(onClick);
@@ -320,7 +319,7 @@ public class MainActivity extends Activity {
 
     private Drawable ghostBg() {
         GradientDrawable content = new GradientDrawable();
-        content.setCornerRadius(dp(6));
+        content.setCornerRadius(dp(2));
         content.setColor(Color.TRANSPARENT);
         return rippleWith(content, getColor(R.color.fde_panel2));
     }
@@ -349,7 +348,7 @@ public class MainActivity extends Activity {
     private Drawable inputBg(boolean focused) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(getColor(R.color.fde_code));
-        d.setCornerRadius(dp(7));
+        d.setCornerRadius(dp(4));
         d.setStroke(dp(1), focused
                 ? getColor(R.color.fde_accent)
                 : getColor(R.color.fde_border_strong));

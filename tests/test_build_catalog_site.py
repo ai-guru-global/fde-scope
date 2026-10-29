@@ -61,6 +61,50 @@ def test_render_markdown_escapes_hostile_headings_and_tables() -> None:
     assert "<table>" in out
 
 
+def test_narrow_nav_grows_to_two_rows_and_moves_the_anchor_offset() -> None:
+    """On a phone the bar has two rows, so ``--nav-h`` has to travel with it.
+
+    ``[id]{scroll-margin-top:calc(var(--nav-h) + var(--sp3))}`` is what keeps a
+    zone heading clear of the sticky bar. A breakpoint that wraps the bar without
+    re-publishing the token leaves every anchor landing under the bar, and because
+    the portal clips ``body`` overflow horizontally, a single-row bar instead
+    pushes the language and theme toggles off-screen (measured at 375px: x=417..530).
+    """
+    bs = _load()
+    block = re.search(r"@media\(max-width:720px\)\{(.*?)\n\}", bs.CHROME, re.S)
+    assert block, "the narrow breakpoint rule is missing from CHROME"
+    css = block.group(1)
+    assert "--nav-h:" in css, "a two-row bar must re-publish --nav-h on :root"
+    assert re.search(r"\.nav\{[^}]*display:grid", css)
+    assert '"search search"' in css, "the search field must own its own full-width row"
+    assert "width:150px" not in bs.CHROME, "a clipped search field is what made the row overflow"
+
+
+def test_status_echo_collapses_glyph_redundant_with_its_own_word() -> None:
+    """``✅ 已安装`` says the state twice; the prose keeps the word, the glyph goes."""
+    bs = _load()
+    assert bs.render_inline("状态：✅ 已安装（firecrawl 插件）", "zone-a/x", set()) == (
+        "状态：已安装（firecrawl 插件）"
+    )
+    for glyph, word in (("✅", "已安装"), ("📦", "可安装"), ("⚰️", "已移除")):
+        assert glyph not in bs.render_inline(f"{glyph} {word}", "zone-a/x", set())
+
+
+def test_standalone_status_glyphs_and_code_samples_survive() -> None:
+    """The handbook names states with the glyph itself, and never edits the archive.
+
+    Also guards the other route to the page body: fenced blocks bypass
+    ``render_inline`` entirely, so an ``✅ 已安装`` shown as a worked example must
+    survive verbatim.
+    """
+    bs = _load()
+    out = bs.render_inline("把该页从 📦 改 ✅", "zone-a/x", set())
+    assert "📦" in out and "✅" in out
+    assert "✅ 已安装" in bs.render_inline("`✅ 已安装`", "zone-a/x", set())
+    md = "# t\n\n```\n状态：✅ 已安装\n```\n"
+    assert "状态：✅ 已安装" in bs.render_markdown(md, "zone-a/x", set())
+
+
 def _hostile_catalog(tmp_path: Path) -> None:
     zone = tmp_path / "zone-a-pre-engagement"
     zone.mkdir()

@@ -237,46 +237,47 @@ split**，手改产物会被测试判红。
 4. [ ] 无自测/进度：补一个纯前端、无后端的样题自测（`<details>` 已证明可零 JS，自测需少量 JS，走既有内联模式）。
 5. [ ] 把 `p(zh,en)` 模式提炼为 §10.1 i18n 迁移的范式样板（文档化，不改行为）。
 
-## §4 `/glossary`（`web/glossary.py`，386 行）
+## §4 `/glossary`（`web/glossary.py`，412 行）
 
-现状：静态 `dl/dt/dd` 卡片，7 个主题组 `_GROUPS`（`:24-174`）；i18n 来自 `i18n.GLOSSARY_ZH/EN`（`:20,:266-267`，**真正的平行列表**）；`_EN_TERM` 17 条 CJK→EN 标签（`:179-197`），其完整性由测试钉住（`:10-14` docstring）；`tips[term]` **未转义插入**（仅因数据是常量才安全）。
+现状：静态 `dl/dt/dd` 卡片，7 个主题组 `_GROUPS`（`:26-176`）；i18n 来自 `i18n.GLOSSARY_ZH/EN`（**真正的平行列表**）；`_EN_TERM`（`:181`）其完整性由测试钉住；`tips[term]`、术语名与别名**全部经 `html.escape`**（`:386,:389-390`）——原「未转义插入」已收口。
 
-1. [ ] **≈80 个术语却没有搜索框** → 补纯前端即时过滤（输入框 + `aria-label` + 命中高亮 + 「无结果」态）。
+1. [x] **≈80 个术语却没有搜索框** → 补纯前端即时过滤（输入框 + `aria-label` + 命中高亮 + 「无结果」态）。✅ `<input id="gl-q" type="search" aria-label>`（`glossary.py:358`），haystack 同时覆盖术语/别名/释义（`:386`）
 2. [x] P0-8 嵌套 sprite（`:293`）。✅ 改为裸 `__ICON_SPRITE__`（占位符自带外层 `<svg>`）；**注**：原「嵌套非法」判定经截图对比证伪，本条为一致性修复
-3. [ ] `tips[term]` 未转义：即使当前安全，也改为经 `html.escape` 后插入，消除「以后有人加动态数据就变 XSS」的地雷。
-4. [ ] `docs/features.md:133` 宣称「术语释义独立成页」，实际是**同页卡片** → P3 改文档（或真做独立页，成本更高、收益更低，选改文档）。
-5. [ ] 补锚点深链与「回到顶部」，与 certification 一致。
+3. [x] `tips[term]` 未转义：即使当前安全，也改为经 `html.escape` 后插入，消除「以后有人加动态数据就变 XSS」的地雷。✅ `glossary.py:386,:389-390`
+4. [x] `docs/features.md:133` 宣称「术语释义独立成页」，实际是**同页卡片** → P3 改文档（或真做独立页，成本更高、收益更低，选改文档）。✅ `features.md:133` 现为「名词解释(全部术语按主题分组,**同页卡片+即时搜索**)」；选改文档这条路
+5. [x] 补锚点深链与「回到顶部」，与 certification 一致。✅ 字母分组锚点作为 `side_nav` 叶子条目（`glossary.py:305,:331`）；`<a href="#top" class="totop">`（`:400`）
 
-## §5 `/course`（`web/course.py`，708 行）
+## §5 `/course`（`web/course.py`，791 行）
 
-现状：**实时渲染仓库根 `course-level-1/` 下 25 篇 Markdown**（`_CHAPTERS :49-250`）；wheel 安装缺失提示（`:667-685`）；单篇不可读提示（`:649-662`）；5 组导航栏（`:256-270`）；Markdown 管道转义安全（`html:False`，`:283`），并在 `<pre>` 外刻意把 `&lt;br&gt;` 还原成 `<br>`（`:431-435`）；外部 http/mailto 链接**降级为纯文本标签**（`:387-397`）。i18n 部分双语：外壳 + 25 个标题双语，**正文在两种语言下都是中文**，EN 下给出提示（`:617-628`）并用 `lang="zh-Hans"` 包裹（`:664`）——这是诚实做法，保留。
+现状：**实时渲染仓库根 `course-level-1/` 下 26 篇 Markdown**（`_CHAPTERS :66-275`）；wheel 安装缺失提示（`:752-770`）；单篇不可读提示（`:732-745`）；6 组导航栏（`_GROUPS :286-308`）；Markdown 管道转义安全（`{"html": False}`，共享模块 `mdrender.py:50`），并在 `<pre>` 外刻意把 `&lt;br&gt;` 还原成 `<br>`（`course.py:445`）；外部 http/mailto 链接**降级为纯文本标签**（`:393`）。i18n 部分双语：外壳 + 26 个标题双语，**正文在两种语言下都是中文**，EN 下给出提示（`:684-693`）并用 `lang="zh-Hans"` 包裹（`:746`）——这是诚实做法，保留。篇数不再手写：`len(_CHAPTERS)` 在进度条、搜索框 placeholder 与提示语里现算（`:688,:700,:705,:758`）。
 
-1. [x] P0-5 打包（最高优先，否则发行版整页空）。✅ 见 P0-5：课程随 wheel/sdist 分发，干净 venv 实测 zh 770,509 / en 772,456 字符、227 个 `<h3`、无缺目录提示
-2. [ ] **统计靠数字符串**：`count("<h3")`、`count("<pre")`、`count("☐")`（`:514-519`）→ 改为在 Markdown 渲染阶段用 token 流统计（结构化，不再被正文里的字面量污染）。
-3. [x] `heading_close` 绑到 `_heading_open`（`:363-364`，mypy 报错源）→ 随 P0-2 一并修。✅ **偏差**：未用 `cast`——`RendererHTML.rules` 存的是实例 bound method，赋普通函数仍报 `[assignment]`；改为 `class _DemotingRenderer(RendererHTML)`（`course.py:289`）覆写 `heading_open`/`heading_close`，经 `MarkdownIt(..., renderer_cls=)`（`:309`）注入，是 markdown-it-py 官方覆写路径
-4. [ ] **无阅读进度** → 纯前端 `localStorage` 记录每篇已读（与主题偏好 `localStorage['fde-theme']` 同一模式，零后端）。
-5. [ ] **无页内搜索** → 25 篇同页，补前端过滤（标题 + 正文）。
-6. [ ] `☐` 练习项是纯文本、不可勾选 → 变为可勾选并计入进度（仍纯前端）。
+1. [x] P0-5 打包（最高优先，否则发行版整页空）。✅ 见 P0-5：课程随 wheel/sdist 分发，干净 venv 实测 zh 770,509 / en 772,456 字符、227 个 `<h3`、无缺目录提示。**2026-10-08 复测**（第 26 篇 `24-开源对标与来源清单.md` 落地后，`TestClient` 直渲染）：`/course` 902,986 / `/en/course` 905,444 字符、两页均 **241** 个 `<h3`、无「读不到课程文件」提示
+2. [x] **统计靠数字符串**：`count("<h3")`、`count("<pre")`、`count("☐")`（`:514-519`）→ 改为在 Markdown 渲染阶段用 token 流统计（结构化，不再被正文里的字面量污染）。✅ `_structured_stats()`（`course.py:449`，调用点 `:602`）；fence 内字面量不再污染计数，`tests/` 侧改为排除 fence 行后逐一对账
+3. [x] `heading_close` 绑到 `_heading_open`（`:363-364`，mypy 报错源）→ 随 P0-2 一并修。✅ **偏差**：未用 `cast`——`RendererHTML.rules` 存的是实例 bound method，赋普通函数仍报 `[assignment]`；改为子类覆写 `heading_open`/`heading_close`，经 `MarkdownIt(..., renderer_cls=)` 注入，是 markdown-it-py 官方覆写路径。**后续**：该子类随 §7 第 4 条被提到共享模块，现为 `mdrender.py:25 class DemotingRenderer(RendererHTML)`（`:34-43`），course 侧只留 `_MD = demoting_markdown()`（`course.py:343`）
+4. [x] **无阅读进度** → 纯前端 `localStorage` 记录每篇已读（与主题偏好 `localStorage['fde-theme']` 同一模式，零后端）。✅ `_store/_save`（`course.py:515-516`）+ 每章「标记已读」+ 顶部 `role="progressbar"` `#cr-bar`/`#cr-lab`（`:536,:697-700`），刷新后保持
+5. [x] **无页内搜索** → 26 篇同页，补前端过滤（标题 + 正文）。✅ `<input id="cr-q" type="search">`（`:703`）+ `#cr-count`（`aria-live`）+ 空态 `#cr-empty`（`:709`）
+6. [x] `☐` 练习项是纯文本、不可勾选 → 变为可勾选并计入进度（仍纯前端）。✅ 渲染时把 `- [ ]` 改写为 `<li class="task"><input type="checkbox" class="taskbox" aria-label="practice">`（`:441`），状态按 章+序号 存 `localStorage`（`:541,:554`），勾选同步推进顶部进度条
 
-## §6 `/sop`（`web/sop.py`，300 行）
+## §6 `/sop`（`web/sop.py`，333 行）
 
-现状：渲染单一文档 `docs/fde_sop_full.md`（`:37-38`）；`##` → id `s01…`（`:50-63`）；文件缺失提示（`:260-277`）；英雄标题与文档 H1 逐字节一致由漂移测试钉住（`:160-161`）。
+现状：渲染单一文档 `docs/fde_sop_full.md`（`_SOP_FILENAME :43`）；`##` → id `s01…`（`_SopRenderer.heading_open :64-84`，token 流内完成）；文件缺失提示（`:182` 起，走**文件**而非目录，与 `course.py` 不同）；英雄标题改为**配对字面量**，zh 侧与文档 H1 逐字节一致、由 `tests/test_web.py` 的漂移测试钉住（`:197-200`）。
 
-1. [ ] **导航栏标签是从自己渲染出的 HTML 里用正则 `_H3`（`:45`）刮出来的，并在全角 `（` 处截断（`:74-76`）→ EN 页面的导航栏还是中文**（`:14-17` docstring 自认）→ 改为从 token 流拿标题结构，EN 下走配对字面量或术语表。
-2. [x] P0-2 mypy（`:66-67`）、P0-8 sprite（`:189`）。✅ `class _SopRenderer(RendererHTML)`（`sop.py:49`）+ `renderer_cls=`（`:72`）；sprite 改裸占位符
-3. [ ] 补 18 阶段与 `/console` SOP tab 的双向深链（页面间目前互不相通）。
-4. [ ] 补当前阶段高亮（有 engagement 上下文时），无上下文时保持纯文档态。
+1. [x] **导航栏标签是从自己渲染出的 HTML 里用正则 `_H3`（`:45`）刮出来的，并在全角 `（` 处截断（`:74-76`）→ EN 页面的导航栏还是中文**（`:14-17` docstring 自认）→ 改为从 token 流拿标题结构，EN 下走配对字面量或术语表。✅ `_sections_from_tokens()`（定义 `:115`，调用点 `:206`）直接吃 `_MD.parse` 的 token 流；EN rail 带 7 节配对字面量，未知标题回退 zh 不硬译；docstring 已改写为「never scraped back out of rendered HTML」（`:27-29`）。`_H1` 仍保留（`:45`），但只用于剥掉文档标题，**不再充当 rail 来源**
+2. [x] P0-2 mypy（`:66-67`）、P0-8 sprite（`:189`）。✅ `class _SopRenderer(RendererHTML)`（`sop.py:64`）+ `MarkdownIt(..., renderer_cls=_SopRenderer)`（`:87`）；sprite 改裸占位符
+3. [x] 补 18 阶段与 `/console` SOP tab 的双向深链（页面间目前互不相通）。✅ `sop.py:274` → `/console`；`app.py:2890`（SOP tab 内「阅读 SOP 全文」）→ `/sop`；zh/en 两侧均已接通
+4. [ ] 补当前阶段高亮（有 engagement 上下文时），无上下文时保持纯文档态。**仍未做**——`/sop` 是纯静态渲染，不读 engagement 状态；`sop.py` 里除 `:272` 的文案外没有任何 engagement 引用（2026-10-08 实测）
 
-## §7 `/docs/{slug}`（`web/docs_reader.py`，446 行）
+## §7 `/docs/{slug}`（`web/docs_reader.py`，479 行）
 
-现状：20 个 slug → 仓库文件（`_DOCS :59-100`）；未知 slug → 404（`app.py:1155-1161`）；图片白名单**只有** `("overview.png","console.png")`（`:55,:149-159`）；GitHub 风格标题锚点（`:114-120`）；`<a id>` 标记上提到下一个标题（`:199-246`）；`_repo_target`（`:162-180`）把文档交叉引用改写为站内路由（`/sop`、`/course#doc-*`、`/catalog/`、`/GTM/`）。EN 外壳双语，正文「served as authored」并给提示（`:402-409`）。
+现状：20 个 slug → 仓库文件（`_DOCS :57-98`）；未知 slug → 404（路由 `app.py:1733`）；图片白名单**由 `docs/images/` 目录推导**（`_repo_images :139-152`，`image_path :153-164` 是唯一解析通道，目录外的路径无法被取出）；GitHub 风格标题锚点（`_slug :123`）；`<a id>` 标记上提到下一个标题（`_EXPLICIT_ANCHOR :106`，`_preprocess :229` 内）；`_repo_target`（`:166-189`）把文档交叉引用改写为站内路由（`/sop`、`/course#doc-*`、`/catalog/`、`/GTM/`）；每篇文档生成 TOC（`_toc_html :297`，插入点 `:445`）。EN 外壳双语，正文「served as authored」并给提示（`:402`）。
 
-1. [ ] **无每篇文档的目录/子导航** → 从标题 token 生成右侧/顶部 TOC（长文档如 `architecture.md` 尤其需要）。
-2. [ ] **「Repo docs」链接恒为 `{base}/docs/readme` 且硬编码 `class="active"`（`:369`）**，看别的 slug 时也高亮 readme → 按当前 slug 计算 active。
-3. [ ] `_resolve_href` 对任何以 `/` 开头的 href **原样透传不校验**（`:187-188`）→ 收敛到站内已知路由白名单，未知则降级纯文本（与 course 的外链策略一致）。
-4. [ ] 从 `course.py` 导入私有 helper（`:44-52`，已承认耦合）→ 提到 `layout.py` 或新 `mdrender.py` 共享模块。
-5. [x] P0-2 mypy（`:141-142`）、P0-8 sprite（`:353`）。✅ `class _DocsRenderer(_DemotingRenderer)`（`docs_reader.py:113`）+ `renderer_cls=`（`:135`）；sprite 改裸占位符。**连带**：本页复用 `course.py` 的私有 `_DemotingRenderer`，即下面第 4 条要拆的耦合——P2 抽 `mdrender.py` 时一并收口
-6. [ ] 图片白名单随 `docs/images/` 实际内容自动推导，避免新增图即 404。
+1. [x] **无每篇文档的目录/子导航** → 从标题 token 生成右侧/顶部 TOC（长文档如 `architecture.md` 尤其需要）。✅ `##`/`###` 大纲在 `_preprocess` 收集（`:232,:252,:264`），`_toc_html()` 渲染（`:297`，插入点 `:445`），锚点逐个验证存在
+2. [x] **「Repo docs」链接恒为 `{base}/docs/readme` 且硬编码 `class="active"`（`:369`）**，看别的 slug 时也高亮 readme → 按当前 slug 计算 active。✅ `docs_reader.py:405`：`side_nav("docs" if slug == "readme" else "")`，高亮判定收口到 `layout.py:171`
+3. [x] `_resolve_href` 对任何以 `/` 开头的 href **原样透传不校验**（`:187-188`）→ 收敛到站内已知路由白名单，未知则降级纯文本（与 course 的外链策略一致）。✅ `_resolve_href :211-227`：`/` 开头须命中 `_STATIC_HREFS :191-207` 或 `_HREF_PREFIXES :208`，否则 `None`；`http/https/mailto` 一律 `None`（`:220`）
+4. [x] 从 `course.py` 导入私有 helper（`:44-52`，已承认耦合）→ 提到 `layout.py` 或新 `mdrender.py` 共享模块。✅ 新模块 `web/mdrender.py`（`DemotingRenderer :25-43`、`demoting_markdown :45`、`fenced_indices :55`、`rewrite_outside_fences :76`、`normalize_path :102`、`MD_IMAGE :18`）；course 另暴露公共映射 `COURSE_FILES`（`course.py:280`），docs reader 不再伸手进私有表
+5. [x] P0-2 mypy（`:141-142`）、P0-8 sprite（`:353`）。✅ `class _DocsRenderer(DemotingRenderer)`（`docs_reader.py:110`）+ `_MD = demoting_markdown(_DocsRenderer)`（`:132`）；sprite 改裸占位符。**连带**：原「复用 `course.py` 私有 `_DemotingRenderer`」的耦合已随上面第 4 条拆掉——现在两边都继承 `mdrender.DemotingRenderer`，本条即收口点
+6. [x] 图片白名单随 `docs/images/` 实际内容自动推导，避免新增图即 404。✅ `_repo_images()`（`:139-152`）列目录并排序，`_resolve_href`/`image_path` 只认这份实时清单（`:181-183,:269`）
+
 
 ## §8 `/catalog/`（`scripts/build_catalog_site.py` 917 行生成，`make build-site`）
 
@@ -429,10 +430,14 @@ split**，手改产物会被测试判红。
   同时覆盖术语/别名/释义）；`tips[term]` 与别名全部 `html.escape`（拆掉将来动态数据的
   XSS 地雷）；回到顶部锚点。
 - **§5 course**：统计改 **token 流**（fence 里的字面量不再污染数字——测试同步改为
-  排除 fence 行后对账，234 个练习项与渲染出的复选框数**逐个相等**）；`- [ ]` 变真复选框
+  排除 fence 行后对账，练习项数与渲染出的复选框数**逐个相等**，`tests/test_web.py:349-365`
+  现算不写死）；`- [ ]` 变真复选框
   （localStorage 持久化，按 章+序号 键）；每章「标记已读」+ 顶部进度条（实测刷新后保持）；
-  25 篇内即时过滤。旧测试「源文件 `- [ ]` 总数 = 渲染 ☐ 数」的断言本身就是被 fence 污染的
-  例子（244 vs 234），已随结构化修正。
+  全课程同页即时过滤（篇数取 `len(_CHAPTERS)`，非硬编码）。旧测试「源文件 `- [ ]` 总数 =
+  渲染 ☐ 数」的断言本身就是被 fence 污染了的例子（落地当日 244 vs 234），已随结构化修正。
+  **2026-10-08 复测**：26 篇顶层章节里 fence 外的 `- [ ]` 实测 **238** 项（分布在 15 个文件，
+  本轮 `13` §9 自查表 +3），渲染出的 `class="taskbox"` 数与之相等；lab 目录下另有 5 项，
+  不进 `/course` 页面（`_CHAPTERS` 只列顶层 26 篇）。
 - **§6 sop**：rail 从 **token 流**取节标题（不再从渲染产物正则刮回）；EN rail 用配对字面量
   （7 节全译，未知标题回退 zh 不硬译）；`/sop` ↔ `/console` 双向深链（zh/en 双语）。
 - **§8 catalog**：品牌区 `<div onclick>` → `<a href="#/">`（键盘可达 + focus-visible）；
@@ -544,6 +549,59 @@ split**，手改产物会被测试判红。
 4. [ ] 真实训练管道 —— `TrainingBackend` 是 Protocol + HTTP webhook + 显式 noop 兜底；接真实训练系统是另一个产品。
 5. [ ] 用真实连接器 POC 替换 mock 用例 —— 需要真实客户环境与凭据，非代码任务。
 6. [ ] `storage-migrate` 支持 sqlite 以外的后端 —— 现仅 sqlite（`cli.py:711`），无需求驱动。
+
+---
+
+## P4 立项批次 1：复盘（SLA 时钟）✅ 已落地（2026-10-08）
+
+三件套优先级第 1 件：**engagement 级复盘 = SLA 时钟 + 阶段时间线 + gate 统计，纯读、零新持久化。**
+
+| 交付物 | 位置 |
+| --- | --- |
+| 领域层（纯函数） | `fde_scope/engagement/retrospective.py`：audit 流重放（advance 事件不带阶段名 → 从 `qualification` 按 `next_phase` 推导；rollback 带显式 `to_phase`）→ `RetrospectiveReport` + `render_markdown` |
+| SLA 里程碑 | ≤14d 首次集成（进入 `corpus`）/ ≤90d 上线（进入 `eval`）/ ≤120d 退场（进入 `disengage`）；`assets["success_criteria_sla"]` 逐项目覆盖，`deadline_source` 逐条标注 |
+| 诚实降级 | 重放终态 ≠ `ctx.current_phase` → `timeline_consistent=false`；无审计事件 → `start_source=earliest-journal` / context-only gate 统计（`evaluations=None`，不编造）；`reason:"complete"` 的推进尝试不计入被拦 |
+| CLI | `fde-scope engage retrospective <id> [--json] [--out md]`；`engage init/advance/rollback`、`gate check` 补写与 web 同名审计事件（`actor:"cli"`） |
+| Web | `GET /api/engagements/{eid}/retrospective`（第 78 条路由，11 处宣称已同步）；控制台「复盘」tab（lazy fetch，与 evidence/audit 同机制）+ 27 条新 i18n 键对 |
+| 测试 | `tests/test_retrospective.py` 17 项（重放/SLA met·missed·at_risk·on_track·unknown/覆盖键/gate 首过/context-only/时间锚降级/markdown/JSON）+ web 3 项 + CLI 3 项（审计链/JSON+`--out`/404 语义） |
+
+**真机验证**：uvicorn 起服 → CLI 建项目推进 → 浏览器「复盘」tab 渲染 SLA 表/时间线/gate 统计（截图存证）；API 返回 `elapsed_days` 取整。
+
+**已知边界（记录，不掩饰）**：本批落地时工作树带 2 个存量 mypy 错（`web/sop.py:107`、`web/course.py:330`）与 1 个存量课程渲染测试失败（`<pre` 224≠223，课程源文件进行中编辑所致）——均先于本批存在，见 git 工作区状态。
+
+---
+
+## P4 立项批次 2：实验判分上台面（课程页 × 执行引擎）✅ 已落地（2026-10-09）
+
+三件套优先级第 2 件。**判分引擎本身（`fde_scope/course/` 的注册表 + verifier + doctor，含 `fde-scope course doctor/labs/check` CLI）是本仓库进行中的既有工作**（CHANGELOG 记录其"不可达"状态时 CLI 尚未接；本批动手时 CLI 已接好、有完整测试）——本批补的是**浏览器侧**：把同一 `run_lab` 接到 Web，学习页与执行引擎共用一个真相。
+
+| 交付物 | 位置 |
+| --- | --- |
+| Web API | `GET /api/course/labs`（D1–D8 注册表）、`GET /api/course/doctor`（G0 环境自检）、`POST /api/course/labs/{day}/grade`（一次性工作区对真实 CLI 判分；`run_in_threadpool`；未知日 404；`manual` 项报告但不进分母）——路由数 78→81，11 处宣称同步 |
+| 课程页面板 | `/course` + `/en/course` 页内「实验判分」节：G0 按钮、服务端渲染的 8 天芯片（门禁/产出/判分项数，双语走 `p()`）、逐日判分结果表（失败项带 hint；标签走 data 属性，JS 保持 locale-free） |
+| 鉴权 | 页面公开不变；判分/自检 API 在 `PUBLIC_PATHS` 精确匹配集之外 → 带 token 即拦（不变式 7；EN 页匿名点击得到明示的 401 提示） |
+| 测试 | `tests/test_web.py` +5：注册表形状、doctor exit 0、未知日 404、**D1 经 API 冷跑全绿**（与 verifier 的 81/10/9 oracle 同源）、双 locale 面板存在性 |
+| 文档 | features.md/en Web 行 + CHANGELOG Added + 基线测量 81/78（2026-10-09） |
+
+**真机验证**：uvicorn 起服 → 浏览器 `/course` 面板：G0 自检 ✅（ok 6 / warn 1）、D1 判分 ✅ 10/10 机器项 + 1 人工评分（截图 `/tmp/fde-lab-grading.png`，DOM 断言双重确认）。
+
+---
+
+## P4 立项批次 3：干系人只读分享 ✅ 已落地（2026-10-09）
+
+三件套优先级第 3 件：给阶段 8（干系人验证）/ 阶段 18（客户签收）一个真实的参与通道。
+
+| 交付物 | 位置 |
+| --- | --- |
+| 第二种凭据 | `POST/GET/DELETE /api/engagements/{eid}/share`：`secrets.token_urlsafe` 明文**只显示一次**，落盘 sha256 + 8 位前缀（`assets["share_access"]`，原子写）；重新生成即轮换吊销；状态接口永不回传 token |
+| 中间件 share 分支 | `auth.py`：`/share/{eid}` 与 `/ack` 由 share token 校验（sha256 timing-safe 比对）；失败一律 **404**（不探测 engagement 存在性）；覆盖绕过 CLI 直接 uvicorn 的启动 |
+| 只读页 | `GET /share/{eid}?t=`（`web/share.py`）：进度 + SLA 时钟（复用 `build_retrospective`）+ 门禁现况（默认注册表现查，只读）+ 阶段清单 + 签收表单 |
+| 签收=证据 | `POST /share/{eid}/ack` → `share.ack` 审计事件（actor `stakeholder`，带可选 label）；**不推进状态机**，`handoff_signoff` 仍走 authed accept 流程；审计只带前缀不带 token |
+| 控制台 | overview 新「只读分享」卡片：状态（前缀+时间）、生成（一次性展示）、吊销 + 9 条新 i18n 键对 |
+| 测试 | `tests/test_share.py` 8 项（一次性展示/轮换吊销/404 fail-closed/只读页无变更入口/ack 审计且审计文件无 token/双凭据独立）+ `test_web_auth` 守卫显式化 ack 例外（全方法 404 fail-closed）|
+| 路由 | 81→86（5 条），11 处宣称同步；api-reference +6 行 |
+
+**真机验证**：mint 链接 → 浏览器只读页渲染（SLA 三里程碑 on_track）→ 表单签收「王经理（客户运营总监）」→ 确认页 + 审计事件落盘 → 控制台卡片实读「已启用 · 前缀 IvjPQ_5u」。
 
 ---
 

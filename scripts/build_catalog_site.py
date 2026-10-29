@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""把 docs/skills-catalog/ 构建成单文件门户（GTM 风格主页 + 全部页面跳转）。
+"""把 docs/skills-catalog/ 构建成单文件门户（工作台风格索引 + 全部页面跳转）。
 
     make build-site    # 等价 python3 scripts/build_catalog_site.py
 
 输出两个纯语言版本：docs/skills-catalog/site/index.html（中文）与
-site/en/index.html（英文）。零依赖、离线可用、双击即开。
-数据源是 README 表格与各页 Markdown，所以门户永远和手册库同源；
-改了 catalog 之后重新跑一次本脚本即可。
+site/en/index.html（英文）。零依赖、离线可用、双击即开。令牌与共享组件
+取自 ``fde_scope/web/layout.py``（见 ``load_ramp``），所以门户与控制台是
+同一套系统，只是外壳不同。数据源是 README 表格与各页 Markdown，
+所以门户永远和手册库同源；改了 catalog 之后重新跑一次本脚本即可。
 
-英文版覆盖：界面壳（导航/英雄区/分区/筛选/页脚）、大区标签、场景、
+英文版覆盖：界面壳（导航/题头/分区/筛选/页脚）、大区标签、场景、
 每页一句话简介（BLURB_EN，缺一条直接构建失败）。档案正文仍以中文
 Markdown 为唯一事实源，英文版在正文页顶部显示语言提示条，不做机翻。
 """
@@ -16,6 +17,7 @@ Markdown 为唯一事实源，英文版在正文页顶部显示语言提示条�
 from __future__ import annotations
 
 import html
+import importlib.util
 import json
 import posixpath
 import re
@@ -25,20 +27,43 @@ ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "docs" / "skills-catalog"
 SITE = CATALOG / "site"
 OUT = SITE / "index.html"
+LAYOUT = ROOT / "fde_scope" / "web" / "layout.py"
+
+
+def load_ramp() -> tuple[str, str, str]:
+    """``THEME_CSS``, ``COMPONENT_CSS`` and ``PROSE_CSS``, read from the shipped module.
+
+    The portal used to keep its own copy of the tokens, and the two drifted: the
+    console ran a 2px corner and an explicit theme switch while the portal ran
+    12px corners and ``prefers-color-scheme``, so the same reader saw two different
+    products. This reads the source of truth instead. ``make build-site`` runs with
+    bare ``python3`` and must not require the package to be installed, so the
+    module is loaded by file path — the same trick
+    ``tests/test_build_catalog_site.py`` uses.
+
+    The middle layer is not optional: reading only the ramp would give the portal
+    the tokens but not the shared components, which is how ``.chip`` ended up at
+    three different radii on three surfaces.
+    """
+    spec = importlib.util.spec_from_file_location("_fde_layout", LAYOUT)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"读不到样式源文件：{LAYOUT}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.THEME_CSS, module.COMPONENT_CSS, module.PROSE_CSS
+
+
+_THEME, _COMPONENT, _PROSE = load_ramp()
+
 
 ZONES = [
-    ("zone-a-pre-engagement", "Zone A · Pre-engagement", "调研 · 摸底 · 干系人 · 成功标准", "#6366f1"),
-    ("zone-b-build", "Zone B · Build", "数据接入 · 语料 · 原型 · 验证 · 部署 · 评估", "#0ea5e9"),
-    (
-        "zone-c-operationalization",
-        "Zone C · Operationalization",
-        "SLO · 监控 · 排障 · 事件 · 训练迭代",
-        "#f59e0b",
-    ),
-    ("zone-d-handoff", "Zone D · Handoff", "文档 · 培训 · 移交演示", "#10b981"),
-    ("cross-cutting", "横切 · 元能力", "skill 工程 · 评审 · 计划 · 调度 · 平台套件", "#8b5cf6"),
-    ("mcp", "MCP · 服务器", "浏览器 · 抓取 · 云端 · 桌面 · 知识库 · 文档", "#e11d48"),
-    ("tools", "工具 · 内置", "执行层全景 · 使用纪律", "#64748b"),
+    ("zone-a-pre-engagement", "Zone A · Pre-engagement", "调研 · 摸底 · 干系人 · 成功标准"),
+    ("zone-b-build", "Zone B · Build", "数据接入 · 语料 · 原型 · 验证 · 部署 · 评估"),
+    ("zone-c-operationalization", "Zone C · Operationalization", "SLO · 监控 · 排障 · 事件 · 训练迭代"),
+    ("zone-d-handoff", "Zone D · Handoff", "文档 · 培训 · 移交演示"),
+    ("cross-cutting", "横切 · 元能力", "skill 工程 · 评审 · 计划 · 调度 · 平台套件"),
+    ("mcp", "MCP · 服务器", "浏览器 · 抓取 · 云端 · 桌面 · 知识库 · 文档"),
+    ("tools", "工具 · 内置", "执行层全景 · 使用纪律"),
 ]
 
 # (标题, 说明, [(展示名, 相对 catalog 的页面路径)])；构建时校验目标存在
@@ -352,16 +377,17 @@ L10N = {
         "htmlLang": "zh-CN",
         "docTitle": "FDE Skills 手册库 · 门户",
         "brandSuffix": "手册库",
-        "gtaText": "GTM 官网 ↗",
-        "gtaHref": "../GTM/index.html",  # served at /catalog/; a file:// open of the standalone site would need ../../../ — the mounted portal is the primary reader
+        "gtmText": "GTM 官网 ↗",
+        "gtmHref": "../GTM/index.html",  # served at /catalog/; a file:// open of the standalone site would need ../../../ — the mounted portal is the primary reader
         "langHref": "./en/",
         "langLabel": "ENGLISH",
         "searchPh": "搜索 {n} 页 skills / tools / MCP…",
         "searchAria": "搜索技能手册",
-        "heroH1": "FDE Skills 手册库",
-        "heroP": "每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。",
-        "statUnits": {
-            "pages": "页能力档案",
+        "mastH1": "FDE Skills 手册库",
+        "mastP": "每个能力一页档案：能做什么 · 何时用（含反向边界）· 最佳实践 · 在 fde-scope 项目中的应用位点。覆盖三层——skills（按 FDE 四 Zone + 横切）、MCP 服务器工具面、内置工具——先选场景，再进页面。",
+        "themeAria": "切换深浅主题",
+        "statLabs": {
+            "pages": "能力档案",
             "installed": "已安装",
             "installable": "可安装",
             "zones": "大区",
@@ -378,28 +404,31 @@ L10N = {
         "itemsSuffix": "项",
         "badgeTxt": {"ok": "已安装", "pkg": "可安装", "dead": "已移除"},
         "crumbHome": "主页",
+        "crumbAria": "面包屑导航",
+        "zonesAria": "大区快捷跳转",
         "langNote": "",
-        "footer1": "FDE Skills 手册库 · {total} 页（✅ {installed} · 📦 {installable}）· 建档 2026-08-27 · 数据源 README + 各页 Markdown",
+        "footer1": "FDE Skills 手册库 · {total} 页 · 已安装 {installed} · 可安装 {installable} · 建档 2026-08-27 · 数据源 README + 各页 Markdown",
         "footer2": "一致性门禁 <code>make check-catalog</code> · 本地对账 <code>make check-local</code> · 改目录后 <code>make build-site</code> 重新生成本页",
     },
     "en": {
         "htmlLang": "en",
         "docTitle": "FDE Skills Handbook · Portal",
         "brandSuffix": "Handbook",
-        "gtaText": "GTM Site ↗",
-        "gtaHref": "../../GTM/index.html",  # served at /catalog/en/
+        "gtmText": "GTM Site ↗",
+        "gtmHref": "../../GTM/index.html",  # served at /catalog/en/
         "langHref": "../",
         "langLabel": "中文",
         "searchPh": "Search {n} skills / tools / MCP pages…",
         "searchAria": "Search the handbook",
-        "heroH1": "FDE Skills Handbook",
-        "heroP": "One profile page per capability: what it does · when to use it (including anti-boundaries) · best practices · where it plugs into the fde-scope project. Three layers — skills (FDE four zones + cross-cutting), MCP server surfaces, built-in tools. Pick a scenario first, then open a page.",
-        "statUnits": {
-            "pages": "capability profiles",
-            "installed": "installed",
-            "installable": "installable",
-            "zones": "zones",
-            "scenarios": "scenario entries",
+        "mastH1": "FDE Skills Handbook",
+        "mastP": "One profile page per capability: what it does · when to use it (including anti-boundaries) · best practices · where it plugs into the fde-scope project. Three layers — skills (FDE four zones + cross-cutting), MCP server surfaces, built-in tools. Pick a scenario first, then open a page.",
+        "themeAria": "Toggle theme",
+        "statLabs": {
+            "pages": "Capability profiles",
+            "installed": "Installed",
+            "installable": "Installable",
+            "zones": "Zones",
+            "scenarios": "Scenarios",
         },
         "secTaskT": "Start by Task",
         "secTaskD": "GTM scenario shortcuts: enter by task, not by catalog",
@@ -412,8 +441,10 @@ L10N = {
         "itemsSuffix": "items",
         "badgeTxt": {"ok": "installed", "pkg": "installable", "dead": "removed"},
         "crumbHome": "Home",
+        "crumbAria": "Breadcrumb",
+        "zonesAria": "Zone shortcuts",
         "langNote": "The profile body below is maintained in Chinese (single source of truth) — navigation, blurbs and metadata on this site are English.",
-        "footer1": "FDE Skills Handbook · {total} profiles (✅ {installed} · 📦 {installable}) · est. 2026-08-27 · sourced from README + per-page Markdown",
+        "footer1": "FDE Skills Handbook · {total} profiles · {installed} installed · {installable} installable · est. 2026-08-27 · sourced from README + per-page Markdown",
         "footer2": "Consistency gate <code>make check-catalog</code> · local reconciliation <code>make check-local</code> · regenerate with <code>make build-site</code> after editing the catalog",
     },
 }
@@ -455,6 +486,14 @@ def parse_readme() -> dict[str, list[tuple[str, str, str, str]]]:
 
 CODE_FENCE = re.compile(r"^```")
 
+# 正文里「✅ 已安装」把同一个状态说了两遍：一遍是图形，一遍是文字。README 的表格
+# 里 ✅ 是数据（parse_readme 用它做连接键），渲染层的 tile/badge 也已经在别处把图形
+# 换成了文字，所以只有紧跟自己那个名字的写法需要收敛。独立的 emoji 不动 ——
+# 「把该页从 📦 改 ✅」里字形就是状态的名字，删掉会毁掉句意，而源文档是手册的归档，
+# 不是这个构建脚本的私有物。只作用在 render_inline 的非代码分支上，因此 `✅ 已安装`
+# 这类代码示例天然不受影响。
+STATUS_ECHO = re.compile(r"(?:✅|📦|⚰️)[ \t]*(?=已安装|可安装|已移除)")
+
 
 def render_inline(text: str, page_rel: str, page_set: set[str]) -> str:
     """行内文本 -> HTML：先整体转义，再做代码/加粗/链接变换（escape-then-transform）。"""
@@ -465,6 +504,7 @@ def render_inline(text: str, page_rel: str, page_set: set[str]) -> str:
         if part.startswith("`") and part.endswith("`") and len(part) > 1:
             out.append(f"<code>{part[1:-1]}</code>")
             continue
+        part = STATUS_ECHO.sub("", part)
         part = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", part)
         part = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: _link(m, page_rel, page_set), part)
         out.append(part)
@@ -502,8 +542,12 @@ def render_markdown(md: str, page_rel: str, page_set: set[str]) -> str:
     def flush_quote():
         nonlocal quote
         if quote:
+            # 每页开头的 `>` 是元数据块（状态/类型/位点/安装），语义上就是一段
+            # 引用式旁注，所以直接输出 <blockquote>，由 PROSE_CSS 统一决定它长什么样。
+            # 原来是自造的 <div class="page-meta"> + 3px 左侧 accent 色条：那条色条
+            # 是被禁用的 affordance，而且它给一个不承载状态的边界上了色。
             body = "<br>".join(render_inline(ln, page_rel, page_set) for ln in quote)
-            html.append(f'<div class="page-meta">{body}</div>')
+            html.append(f"<blockquote>{body}</blockquote>")
             quote = []
 
     def flush_table():
@@ -601,7 +645,7 @@ def build_data(lang: str) -> dict:
 
     zones = []
     all_pages: list[dict] = []
-    for zone_id, label, tag, accent in ZONES:
+    for zone_id, label, tag in ZONES:
         if lang == "en":
             label, tag = ZONES_EN[zone_id]
         skills = []
@@ -636,7 +680,7 @@ def build_data(lang: str) -> dict:
                     "html": render_markdown(md, page_rel, page_set),
                 }
             )
-        zones.append({"id": zone_id, "label": label, "tag": tag, "accent": accent, "skills": skills})
+        zones.append({"id": zone_id, "label": label, "tag": tag, "skills": skills})
 
     scenarios = []
     for title, desc, items in SCENARIOS:
@@ -673,119 +717,143 @@ def build_data(lang: str) -> dict:
 
 # --------------------------------------------------------------------------- HTML 模板
 
-CSS = """
-:root{--bg:oklch(0.973 0.003 255);--card:oklch(1 0 0);--ink:oklch(0.225 0.014 255);--muted:oklch(0.47 0.016 255);
---line:oklch(0.9 0.006 255);--border-strong:oklch(0.8 0.01 255);
---accent:oklch(0.5 0.095 235);--accent-2:oklch(0.44 0.095 235);--accent-ink:oklch(0.99 0.002 255);
---ok:oklch(0.51 0.12 152);--warn:oklch(0.53 0.11 75);--bad:oklch(0.55 0.17 25);--radius:12px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
-color-scheme:light}
-@media(prefers-color-scheme:dark){:root{--bg:oklch(0.18 0.01 255);--card:oklch(0.23 0.012 255);--ink:oklch(0.93 0.006 255);--muted:oklch(0.72 0.014 255);
---line:oklch(0.32 0.012 255);--border-strong:oklch(0.45 0.015 255);
---accent:oklch(0.68 0.1 235);--accent-2:oklch(0.74 0.09 235);--accent-ink:oklch(0.16 0.01 255);
---ok:oklch(0.72 0.13 152);--warn:oklch(0.78 0.12 75);--bad:oklch(0.68 0.16 25);color-scheme:dark}
-.article pre{background:oklch(0.16 0.012 255)}}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{overflow-x:clip}
-body{font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
-background:var(--bg);color:var(--ink);line-height:1.65}
-a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-.nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:18px;padding:12px 28px;
-background:color-mix(in oklab,var(--card) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
-.nav .brand{font-weight:700;font-size:16px;color:var(--ink);white-space:nowrap;letter-spacing:-.01em;text-decoration:none}
-.nav .brand:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-.nav .brand span{color:var(--accent)}
-.nav .gta{font:600 11px/1 var(--mono);letter-spacing:.1em;color:var(--accent);background:color-mix(in oklab,var(--accent) 9%,transparent);
-padding:5px 10px;border-radius:999px;white-space:nowrap;text-decoration:none}
-.nav .gta:hover{background:color-mix(in oklab,var(--accent) 16%,transparent);text-decoration:none}
-.nav .zlinks{display:flex;gap:14px;overflow-x:auto}
-.nav .zlinks a{color:var(--muted);font-size:13px;white-space:nowrap}
-.nav input{margin-left:auto;width:230px;padding:7px 12px;border:1px solid var(--line);border-radius:99px;
-font-size:13px;outline:none;background:var(--card);font-family:inherit}
-.nav input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in oklab,var(--accent) 12%,transparent)}
-.hero{background:linear-gradient(160deg,oklch(0.35 0.07 255) 0%,oklch(0.5 0.095 235) 62%,oklch(0.44 0.095 235) 100%);
-color:#fff;padding:60px 28px 52px;text-align:center}
-.hero h1{font-size:34px;letter-spacing:-.015em;line-height:1.15;overflow-wrap:anywhere}
-.hero p{margin:14px auto 0;max-width:760px;color:rgba(255,255,255,.84);font-size:15px}
-.hero .stats{display:flex;justify-content:center;gap:14px;margin-top:28px;flex-wrap:wrap}
-.stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:99px;
-padding:7px 18px;font-size:13px;color:#fff}
-.stat b{font-size:16px;margin-right:4px}
-.wrap{max-width:1120px;margin:0 auto;padding:36px 24px 72px}
-.section-h{display:flex;align-items:baseline;gap:12px;margin:8px 0 18px}
-.section-h h2{font-size:21px;letter-spacing:-.01em}
-.section-h p{color:var(--muted);font-size:13px}
-.scen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
-.scen{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;
-transition:box-shadow .15s,border-color .15s}
-.scen:hover{box-shadow:0 10px 26px -14px rgba(15,30,60,.3);border-color:var(--border-strong)}
-.scen h3{font-size:15px;margin-bottom:4px}
-.scen .d{color:var(--muted);font-size:12.5px;margin-bottom:12px}
-.scen .links{display:flex;flex-wrap:wrap;gap:8px}
-.scen .links a{font-size:12.5px;background:color-mix(in oklab,var(--accent) 8%,var(--card));border:1px solid color-mix(in oklab,var(--accent) 20%,var(--card));color:var(--accent-2);
-padding:4px 11px;border-radius:99px;text-decoration:none}
-.scen .links a:hover{background:color-mix(in oklab,var(--accent) 16%,var(--card));text-decoration:none}
-.zone-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;margin-top:6px}
-.zone{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
-display:flex;flex-direction:column}
-.zone .zh{padding:16px 20px 12px;border-top:3px solid var(--accent)}
-.zone .zh h3{font-size:15.5px}
-.zone .zh p{color:var(--muted);font-size:12.5px;margin-top:2px}
-.zone .zs{padding:6px 14px 16px;display:flex;flex-wrap:wrap;gap:7px}
-.zone .zs a{font-size:12.5px;padding:4px 10px;border-radius:8px;background:color-mix(in oklab,var(--ink) 4%,var(--card));color:var(--ink);
-border:1px solid var(--line);text-decoration:none}
-.zone .zs a:hover{text-decoration:none;border-color:var(--accent);color:var(--accent)}
-.zone .zs a .st{font-size:11px;margin-right:3px}
-.toolbar{display:flex;gap:10px;align-items:center;margin:4px 0 16px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 14px;font-size:12.5px;
-cursor:pointer;color:var(--muted);font-family:inherit}
-.chip:hover{border-color:var(--border-strong);color:var(--ink)}
-.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-.all-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
-.sk{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:block;color:var(--ink);
-transition:box-shadow .15s,border-color .15s}
-.sk:hover{box-shadow:0 8px 22px -14px rgba(15,30,60,.3);border-color:var(--border-strong);text-decoration:none}
-.sk .t{display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px}
-.sk .b{color:var(--muted);font-size:12.5px;margin-top:4px}
-.sk .z{font-size:11px;color:var(--muted);margin-top:6px}
-.badge{font-size:11px;border-radius:99px;padding:2px 9px;font-weight:600}
-.badge.ok{background:color-mix(in oklab,var(--ok) 14%,var(--card));color:oklch(0.35 0.1 152)}
-.badge.pkg{background:color-mix(in oklab,var(--warn) 14%,var(--card));color:oklch(0.38 0.09 75)}
-.badge.dead{background:color-mix(in oklab,var(--muted) 10%,var(--card));color:var(--muted)}
-.crumb{font-size:13px;color:var(--muted);margin-bottom:6px}
+CHROME = """
+/* The chrome this portal owns: its sticky app bar, its masthead band, the two
+   grids that open the catalogue and the article shell. Placement lives here; the
+   appearance of anything with a shared meaning — the metrics row, section heads,
+   tiles, filter chips, the search field, the inline code chip, the footer — comes
+   from COMPONENT_CSS above. That split is the whole fix: the same control used to
+   be authored three times at three radii (a chip at 2px in the app, 6px in the
+   resources portal, 999px here) and only the last of them was mistaken for a
+   design decision.
+   The register is an enterprise workbench, so: corners come from the ladder
+   (``--r1``), a selected state is a fill and never a coloured side stripe,
+   elevation is a 1px hairline and never a shadow, the bar is opaque and never a
+   blur, and no glyph is a webfont the air-gapped reader cannot load. */
+:root{--nav-h:56px;--measure:860px}
+html{scroll-behavior:smooth}
+.wrap{max-width:1120px;margin-inline:auto;padding-inline:var(--sp4)}
+main{padding-block:var(--sp5) var(--sp6)}
+/* One cadence between the chapters of the index. It hangs off the wrapper rather
+   than ``main`` because the 1120px column is what holds the sections; a rule on
+   ``main>section`` would silently stop applying the moment a ``.wrap`` moved in. */
+.wrap>section+section{margin-top:var(--sp5)}
+/* A sticky bar is why an anchor target has to clear it: without this the zone
+   tile lands under the bar and reads as the wrong section. The smooth scroll is
+   CSS-side, so ``prefers-reduced-motion`` in the ramp already governs it. */
+[id]{scroll-margin-top:calc(var(--nav-h) + var(--sp3))}
+/* ``--nav-h`` is authoritative, not descriptive: the bar's height comes from the
+   same token the anchors clear, so the two cannot drift. They had — the bar was
+   60px tall off ``padding:10px`` while ``--nav-h`` said 53px, and every zone
+   anchor landed 7px under the bar. ``min-height`` (not ``height``) because the
+   row may grow if a long language label wraps; ``box-sizing`` is border-box in
+   the shared layer, so the hairline is already inside the 56px. */
+.nav{position:sticky;top:0;z-index:var(--z-sticky);display:flex;align-items:center;gap:var(--sp3);
+min-height:var(--nav-h);padding-inline:var(--sp4);background:var(--panel);border-bottom:1px solid var(--border)}
+.nav .brand{font-weight:650;font-size:var(--fs-h4);letter-spacing:var(--track-tight);color:var(--fg);
+white-space:nowrap;text-decoration:none}
+.nav .brand span{color:var(--accent-text)}
+/* The zone shortcuts are an index, not a nav model: seven labels that only fit
+   above 1100px, so below that they go and the "by phase" section carries the same
+   destinations. Never ``overflow:clip`` here — clipped links are lost links. */
+.nav .zlinks{display:flex;gap:var(--sp3);flex:1;min-width:0;overflow-x:auto}
+.nav .zlinks a{font-size:var(--fs-sm);color:var(--muted);white-space:nowrap;text-decoration:none;
+transition:color var(--dur) var(--ease)}
+.nav .zlinks a:hover{color:var(--fg)}
+.nav .search{width:min(300px,42vw);flex:none}
+.nav-actions{display:flex;align-items:center;gap:var(--sp2);flex:none}
+.nav .lang,.nav .tbtn{text-decoration:none}
+/* The masthead is a band, not a banner: a hairline-edged panel with the title
+   left-aligned on the grid and the shared metrics row under it. The old one was a
+   gradient with white centred type and pill-shaped stats, which is the template
+   this system exists to stop producing. */
+.masthead{background:var(--panel);border-bottom:1px solid var(--border);padding-block:var(--sp5)}
+.masthead h1{margin:0;font-size:var(--fs-display);font-weight:650;letter-spacing:var(--track-tight);
+line-height:1.2;text-wrap:balance;overflow-wrap:anywhere;max-width:28ch}
+.masthead p{margin:var(--sp2) 0 0;color:var(--muted);max-width:75ch}
+/* five dimensions, not four: the portal counts zones and scenarios as well as
+   pages, so the shared ``.stats`` column count is overridden at the call site
+   rather than in the layer every surface inherits. */
+.masthead .stats{margin-top:var(--sp4);grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+/* Scenarios and zones are both collections of tiles, so they take the shared
+   ``.grid`` and ``.tile`` from COMPONENT_CSS; what is authored here is only the
+   column count and the link row a tile carries inside it. */
+.flow{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.tile .links{display:flex;flex-wrap:wrap;gap:var(--sp1) var(--sp3);margin-top:var(--sp2)}
+.tile .links a{font-size:var(--fs-sm)}
+a.tile{display:flex;flex-direction:column;gap:var(--sp1);color:var(--fg)}
+.tile .where{font:400 var(--fs-xs)/1.5 var(--mono);color:var(--muted);margin-top:var(--sp1)}
+/* The ramp carries one accent and the console underlines nothing, so inside a
+   document a link may not rely on colour alone (WCAG 1.4.1). In-content links are
+   underlined at rest on a hairline and darken to the accent on hover, while the
+   chrome links above keep the console's treatment — each of those carries a
+   border, a fill or a structural slot, so colour alone is not their only cue. */
+.prose a,.tile .links a{text-decoration:underline;text-underline-offset:2px;
+text-decoration-thickness:1px;text-decoration-color:var(--border-strong)}
+.prose a:hover,.tile .links a:hover{text-decoration-color:var(--accent-text)}
+/* A status mark is state, and state takes the ramp's ink-on-fill triad rather
+   than a per-theme color-mix: the emoji stays in the data key that joins the
+   README row, never in the visible label. */
+.badge{font:600 var(--fs-xs)/1.5 var(--mono);padding:2px 8px;border-radius:var(--r1);white-space:nowrap}
+.badge.ok{background:var(--good-fill);color:var(--good)}
+.badge.pkg{background:var(--warn-fill);color:var(--warn)}
+.badge.dead{background:var(--layer-02);color:var(--muted)}
+.toolbar{display:flex;gap:var(--sp2);align-items:center;flex-wrap:wrap;margin-bottom:var(--sp3)}
+/* The running hit count lives in the section header (``.sec-head .n``), not in the
+   toolbar: a count is a heading-scale number, not a fifth filter chip, and putting
+   it beside the chips made it look like a control you could click off. */
+.crumb{font-size:var(--fs-sm);color:var(--muted);margin-bottom:var(--sp2)}
 .crumb a{color:var(--muted)}
-.article{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-padding:36px 44px;max-width:900px;margin:0 auto}
-.article h1{font-size:24px;margin:4px 0 14px;letter-spacing:-.01em;overflow-wrap:anywhere}
-.article h2{font-size:17px;margin:26px 0 10px;padding-left:10px;border-left:3px solid var(--accent)}
-.article h3{font-size:15px;margin:18px 0 8px}
-.article p{margin:8px 0}
-.article ul{margin:8px 0 8px 22px}
-.article li{margin:4px 0}
-.article code{font-family:var(--mono);font-size:.86em;background:color-mix(in oklab,var(--ink) 4%,var(--card));border:1px solid var(--line);
-border-radius:5px;padding:1px 5px;word-break:break-all}
-.article pre{background:oklch(0.22 0.015 255);color:oklch(0.93 0.006 255);border-radius:10px;padding:14px 16px;overflow-x:auto;margin:10px 0}
-.article pre code{background:none;border:none;color:inherit;padding:0;font-size:12.5px;line-height:1.55}
-.article table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
-.article th,.article td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
-.article th{background:color-mix(in oklab,var(--ink) 3%,var(--card))}
-.article .page-meta{background:color-mix(in oklab,var(--accent) 6%,var(--card));border:1px solid color-mix(in oklab,var(--accent) 20%,var(--card));border-left:3px solid var(--accent);
-border-radius:10px;padding:12px 16px;margin:6px 0 16px;font-size:13px;color:var(--ink)}
-.pager{display:flex;justify-content:space-between;gap:16px;max-width:900px;margin:14px auto 0}
-.pager a{font-size:13px;color:var(--muted);border:1px solid var(--line);background:var(--card);
-border-radius:10px;padding:8px 14px;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}
-.pager a:hover{color:var(--accent);text-decoration:none;border-color:var(--accent)}
-.empty{display:none;text-align:center;color:var(--muted);padding:40px 0}
-footer{border-top:1px solid var(--line);margin-top:56px;padding:26px 28px 40px;color:var(--muted);
-font-size:12.5px;text-align:center}
-footer code{font-family:var(--mono);background:color-mix(in oklab,var(--ink) 4%,var(--card));border-radius:5px;padding:1px 5px}
-.nav .lang{font:600 12px/1 var(--mono);letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);
-border-radius:99px;padding:6px 12px;white-space:nowrap;text-decoration:none}
-.nav .lang:hover{color:var(--accent);border-color:var(--accent);text-decoration:none}
-.lang-note{background:color-mix(in oklab,var(--warn) 8%,var(--card));border:1px solid color-mix(in oklab,var(--warn) 25%,var(--card));
-border-left:3px solid var(--warn);border-radius:10px;padding:10px 14px;margin:0 auto 10px;max-width:900px;font-size:13px;color:var(--ink)}
-@media(max-width:720px){.article{padding:22px 18px}.nav .zlinks{display:none}.nav input{width:150px}.nav{gap:10px}}
+.crumb a:hover{color:var(--fg)}
+.crumb .now{color:var(--fg);font-weight:600;font-family:var(--mono);overflow-wrap:anywhere}
+/* The article is a document page, not a card. The shell and the measure come from
+   ``--measure`` so the article, its language note and its pager share one column,
+   and the reading measure never exceeds the 860px the shared PROSE_CSS declares —
+   the old 900px box won only by source order over its own prose layer. */
+.article{background:var(--panel);border:1px solid var(--border);border-radius:var(--r1);
+padding:var(--sp5) var(--sp6);max-width:var(--measure);margin-inline:auto}
+.article h1{margin:0 0 var(--sp3);font-size:var(--fs-display);font-weight:650;
+letter-spacing:var(--track-tight);line-height:1.25;text-wrap:balance;overflow-wrap:anywhere}
+.article h2{margin:var(--sp5) 0 var(--sp2);padding-bottom:var(--sp2);border-bottom:1px solid var(--border);
+font-size:var(--fs-h2);font-weight:650;letter-spacing:var(--track-tight);text-wrap:balance;overflow-wrap:anywhere}
+.pager{display:flex;justify-content:space-between;gap:var(--sp3);max-width:var(--measure);
+margin:var(--sp3) auto 0}
+.pager a{font-size:var(--fs-sm);border:1px solid var(--border);background:var(--panel);border-radius:var(--r1);
+padding:var(--sp2) var(--sp3);max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+text-decoration:none}
+.pager a:hover{border-color:var(--border-ink);background:var(--layer-02)}
+.lang-note{background:var(--layer-02);border:1px solid var(--border);border-radius:var(--r1);
+padding:var(--sp2) var(--sp3);max-width:var(--measure);margin:0 auto var(--sp3);
+font-size:var(--fs-sm);color:var(--fg)}
+.empty{display:none;text-align:center;color:var(--muted);padding-block:var(--sp5)}
+@media(max-width:1100px){.nav .zlinks{display:none}}
+/* A phone can't hold identity + search + three actions on one row, and this
+   portal clips horizontal overflow on ``body`` (COMPONENT_CSS), so what spilled
+   didn't scroll — it disappeared. Measured at 375px: the language toggle sat at
+   x=417..490 and the theme button at x=498..530, i.e. there was no way left to
+   change language or theme. The bar therefore becomes two rows: identity and the
+   actions share row 1, the search field owns row 2 at full width (150px was
+   never enough room to type a query in). The brand's ``· 目录`` suffix yields
+   first — the masthead and every article crumb already name the section, and
+   dropping it buys a clean row instead of an ellipsis on the word people scan
+   for. ``--nav-h`` moves with the bar and it moves on ``:root``, because the
+   anchor offset in ``[id]`` reads the same token: a bar that has doubled in
+   height while still reporting one row would bury every zone heading under
+   itself. */
+@media(max-width:720px){
+  :root{--nav-h:98px}
+  .article{padding:var(--sp4) var(--sp3)}
+  .nav{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:
+       "brand actions" "search search";column-gap:var(--sp2);row-gap:var(--sp2);
+       align-items:center;padding-inline:var(--sp3);padding-block:var(--sp2)}
+  .nav .brand{grid-area:brand;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .nav .brand span{display:none}
+  .nav .search{grid-area:search;width:100%}
+  .nav-actions{grid-area:actions;justify-self:end}
+}
 """
+
+CSS = _THEME + _COMPONENT + _PROSE + CHROME
 
 JS = r"""
 const DATA = JSON.parse(document.getElementById('catalog-data').textContent);
@@ -793,66 +861,94 @@ const L = DATA.l10n;
 const PAGES = {}; DATA.pages.forEach((p,i)=>{PAGES[p.route]=i;});
 const app = document.getElementById('app');
 
+/* Sun and moon, inlined: the portal is a single file opened over ``file://`` as
+   well as mounted at /catalog, so it has no icon sprite to reference. The
+   geometry matches ``i-sun``/``i-moon`` in the app so the two surfaces cannot
+   drift apart on glyph shape the way they drifted on radius. */
+const SUN = '<circle cx="8" cy="8" r="3.2"/><path d="M8 1.2v1.8M8 13v1.8M1.2 8H3M13 8h1.8M3.2 3.2l1.3 1.3M11.5 11.5l1.3 1.3M12.8 3.2l-1.3 1.3M4.5 11.5l-1.3 1.3"/>';
+const MOON = '<path d="M14 8.53A6 6 0 1 1 7.47 2 4.67 4.67 0 0 0 14 8.53z"/>';
+function toggleTheme(){
+  var h = document.documentElement;
+  var n = h.dataset.theme === 'light' ? 'dark' : 'light';
+  h.dataset.theme = n;
+  try { localStorage.setItem('fde-theme', n); } catch(e) {}
+}
+/* The status key (✅ / 📦 / ⚰️) is the join against the README row and stays in the
+   data; the visible mark is a word. An emoji-only badge fails the moment the
+   reader has two of the three states on screen and no legend. */
 function badge(st){
   const cls = st==='✅' ? 'ok' : (st==='📦' ? 'pkg' : 'dead');
   const txt = st==='✅' ? L.badgeTxt.ok : (st==='📦' ? L.badgeTxt.pkg : L.badgeTxt.dead);
-  return `<span class="badge ${cls}">${st} ${txt}</span>`;
+  return `<span class="badge ${cls}">${txt}</span>`;
 }
 function nav(){
-  return `<nav class="nav">
+  return `<header class="nav">
     <a class="brand" href="#/">FDE Skills <span>${L.brandSuffix}</span></a>
-    <a class="gta" href="${L.gtaHref}">${L.gtaText}</a>
-    <a class="lang" href="${L.langHref}" hreflang="${DATA.lang==='zh'?'en':'zh-CN'}">${L.langLabel}</a>
-    <div class="zlinks">${DATA.zones.map(z=>`<a href="#/" onclick="goZone('${z.id}')">${z.label.split('·')[0].trim()}</a>`).join('')}</div>
-    <input id="q" type="search" aria-label="${L.searchAria}" placeholder="${L.searchPh.replace('{n}',DATA.stats.total)}" oninput="onSearch(this.value)">
-  </nav>`;
-}
-function goZone(id){ location.hash='#/'; setTimeout(()=>{const el=document.getElementById('zone-'+id); if(el) el.scrollIntoView({behavior:'smooth'});},30); }
-
-function home(){
-  const s = DATA.stats, u = L.statUnits;
-  return `${nav()}
-  <header class="hero">
-    <h1>${L.heroH1}</h1>
-    <p>${L.heroP}</p>
-    <div class="stats">
-      <span class="stat"><b>${s.total}</b> ${u.pages}</span>
-      <span class="stat"><b>${s.installed}</b> ${u.installed}</span>
-      <span class="stat"><b>${s.installable}</b> ${u.installable}</span>
-      <span class="stat"><b>${s.zoneCount}</b> ${u.zones}</span>
-      <span class="stat"><b>${s.scenarioCount}</b> ${u.scenarios}</span>
+    <nav class="zlinks" aria-label="${L.zonesAria}">${DATA.zones.map(z=>`<a href="#zone-${z.id}" onclick="goZone(event,'zone-${z.id}')">${z.label.split('·')[0].trim()}</a>`).join('')}</nav>
+    <input class="search" id="q" type="search" aria-label="${L.searchAria}" placeholder="${L.searchPh.replace('{n}',DATA.stats.total)}" oninput="onSearch(this.value)">
+    <div class="nav-actions">
+      <a class="lang" href="${L.gtmHref}">${L.gtmText}</a>
+      <a class="lang" href="${L.langHref}" hreflang="${DATA.lang==='zh'?'en':'zh-CN'}">${L.langLabel}</a>
+      <button class="tbtn" type="button" onclick="toggleTheme()" aria-label="${L.themeAria}" title="${L.themeAria}">
+        <svg class="ic when-light" viewBox="0 0 16 16" aria-hidden="true">${MOON}</svg>
+        <svg class="ic when-dark" viewBox="0 0 16 16" aria-hidden="true">${SUN}</svg>
+      </button>
     </div>
-  </header>
-  <div class="wrap">
-    <div id="scen-sec">
-      <div class="section-h"><h2>${L.secTaskT}</h2><p>${L.secTaskD}</p></div>
-      <div class="scen-grid">
-        ${DATA.scenarios.map(sc=>`<div class="scen"><h3>${sc.title}</h3><div class="d">${sc.desc}</div>
+  </header>`;
+}
+function home(){
+  const s = DATA.stats, k = L.statLabs;
+  /* Three sections, one per way in: by task, by phase, then the whole index.
+     Each is a ``<section>`` with the shared ``.sec-head`` rule and ``.sec-note``,
+     and each grid is the shared ``.tile`` — the old page had a ``.scen`` card, a
+     ``.zone`` card with an accent stripe across the top and an ``.sk`` card, three
+     names for one object that had already drifted three pixels apart. */
+  return `${nav()}
+  <div class="masthead"><div class="wrap">
+    <h1>${L.mastH1}</h1>
+    <p>${L.mastP}</p>
+    <div class="stats">
+      <div class="stat"><div class="num">${s.total}</div><div class="lab">${k.pages}</div></div>
+      <div class="stat"><div class="num">${s.installed}</div><div class="lab">${k.installed}</div></div>
+      <div class="stat"><div class="num">${s.installable}</div><div class="lab">${k.installable}</div></div>
+      <div class="stat"><div class="num">${s.zoneCount}</div><div class="lab">${k.zones}</div></div>
+      <div class="stat"><div class="num">${s.scenarioCount}</div><div class="lab">${k.scenarios}</div></div>
+    </div>
+  </div></div>
+  <main><div class="wrap">
+    <section id="scen-sec">
+      <div class="sec-head"><h2>${L.secTaskT}</h2><span class="n">${s.scenarioCount}</span></div>
+      <p class="sec-note">${L.secTaskD}</p>
+      <div class="grid flow">
+        ${DATA.scenarios.map(sc=>`<div class="tile">
+          <div class="name">${sc.title}</div><div class="desc">${sc.desc}</div>
           <div class="links">${sc.items.map(i=>`<a href="#/${i.route}">${i.name}</a>`).join('')}</div></div>`).join('')}
       </div>
-    </div>
-    <div id="zones-sec" style="margin-top:40px">
-      <div class="section-h"><h2>${L.secPhaseT}</h2><p>${L.secPhaseD}</p></div>
-      <div class="zone-grid">
-        ${DATA.zones.map(z=>`<div class="zone" id="zone-${z.id}">
-          <div class="zh" style="--accent:${z.accent}"><h3>${z.label}</h3><p>${z.tag} · ${z.skills.length} ${L.itemsSuffix}</p></div>
-          <div class="zs">${z.skills.map(k=>`<a href="#/${k.route}"><span class="st">${k.status}</span>${k.name}</a>`).join('')}</div>
+    </section>
+    <section id="zones-sec">
+      <div class="sec-head"><h2>${L.secPhaseT}</h2><span class="n">${s.zoneCount}</span></div>
+      <p class="sec-note">${L.secPhaseD}</p>
+      <div class="grid flow">
+        ${DATA.zones.map(z=>`<div class="tile" id="zone-${z.id}">
+          <div class="name">${z.label}</div>
+          <div class="desc">${z.tag} · ${z.skills.length} ${L.itemsSuffix}</div>
+          <div class="links">${z.skills.map(k2=>`<a href="#/${k2.route}">${k2.name}</a>`).join('')}</div>
         </div>`).join('')}
       </div>
-    </div>
-    <div id="all-sec" style="margin-top:40px">
-      <div class="section-h"><h2>${L.secAllT}</h2><p>${L.secAllD}</p></div>
+    </section>
+    <section id="all-sec">
+      <div class="sec-head"><h2>${L.secAllT}</h2><span class="n" id="hit"></span></div>
+      <p class="sec-note">${L.secAllD}</p>
       <div class="toolbar">
         <button class="chip on" data-f="all" onclick="setFilter(this)">${L.filterAll}</button>
-        <button class="chip" data-f="✅" onclick="setFilter(this)">✅ ${L.badgeTxt.ok}</button>
-        <button class="chip" data-f="📦" onclick="setFilter(this)">📦 ${L.badgeTxt.pkg}</button>
-        ${DATA.zones.some(z=>z.skills.some(k=>k.status==='⚰️'))?`<button class="chip" data-f="⚰️" onclick="setFilter(this)">⚰️ ${L.badgeTxt.dead}</button>`:''}
-        <span id="hit" style="color:var(--muted);font-size:12.5px"></span>
+        <button class="chip" data-f="✅" onclick="setFilter(this)">${L.badgeTxt.ok}</button>
+        <button class="chip" data-f="📦" onclick="setFilter(this)">${L.badgeTxt.pkg}</button>
+        ${DATA.zones.some(z=>z.skills.some(k2=>k2.status==='⚰️'))?`<button class="chip" data-f="⚰️" onclick="setFilter(this)">${L.badgeTxt.dead}</button>`:''}
       </div>
-      <div class="all-grid" id="all-grid"></div>
+      <div class="grid flow" id="all-grid"></div>
       <div class="empty" id="nohit">${L.nohit}</div>
-    </div>
-  </div>
+    </section>
+  </div></main>
   ${footer()}`;
 }
 
@@ -870,18 +966,22 @@ function renderAll(){
     if(q && !(k.name+' '+k.blurb+' '+z.label).toLowerCase().includes(q)) return;
     items.push({k,z});
   }));
-  grid.innerHTML=items.map(({k,z})=>`<a class="sk" href="#/${k.route}">
-    <div class="t">${k.name} ${badge(k.status)}</div><div class="b">${k.blurb}</div>
-    <div class="z">${z.label}</div></a>`).join('');
+  grid.innerHTML=items.map(({k,z})=>`<a class="tile" href="#/${k.route}">
+    <div class="name">${k.name} ${badge(k.status)}</div><div class="desc">${k.blurb}</div>
+    <div class="where">${z.label}</div></a>`).join('');
   document.getElementById('nohit').style.display=items.length?'none':'block';
   const hit=document.getElementById('hit'); if(hit) hit.textContent=`${items.length} ${L.itemsSuffix}`;
 }
 function onSearch(v){
   const hasQ=!!v;
+  /* A query is a filter over the index, so the two curated entry points and the
+     metrics band step out of the way and only the result grid remains. The
+     smooth scroll comes from ``scroll-behavior`` in the ramp, which the
+     reduced-motion block already turns off — not from an option here. */
   ['scen-sec','zones-sec'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display=hasQ?'none':'';});
-  const heroEl=document.querySelector('.hero'); if(heroEl) heroEl.style.display=hasQ?'none':'';
+  const mast=document.querySelector('.masthead'); if(mast) mast.style.display=hasQ?'none':'';
   const allSec=document.getElementById('all-sec');
-  if(hasQ && allSec) allSec.scrollIntoView({behavior:'smooth'});
+  if(hasQ && allSec) allSec.scrollIntoView();
   renderAll();
 }
 
@@ -889,17 +989,22 @@ function page(route){
   const i=PAGES[route]; if(i===undefined){location.hash='#/';return '';}
   const p=DATA.pages[i];
   const prev=DATA.pages[i-1], next=DATA.pages[i+1];
-  const note = L.langNote ? `<div class="lang-note">${L.langNote}</div>` : '';
+  const note = L.langNote ? `<p class="lang-note">${L.langNote}</p>` : '';
+  /* ``.article`` is the shell (border, padding, measure) and ``.prose`` is the
+     typography, which is the split PROSE_CSS was authored for: the article's own
+     h1/h2 live in the shell, everything a Markdown renderer emits lives in the
+     prose layer. The page body is verbatim catalog Markdown, so it is the one
+     place the underline-at-rest rule for in-content links actually matters. */
   return `${nav()}
-  <div class="wrap">
-    <div class="crumb"><a href="#/">${L.crumbHome}</a> › ${p.zone} › <b style="color:var(--ink)">${route.split('/').pop()}</b></div>
+  <main><div class="wrap">
+    <nav class="crumb" aria-label="${L.crumbAria}"><a href="#/">${L.crumbHome}</a> › ${p.zone} › <span class="now">${route.split('/').pop()}</span></nav>
     ${note}
-    <article class="article">${p.html}</article>
+    <article class="article prose">${p.html}</article>
     <div class="pager">
-      ${prev?`<a href="#/${prev.route}">← ${prev.route.split('/').pop()}</a>`:'<span></span>'}
-      ${next?`<a href="#/${next.route}">${next.route.split('/').pop()} →</a>`:'<span></span>'}
+      ${prev?`<a href="#/${prev.route}" rel="prev">← ${prev.route.split('/').pop()}</a>`:'<span></span>'}
+      ${next?`<a href="#/${next.route}" rel="next">${next.route.split('/').pop()} →</a>`:'<span></span>'}
     </div>
-  </div>
+  </div></main>
   ${footer()}`;
 }
 
@@ -907,17 +1012,47 @@ function footer(){
   const s=DATA.stats;
   const f1=L.footer1
     .replace('{total}',s.total).replace('{installed}',s.installed).replace('{installable}',s.installable);
-  return `<footer>
+  return `<div class="wrap"><footer>
     <div>${f1}</div>
-    <div style="margin-top:6px">${L.footer2}</div>
-  </footer>`;
+    <div>${L.footer2}</div>
+  </footer></div>`;
 }
 
+/* A zone shortcut is an index into this one long page, not a route. It used to be
+   ``href="#/"`` plus a 30ms ``setTimeout(scrollIntoView)``, and ``render`` ends in
+   ``scrollTo(0,0)``, so on every click that fired a hashchange the timer lost and
+   the reader was thrown back to the masthead. Giving the link a real fragment
+   invites the browser's own scroll-to-fragment into the fight, which lands
+   somewhere else entirely under ``scroll-behavior:smooth``, so the click is
+   intercepted: the URL is still written (a zone view is shareable and survives a
+   reload, which is why ``ZONE`` is consulted on every render), but only one thing
+   ever moves the window. ``scrollIntoView`` then honours the ``scroll-margin-top``
+   that clears the sticky bar, so the offset lives in CSS, not in a race. */
+const ZONE = new Set(DATA.zones.map(z=>'zone-'+z.id));
+let onHome = false;
 function render(){
-  const h=location.hash.replace(/^#\/?/,'');
+  const raw=location.hash.replace(/^#/,'');
+  const zone=ZONE.has(raw);
+  const h=zone?'':raw.replace(/^\//,'');
+  onHome = !h;
   app.innerHTML = h ? page(h) : home();
   renderAll();
-  window.scrollTo(0,0);
+  const target = zone ? document.getElementById(raw) : null;
+  /* Two different journeys, so two different behaviours: an index jump is a
+     travel *within* the page the reader is looking at, so it inherits
+     ``scroll-behavior:smooth`` and the eye can follow it; opening a page is a
+     teleport, and animating that means a second of scrolling past content the
+     reader never asked for — which also leaves an in-flight animation for the
+     next click to inherit. ``instant`` is explicit, not ``auto``, because ``auto``
+     resolves to the smooth value set on ``html``. */
+  if(target) target.scrollIntoView();
+  else window.scrollTo({top:0, left:0, behavior:'instant'});
+}
+function goZone(ev,id){
+  ev.preventDefault();
+  history.pushState(null,'','#'+id);
+  if(onHome) document.getElementById(id).scrollIntoView();
+  else render();
 }
 window.addEventListener('hashchange',render);
 render();
@@ -929,12 +1064,27 @@ def build_html(data: dict) -> str:
     # 提前闭合、`<!--` + `<script` 吞掉整页。`\u003c` 是合法 JSON 转义，parse 后还原。
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     l10n = data["l10n"]
+    # The theme has to be on ``<html>`` before the first paint, or the reader sees
+    # a light frame flash on a dark reload. It is the same contract as the app:
+    # ``localStorage['fde-theme']``, a ``?theme=`` override wins, and
+    # ``prefers-color-scheme`` is deliberately *not* the mechanism — the surfaces
+    # switch by an explicit attribute so a reader on an OS-dark laptop still gets
+    # the light workbench until they ask for dark. Both storage and the query can
+    # throw (the portal is also opened over ``file://``), hence the guards.
+    bootstrap = (
+        "<script>(function(){var t=null,q=null;"
+        "try{t=localStorage.getItem('fde-theme')}catch(e){}"
+        "try{q=new URLSearchParams(location.search).get('theme')}catch(e){}"
+        "if(q==='dark'||q==='light'){t=q}else if(!t){t='light'}"
+        "document.documentElement.dataset.theme=t})();</script>"
+    )
     return f"""<!DOCTYPE html>
 <html lang="{l10n["htmlLang"]}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{l10n["docTitle"]}</title>
+{bootstrap}
 <style>{CSS}</style>
 </head>
 <body>
@@ -954,7 +1104,7 @@ def main() -> None:
         out.write_text(build_html(data), encoding="utf-8")
         s = data["stats"]
         print(
-            f"OK {out.relative_to(ROOT)} ｜ {s['total']} 页（✅ {s['installed']} / 📦 {s['installable']}）｜ {out.stat().st_size // 1024} KB"
+            f"OK {out.relative_to(ROOT)} ｜ {s['total']} 页（已安装 {s['installed']} / 可安装 {s['installable']}）｜ {out.stat().st_size // 1024} KB"
         )
 
 

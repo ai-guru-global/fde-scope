@@ -6,6 +6,15 @@
 
 web
 
+## Register
+
+product
+
+Design serves the product: the primary surface is the Engagement console and the
+SOP/glossary/course pages — workbenches read by practitioners mid-engagement. The
+GTM board is a marketing satellite that borrows the same system rather than the
+other way round, so it must not drive the visual language.
+
 ## Stack
 
 delegated: 静态 HTML/CSS/JS（无构建链，浏览器直接打开，可放 GitHub Pages）— 与仓库零构建约定一致；用户确认。

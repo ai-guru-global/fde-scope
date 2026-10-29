@@ -1,0 +1,16 @@
+source: github
+queries:
+- query: topic:forward-deployed-engineer
+  total_count: 125
+  pages_fetched: 2
+  snapshot_at: '2026-10-06'
+- query: '"forward deployed engineer" in:readme'
+  total_count: 4280
+  pages_fetched: 4
+  snapshot_at: '2026-10-06'
+- query: '"forward deployed engineer" in:name,description'
+  total_count: 532
+  pages_fetched: 4
+  snapshot_at: '2026-10-06'
+unique_repos: 804
+note: union 是「本次采集前若干页」的去重结果，不是全体匹配。in:readme / name,description 的全量命中远大于此；此处诚实记录 total_count 与实采页数。

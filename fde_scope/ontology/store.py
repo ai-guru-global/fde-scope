@@ -13,7 +13,7 @@ from pathlib import Path
 import yaml
 
 from .. import paths
-from ..fsutil import atomic_write_text
+from ..fsutil import atomic_write_text, safe_child
 from .models import InstanceStore, OntologySchema
 
 _DATA_DIR = Path(__file__).parent / "data"
@@ -39,16 +39,26 @@ class OntologyStore:
                 out.setdefault(schema.id, schema)
         return out
 
+    # -- 路径 ---------------------------------------------------------------
+    def _schema_path(self, schema_id: str) -> Path:
+        # A schema id reaches here from an HTTP path parameter — and on the
+        # write side straight out of a parsed YAML body — so it has to stay
+        # one segment inside ``schemas_dir`` (fsutil.safe_child).
+        return safe_child(self.schemas_dir, f"{schema_id}.yaml")
+
+    def _store_path(self, store_id: str) -> Path:
+        return safe_child(self.stores_dir, f"{store_id}.json")
+
     # -- 读写 schema -----------------------------------------------------------
     def load_schema(self, schema_id: str) -> OntologySchema | None:
-        p = self.schemas_dir / f"{schema_id}.yaml"
+        p = self._schema_path(schema_id)
         if p.exists():
             return self._parse_schema(p)
         return self.builtin_schemas().get(schema_id)
 
     def save_schema(self, schema: OntologySchema) -> None:
         text = yaml.safe_dump(schema.model_dump(mode="json"), allow_unicode=True, sort_keys=False)
-        atomic_write_text(self.schemas_dir / f"{schema.id}.yaml", text)
+        atomic_write_text(self._schema_path(schema.id), text)
 
     def list_schemas(self) -> list[dict]:
         workspace: dict[str, dict] = {}
@@ -66,7 +76,7 @@ class OntologyStore:
 
     # -- 读写 store ------------------------------------------------------------
     def load_store(self, store_id: str) -> InstanceStore | None:
-        p = self.stores_dir / f"{store_id}.json"
+        p = self._store_path(store_id)
         if not p.exists():
             return None
         try:
@@ -76,14 +86,17 @@ class OntologyStore:
 
     def save_store(self, store: InstanceStore) -> None:
         text = json.dumps(store.model_dump(mode="json"), ensure_ascii=False, indent=2)
-        atomic_write_text(self.stores_dir / f"{store.id}.json", text)
+        atomic_write_text(self._store_path(store.id), text)
 
     def list_stores(self) -> list[dict]:
         entries: list[dict] = []
         if not self.stores_dir.is_dir():
             return entries
         for p in sorted(self.stores_dir.glob("*.json")):
-            inst = self.load_store(p.stem)
+            try:
+                inst = self.load_store(p.stem)
+            except ValueError:
+                continue  # an unusable file name is skipped like a corrupt entry
             if inst is not None:
                 entries.append(
                     {

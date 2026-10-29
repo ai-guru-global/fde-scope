@@ -1,14 +1,54 @@
 #!/usr/bin/env python3
 """Split the bilingual GTM board into language-specific files.
 
-Reads GTM/index.bilingual.html (the en-first + .zh-annotated single file),
-emits:
-  - GTM/index.html      Chinese-primary board (default entry, what Meoo serves)
+Reads GTM/index.bilingual.html (the authored source: English-first, every
+Chinese line carried in a `<span class="zh" lang="zh">` twin), emits:
+  - GTM/index.html      Chinese-primary board (default entry)
   - GTM/en/index.html   English-only board (sub-path /en/)
 
-Run GTM/sync_log.py --lang zh --page index.html and
-      GTM/sync_log.py --lang en --page en/index.html afterwards to fill the
-incident-log sentinels per language.
+Neither artifact is ever hand-edited; both are regenerated from the source, and
+tests/test_gtm_site_guard.py fails the build unless the output matches this
+script byte for byte.
+
+Why the rules look the way they do
+----------------------------------
+Both artifacts are monolingual, so `.en` and `.zh` are never simultaneously
+visible. Any CSS that styled `.zh` as a *second* line under its English twin was
+therefore dead code, and the surviving convention is the opposite one: where the
+Chinese text is the page's primary content it stays wrapped in `<span class="zh">`
+(so `.zh{font-family:var(--zh)}` reaches it), and only the English twin is
+removed. Folding never erases a wrapper that carries content.
+
+  rule 0  pairs      <span class="en">A</span><span class="zh" lang="zh">B</span>
+                        -> <span class="zh">B</span>
+                     Consuming: dropping `lang="zh"` doubles as an
+                     "already folded" marker, so rules 1/3a/3/4 (all keyed on
+                     `<span class="zh" lang="zh">`) can never re-match a pair,
+                     and it makes the zh artifact assertible.
+  rule 1  paragraphs  <p class="lede|board-sub">…<span class="zh">B</span></p> -> B
+                     The English run may contain inline <span class="mono">, so
+                     it is fenced on </p>, not on "<".
+  rule 2  station chips <b>L</b> gloss<span class="zh">D</span>
+                        -> <b>L</b><span class="zh">D</span>
+                     .station is a flex column: label and detail already stack,
+                     so an em-dash seam would sit alone on the second line.
+                     Station labels are Latin codes -> no B_LABELS lookup.
+  rule 3  list items  <b>L</b> gloss<span class="zh">D</span>
+                        -> <b>zh(L)</b> — <span class="zh">D</span>
+                     These glosses flow INLINE (.log-catch, .lists-col li), so
+                     the em-dash seam is kept: without it CJK runs collide
+                     ("运行手册回滚路径与安全"). L translates through B_LABELS;
+                     stamps with no mapping stay Latin on purpose.
+  rule 4  text nodes  TEXT<span class="zh">D</span> -> D
+                     Deliberately BARE (no wrapper). `copyText` reads and
+                     restores `btn.firstChild.nodeValue` on the copy chips; an
+                     Element there makes nodeValue null and silently breaks the
+                     button.
+
+`main()` asserts the two invariants that replaced the old residual-span check:
+the zh artifact holds zero `<span class="en">` and zero `<span class="zh"
+lang="zh">`; the en artifact holds zero CJK outside `<code>`, `data-copy` and the
+locale-switch link.
 
 Both outputs are served from inside the app at /GTM/, so every anchor points at
 an in-app route: tests/test_web.py fails the build if an external href or a
@@ -38,30 +78,11 @@ META_EN = (
     "10 executable gates) into a gate-enforced state machine. Software desks and factory floors alike."
 )
 
-# state badges -> per-language display
-STATE_ZH = {
-    "SIGNED": "已签收",
-    "RUNBOOK": "运行中",
-    "BLOCKED": "阻断",
-    "FLYWHEEL": "飞轮",
-    "PROTOTYPE": "原型",
-    "DEMO DATA · 演示数据 · seeded by examples/seed_mock_engagements.py; every record engine-generated.": "演示数据 · 由 examples/seed_mock_engagements.py 种入；每条门禁记录均由引擎生成。",
-    "VERIFIED BY: CI-green suite · contract pins tests/test_architecture_guard.py · evidence model docs/architecture-model/architecture-map.md": "验证来源：CI 全绿套件 · 契约测试 tests/test_architecture_guard.py · 证据模型 docs/architecture-model/architecture-map.md",
-    "LIVE CAPTURE · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS window · $ ./appbuild/build_release.sh": "实机截图 · FDE-Scope-0.1.0-universal2.app · 1440×952 @2x · macOS 窗口 · $ ./appbuild/build_release.sh",
-    "COPY": "复制",
-    "COPIED ✓": "已复制 ✓",
-}
-
-# <b>EN label</b>[en gloss]<span class="zh">detail</span> list items -> zh label
+# rule 3: <b> label -> Chinese label. Keys are the 31 translated list-item labels.
+# The six mono log stamps (FDE · GATE slo, SA · PHASE 07 · REAL DATA, ...) and the
+# path names deploy/ and connectors/documents.py are absent by design: technical
+# field names stay Latin in both builds.
 B_LABELS = {
-    "ROSTER": "花名册",
-    "SUBAGENT TEMPLATE": "子代理模板",
-    "AGENTCREATE · TEAM SAY": "AGENTCREATE · TEAM SAY",
-    "SERVE": "SERVE",
-    "SKILL CAPTURE": "技能捕获",
-    "REVIEW": "审阅",
-    "PUBLISH": "发布",
-    "EXPORT": "导出",
     "18-phase SOP": "18 阶段 SOP",
     "2 profiles": "2 套场景",
     "10 data connectors": "10 个数据连接器",
@@ -91,74 +112,65 @@ B_LABELS = {
     "Team onboarding": "团队导入",
     "Everything in Pro": "Pro 全量",
     "Audit + evidence chain": "审计 + 证据链",
-    "Custom connector adaptation": "专属连接器适配",
+    "Custom connector adaptation": "专属连接器",
     "SLA": "SLA 保障",
 }
 
-# figure captions
-FIGCAP_ZH = {
-    "<b>ENGAGEMENT CONSOLE · 工作台</b><small>cross-project matrix · gates · recent skills</small>": "<b>工作台</b><small>跨项目矩阵 · 门禁 · 最近技能</small>",
-    "<b>FUNCTIONAL OVERVIEW · 功能总览</b><small>18 phases · 4 zones · 10 gates · 10 connectors</small>": "<b>功能总览</b><small>18 阶段 · 4 大区 · 10 门禁 · 10 连接器</small>",
-}
-FIGCAP_EN = {
-    "<b>ENGAGEMENT CONSOLE · 工作台</b>": "<b>ENGAGEMENT CONSOLE</b>",
-    "<b>FUNCTIONAL OVERVIEW · 功能总览</b>": "<b>FUNCTIONAL OVERVIEW</b>",
-}
+# CJK prose: Han, CJK punctuation, fullwidth forms. Circled numerals
+# (U+2460-U+24FF, e.g. the gate chip "G7") are deliberately excluded: they are
+# diagram furniture, present in both builds.
+CJK = re.compile("[\\u4e00-\\u9fff\\u3000-\\u303f\\uff00-\\uffef]")
 
-JS_ZH = {
-    "REFUSED · functional_safety: hazard analysis missing": "拒绝推进 · functional_safety：缺少危害分析",
-    "OK · phase 12 runbook": "OK · 第 12 阶段 · 运行手册",
-    "advance → REFUSED<br>hazard analysis missing": "advance → 拒绝推进<br>缺少危害分析",
-    "industrial-only · 工业专属，ticket 不适用": "工业专属 · ticket 不适用",
-    '"COPIED"': '"已复制"',
-}
-
-ZH_SPAN = re.compile(r'<span class="zh" lang="zh">(.*?)</span>', re.S)
+ZH_PAIR = re.compile(r'<span class="en">[^<]*</span><span class="zh" lang="zh">([^<]*)</span>')
+ZH_SPAN = re.compile(r'<span class="zh"[^>]*>(.*?)</span>', re.S)
+ZH_FENCE = re.compile(r"[ \t]*//i18n-zh-begin\n.*?//i18n-zh-end\n", re.S)
+ZH_FENCE_KEEP_INNER = re.compile(r"[ \t]*//i18n-zh-(?:begin|end)\n", re.S)
 
 
 def zh_fold_spans(html: str) -> str:
-    """Fold bilingual patterns into pure Chinese, in bounded-safe order.
-
-    Every pattern is anchored so it cannot span structural boundaries:
-    lede/board-sub blocks are fenced by (?!</p>), inline pairs by [^<],
-    and the text-node rule cannot cross a tag.
-    """
-    # 1. paragraph blocks whose English run ends at the zh span (may contain
-    #    inline <a> tags, so fence on the closing </p> only)
+    """Fold bilingual patterns into Chinese-primary, in bounded-safe order."""
+    # 0. consuming pair fold (see module docstring)
+    html = ZH_PAIR.sub(lambda m: f'<span class="zh">{m.group(1)}</span>', html)
+    # 1. lede / board-sub paragraphs: the Chinese run is the primary copy
     html = re.sub(
         r'(<p class="(?:lede|board-sub)">)(?:(?!</p>).)*?<span class="zh" lang="zh">(.*?)</span>\s*</p>',
         lambda m: m.group(1) + m.group(2) + "</p>",
         html,
         flags=re.S,
     )
-    # 2. <span class="en">EN</span><span class="zh">ZH</span> -> ZH
+    # 2. station chips: flex column, no seam, label stays Latin
     html = re.sub(
-        r'<span class="en">[^<]*</span><span class="zh" lang="zh">(.*?)</span>',
-        r"\1",
+        r'<span class="station"><b>([^<]+)</b>[^<]*<span class="zh" lang="zh">([^<]*)</span>',
+        lambda m: f'<span class="station"><b>{m.group(1)}</b><span class="zh">{m.group(2)}</span>',
         html,
-        flags=re.S,
     )
-    # 3. <b>EN label</b>[en gloss]<span class="zh">ZH</span> -> <b>zh label</b>ZH
+    # 3. inline label + gloss: translate the label, keep the em-dash seam
     html = re.sub(
-        r"<b>([^<]+)</b>[^<]*<span class=\"zh\" lang=\"zh\">(.*?)</span>",
-        lambda m: f"<b>{B_LABELS.get(m.group(1), m.group(1))}</b>{m.group(2)}",
+        r"<b>([^<]+)</b>[^<]*<span class=\"zh\" lang=\"zh\">([^<]*)</span>",
+        lambda m: f'<b>{B_LABELS.get(m.group(1), m.group(1))}</b> — <span class="zh">{m.group(2)}</span>',
         html,
-        flags=re.S,
     )
-    # 4. text node + zh span -> zh (drop the English text node)
+    # 4. bare text node + gloss: the Chinese replaces it, wrapper-free
     html = re.sub(
-        r'([^<>]+)<span class="zh" lang="zh">(.*?)</span>',
+        r'([^<>]+)<span class="zh" lang="zh">([^<]*)</span>',
         r"\2",
         html,
-        flags=re.S,
     )
-    # 5. any remaining zh span: unwrap
-    html = ZH_SPAN.sub(r"\1", html)
     return html
 
 
 def en_drop_spans(html: str) -> str:
     return ZH_SPAN.sub("", html)
+
+
+def en_drop_script_block(html: str) -> str:
+    """Remove the Chinese L10N reassignment from the English build."""
+    return ZH_FENCE.sub("", html)
+
+
+def zh_drop_fence_markers(html: str) -> str:
+    """Keep the reassignment, drop the comments that delimit it."""
+    return ZH_FENCE_KEEP_INNER.sub("", html)
 
 
 def zh_head(html: str) -> str:
@@ -208,82 +220,20 @@ def en_title_sections(html: str) -> str:
     return html
 
 
-def split_labels(html: str, keep: str) -> str:
-    """crib-label etc. hold 'EN · 中文'; keep one side."""
-    cls = "crib-label|ledger-head|gates-hint|ps-label"
+def language_switch(html: str, lang: str) -> str:
+    """Append the sibling-locale link to the top nav.
 
-    def fix(m):
-        en, zh = m.group(2), m.group(3)
-        return f'<span class="{m.group(1)}">{(en if keep == "en" else zh).strip()}</span>'
-
-    return re.sub(rf'<span class="({cls})">([^<]*?)\s*·\s*([^<]*?)</span>', fix, html)
-
-
-def zh_buttons(html: str) -> str:
-    html = html.replace("TICKET · 客服工单", "客服工单")
-    html = html.replace("MANUFACTURING · 工厂", "工厂")
-    return html
-
-
-def en_buttons(html: str) -> str:
-    html = html.replace("TICKET · 客服工单", "TICKET")
-    html = html.replace("MANUFACTURING · 工厂", "MANUFACTURING")
-    return html
-
-
-def nav_links(html: str, lang: str) -> str:
-    if lang == "zh":
-        html = html.replace(
-            '<a href="/sop">SOP DOCS</a>',
-            '<a href="/sop">SOP 文档</a>',
-        )
-        html = html.replace(
-            '<a href="/catalog/index.html">SKILLS · 技能库</a>',
-            '<a href="/catalog/index.html">技能手册库</a>',
-        )
-        html = html.replace(
-            '<a href="#pricing">PRICING · 定价</a>',
-            '<a href="#pricing">定价</a>',
-        )
-        html = html.replace(
-            '<a href="#contact">CONTACT · 联系</a>',
-            '<a href="#contact">联系</a>',
-        )
-        html = html.replace(
-            '<a href="#crib">QUICK START</a>',
-            '<a href="#crib">快速开始</a><a href="./en/" hreflang="en" lang="en">ENGLISH</a>',
-        )
-        html = html.replace(
-            "<small>FORWARD-DEPLOYED OPERATING SYSTEM · MIT</small>",
-            "<small>外派工程师作业系统 · MIT</small>",
-        )
-        html = html.replace("FDE SCOPE · GTM BOARD", "FDE SCOPE · GTM 看板")
-    else:
-        html = html.replace(
-            '<a href="/catalog/index.html">SKILLS · 技能库</a>',
-            '<a href="/catalog/index.html">SKILLS</a>',
-        )
-        html = html.replace(
-            '<a href="#pricing">PRICING · 定价</a>',
-            '<a href="#pricing">PRICING</a>',
-        )
-        html = html.replace(
-            '<a href="#contact">CONTACT · 联系</a>',
-            '<a href="#contact">CONTACT</a>',
-        )
-        html = html.replace(
-            '<a href="#crib">QUICK START</a>',
-            '<a href="#crib">QUICK START</a><a href="../" hreflang="zh-CN" lang="zh-CN">中文</a>',
-        )
-    return html
-
-
-def zh_states(html: str) -> str:
-    for en, zh in STATE_ZH.items():
-        html = html.replace(f">{en}</", f">{zh}</")
-    for en, zh in JS_ZH.items():
-        html = html.replace(en, zh)
-    return html
+    Anchored on `</nav>` rather than on a specific link's label, so relabelling
+    or reordering nav items cannot silently drop the switch.
+    """
+    switch = (
+        '<a href="./en/" hreflang="en" lang="en">ENGLISH</a>'
+        if lang == "zh"
+        else '<a href="../" hreflang="zh-CN" lang="zh-CN">中文</a>'
+    )
+    if "</nav>" not in html:
+        sys.exit("nav language switch not injected: no </nav> in the source")
+    return html.replace("</nav>", switch + "</nav>", 1)
 
 
 def rewrite_assets_for_en(html: str) -> str:
@@ -297,44 +247,61 @@ def build_zh(src: str) -> str:
     html = zh_head(src)
     html = zh_title_sections(html)
     html = zh_fold_spans(html)
-    html = split_labels(html, "zh")
-    html = zh_buttons(html)
-    html = nav_links(html, "zh")
-    for en, zh in FIGCAP_ZH.items():
-        html = html.replace(en, zh)
-    html = zh_states(html)
-    html = html.replace(
-        "DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF"
-    )
+    html = zh_drop_fence_markers(html)
+    html = language_switch(html, "zh")
     return html
 
 
 def build_en(src: str) -> str:
     html = en_head(src)
     html = en_title_sections(html)
+    html = en_drop_script_block(html)
     html = en_drop_spans(html)
-    html = split_labels(html, "en")
-    html = en_buttons(html)
-    html = nav_links(html, "en")
-    for en, en2 in FIGCAP_EN.items():
-        html = html.replace(en, en2)
-    html = html.replace(
-        "DIRECTION: SHIFT BOARD · SEED 773793EF", "DIRECTION: ENTERPRISE LIGHT · SEED 773793EF"
-    )
+    html = language_switch(html, "en")
     html = rewrite_assets_for_en(html)
     return html
+
+
+def en_cjk_leaks(html: str) -> list[str]:
+    """CJK surviving in the English artifact, excluding the three sanctioned kinds.
+
+    `<code>` blocks quote real repo paths and CLI output, and `data-copy` holds
+    the literal text a copy chip writes to the clipboard; both legitimately carry
+    Chinese and never render as prose. So does the locale switch: a link to the
+    Chinese build reads 中文 by definition, in either direction.
+    """
+    probe = re.sub(r"<code\b[^>]*>.*?</code>", "", html, flags=re.S)
+    probe = re.sub(r"\sdata-copy=\"[^\"]*\"", "", probe)
+    probe = re.sub(r'<a [^>]*hreflang="zh-CN"[^>]*>[^<]*</a>', "", probe)
+    return [
+        re.sub(r"\s+", " ", probe[max(0, m.start() - 60) : m.start() + 40]).strip()
+        for m in CJK.finditer(probe)
+    ]
+
+
+def zh_residual_spans(html: str) -> tuple[int, int]:
+    return (
+        len(re.findall(r'<span class="en"', html)),
+        len(re.findall(r'<span class="zh" lang="zh"', html)),
+    )
 
 
 def main() -> None:
     src = SRC.read_text(encoding="utf-8")
     zh = build_zh(src)
     en = build_en(src)
-    for path, text, lang in ((ZH_OUT, zh, "zh"), (EN_OUT, en, "en")):
-        path.write_text(text, encoding="utf-8")
-        residual = len(ZH_SPAN.findall(text))
-        print(f"wrote {path} ({len(text)} chars, {residual} residual zh spans)")
-        if lang == "zh" and residual:
-            sys.exit(f"zh output still contains {residual} zh spans")
+
+    en_spans, un_folded = zh_residual_spans(zh)
+    if en_spans or un_folded:
+        sys.exit(f'zh output: {en_spans} <span class="en">, {un_folded} unfoldable zh spans')
+    leaks = en_cjk_leaks(en)
+    if leaks:
+        sys.exit("en output leaks CJK into prose:\n  " + "\n  ".join(leaks[:12]))
+
+    ZH_OUT.write_text(zh, encoding="utf-8")
+    EN_OUT.write_text(en, encoding="utf-8")
+    print(f"wrote {ZH_OUT} ({len(zh)} chars, zero English twins, zero unfoldable spans)")
+    print(f"wrote {EN_OUT} ({len(en)} chars, zero CJK in prose)")
     print(f"zh/en char ratio: {len(zh) / len(en):.2f}")
 
 

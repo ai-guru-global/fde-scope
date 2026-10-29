@@ -40,7 +40,7 @@ import re
 from pathlib import Path
 
 from .course import COURSE_FILES
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, side_nav
 from .mdrender import (
     AUTOLINK,
     MD_IMAGE,
@@ -311,47 +311,33 @@ def _toc_html(toc: list[tuple[int, str, str]], locale: str) -> str:
 
 _STYLE = (
     BASE_CSS
+    + PROSE_CSS
     + """
-.doc-note{display:flex;gap:10px;align-items:flex-start;background:var(--panel2);border:1px solid var(--border);
-border-radius:9px;padding:12px 14px;margin:18px 0 0;font-size:.84rem;color:var(--muted);max-width:860px;line-height:1.7}
+.doc-note{display:flex;gap:var(--sp2);align-items:flex-start;
+background:var(--layer-02);border:1px solid var(--border);border-radius:var(--r2);
+padding:var(--sp3);margin:var(--sp3) 0 0;font-size:var(--fs-sm);color:var(--muted);
+max-width:860px;line-height:1.7}
 .doc-note .ic{color:var(--accent);margin-top:2px}
 .doc-note strong{color:var(--fg)}
-.src{font:500 .74rem/1.7 var(--mono);color:var(--faint);margin:7px 0 0;overflow-wrap:anywhere}
-.toc{margin:14px 0 0;border:1px solid var(--border);border-radius:9px;background:var(--panel2);max-width:860px}
-.toc summary{cursor:pointer;padding:9px 14px;font-weight:600;font-size:.86rem;color:var(--fg)}
-.toc-list{margin:0;padding:4px 14px 10px;list-style:none;columns:2;column-gap:24px}
-.toc-list li{margin:.22em 0;break-inside:avoid;font-size:.84rem}
-.toc-list li.l4{padding-left:14px}
+.src{font:500 var(--fs-xs)/1.7 var(--mono);color:var(--muted);margin:var(--sp2) 0 0;
+overflow-wrap:anywhere}
+/* The contents box is a disclosure, so it reads as one raised layer with the
+   summary as its header row. Two columns at 24px: at 860px a single column
+   makes the h4 sub-entries wander, and three crams the labels. */
+.toc{margin:var(--sp3) 0 0;border:1px solid var(--border);border-radius:var(--r2);
+background:var(--layer-02);max-width:860px}
+.toc summary{cursor:pointer;padding:var(--sp2) var(--sp3);font-weight:600;
+font-size:var(--fs-sm);color:var(--fg)}
+.toc-list{margin:0;padding:var(--sp1) var(--sp3) var(--sp2);list-style:none;
+columns:2;column-gap:var(--sp4)}
+.toc-list li{margin:.22em 0;break-inside:avoid;font-size:var(--fs-sm)}
+.toc-list li.l4{padding-left:var(--sp3)}
 .toc-list a{color:var(--muted);text-decoration:none}
-.toc-list a:hover{color:var(--accent)}
+.toc-list a:hover{color:var(--accent-text)}
 .snav .subnav a{overflow-wrap:anywhere}
-.md{max-width:860px;font-size:.92rem;line-height:1.78;color:var(--fg);padding-top:22px}
-.md>*:first-child{margin-top:0}
-.md h3,.md h4,.md h5,.md h6{margin:1.7em 0 .55em;font-weight:650;letter-spacing:-.008em;line-height:1.35;overflow-wrap:anywhere}
-.md h3[id]{scroll-margin-top:20px}
-.md h3{font-size:1.13rem;padding-bottom:7px;border-bottom:1px solid var(--border)}
-.md h4{font-size:1rem}
-.md h5,.md h6{font-size:.93rem;color:var(--muted)}
-.md p{margin:.7em 0}
-.md ul,.md ol{margin:.6em 0;padding-left:1.5em}
-.md li{margin:.28em 0}
-.md li>ul,.md li>ol{margin:.28em 0}
-.md a{overflow-wrap:anywhere}
-.md strong{font-weight:650}
-.md code{font:.82em/1.6 var(--mono);background:var(--code);border:1px solid var(--border);border-radius:5px;
-padding:1px 5px;overflow-wrap:anywhere}
-.md pre{background:var(--code);border:1px solid var(--border);border-radius:9px;padding:13px 15px;margin:.95em 0;
-overflow-x:auto}
-.md pre code{background:none;border:0;padding:0;font-size:.79rem;line-height:1.68;overflow-wrap:normal}
-.md blockquote{margin:.95em 0;padding:2px 0 2px 14px;border-left:3px solid var(--accent);color:var(--muted)}
-.md blockquote p{margin:.4em 0}
-.md hr{border:0;border-top:1px solid var(--border);margin:1.7em 0}
-.md table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;margin:.95em 0;font-size:.84rem}
-.md th,.md td{border:1px solid var(--border);padding:7px 10px;text-align:left;vertical-align:top}
-.md th{background:var(--panel2);font-weight:600;white-space:nowrap}
-.md tbody tr:nth-child(even) td{background:color-mix(in oklab,var(--panel2) 42%,transparent)}
-.md img{max-width:100%;border:1px solid var(--border);border-radius:9px;margin:.6em 0}
-@media(max-width:640px){.md{font-size:.88rem}}
+/* the article opens its own gap: the source line and the contents box above it
+   both close their own bottom margins */
+.prose{padding-top:var(--sp4)}
 """
     + SHELL_CSS
 )
@@ -392,9 +378,6 @@ def render(slug: str, locale: str = "zh", root: Path | None = None) -> str:
     lang = "en" if en else "zh"
     other = f"/en/docs/{slug}" if not en else f"/docs/{slug}"
     lang_label = "中文" if en else "EN"
-    base = "/en" if en else ""
-    catalog = "/catalog/en/index.html" if en else "/catalog/index.html"
-    gtm = "/GTM/en/index.html" if en else "/GTM/index.html"
     title = p(zh_title, en_title)
 
     out: list[str] = []
@@ -419,19 +402,7 @@ __ICON_SPRITE__
 <span class="tag">{p("仓库文档 · 原文阅读", "repo docs · as authored")}</span>
 </div>
 <nav class="snav">
-<div class="grp">{p("FDE 学习者", "FDE learners")}</div>
-<a href="{base}/">{p("功能总览", "Overview")}</a>
-<a href="{base}/course">{p("入门课程", "Intro course")}</a>
-<a href="{base}/glossary">{p("名词解释", "Glossary")}</a>
-<a href="{base}/certification">{p("认证中心", "Certification")}</a>
-<div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
-<a href="{base}/sop">{p("SOP 全文", "SOP full text")}</a>
-<a href="{catalog}">{p("技能手册库", "Skills handbook")}</a>
-<a href="{base}/docs/readme"{' class="active"' if slug == "readme" else ""}>{p("仓库文档", "Repo docs")}</a>
-<div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
-<a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
-<div class="grp">{p("外部", "External")}</div>
-<a href="{gtm}">{p("GTM 官网", "GTM site")}</a>
+{side_nav("docs" if slug == "readme" else "", en=en)}
 </nav>
 <div class="side-foot">
 <a class="lang" href="{other}">{lang_label}</a>
@@ -472,7 +443,7 @@ the document text.</p>
     if body is not None:
         body_lang = ' lang="zh-Hans"' if en else ""
         add(_toc_html(toc, locale))
-        add(f'<div class="md"{body_lang}>{body}</div>')
+        add(f'<div class="prose"{body_lang}>{body}</div>')
     else:
         add(
             f"""<div class="doc-note">

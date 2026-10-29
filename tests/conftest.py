@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -68,6 +69,22 @@ def _pro_license_env(monkeypatch: pytest.MonkeyPatch) -> None:
         lic.ENV_LICENSE_KEY,
         lic.issue_license(customer="Test Suite", tier="pro", seats=50, secret="test-suite-license-secret"),
     )
+
+
+@pytest.fixture(autouse=True)
+def _drain_storage_pool() -> Iterator[None]:
+    """Close pooled SQLite connections once a test is done with them.
+
+    ``storage._pooled_sqlite`` deliberately keeps a connection alive across
+    calls — that is the point of the pool — so the suite has to drain it,
+    otherwise a full run holds an open descriptor and a WAL pair per
+    sqlite-mode test against a ``tmp_path`` that no longer matters.
+    """
+    yield
+    from fde_scope import storage
+
+    for backend in list(storage._SQLITE_POOL.values()):
+        backend.close()
 
 
 SAMPLE_ROWS = [

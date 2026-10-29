@@ -138,6 +138,89 @@ def test_store_load_all_skips_corrupt(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# path traversal (fsutil.safe_child guard on the {skill_id} choke point)
+# ---------------------------------------------------------------------------
+
+#: ids an HTTP path parameter or CLI argument could plausibly carry; every one
+#: of these used to become ``root / skill_id`` verbatim.
+_EVIL_IDS = [
+    "../../outside",
+    "skill-../escape",
+    "a/b",
+    "\\\\..\\escape",
+    "\x00skill",
+    "..",
+    ".",
+]
+
+
+def test_safe_child_accepts_ordinary_ids(tmp_path):
+    from fde_scope.fsutil import safe_child
+
+    root = tmp_path / "skills"
+    assert safe_child(root, "skill-1a2b3c4d") == (root / "skill-1a2b3c4d").resolve()
+    # hand-authored ids keep working: dots, dashes, unicode
+    assert safe_child(root, "my.skill_v1-2").name == "my.skill_v1-2"
+    assert safe_child(root, "现场技能").name == "现场技能"
+
+
+@pytest.mark.parametrize("evil", _EVIL_IDS)
+def test_safe_child_refuses_traversal(tmp_path, evil):
+    from fde_scope.fsutil import UnsafeIdentifier, safe_child
+
+    with pytest.raises(UnsafeIdentifier):
+        safe_child(tmp_path / "skills", evil)
+
+
+def test_safe_child_refuses_a_symlink_pointing_outside(tmp_path):
+    """The resolve backstop, not just the string check: ``link`` is one clean
+    segment whose *target* leaves the root."""
+    from fde_scope.fsutil import UnsafeIdentifier, safe_child
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root = tmp_path / "skills"
+    root.mkdir()
+    (root / "link").symlink_to(outside, target_is_directory=True)
+    assert safe_child(root, "plain").name == "plain"
+    with pytest.raises(UnsafeIdentifier):
+        safe_child(root, "link")
+
+
+@pytest.mark.parametrize("evil", _EVIL_IDS)
+def test_store_refuses_traversal_ids_without_touching_anything(tmp_path, evil):
+    """load/save/delete all funnel through ``_dir_for``, so all three refuse."""
+    from fde_scope.fsutil import UnsafeIdentifier
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    store.save(_rec())
+    with pytest.raises(UnsafeIdentifier):
+        store.load(evil)
+    with pytest.raises(UnsafeIdentifier):
+        store.save(_rec(id=evil))
+    with pytest.raises(UnsafeIdentifier):
+        store.delete(evil)
+    # nothing was created, renamed or removed outside the store root
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["skills"]
+    assert len(store.load_all()) == 1
+
+
+def test_store_delete_stays_inside_root(tmp_path):
+    """A refused delete must leave the real skill directory intact."""
+    from fde_scope.fsutil import UnsafeIdentifier
+    from fde_scope.skills.store import SkillStore
+
+    store = SkillStore(tmp_path / "skills")
+    rec = _rec()
+    store.save(rec)
+    with pytest.raises(UnsafeIdentifier):
+        store.delete("../skills")
+    assert store.load(rec.id) is not None
+    assert (tmp_path / "skills" / rec.id / "meta.json").exists()
+
+
+# ---------------------------------------------------------------------------
 # service
 # ---------------------------------------------------------------------------
 

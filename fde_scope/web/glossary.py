@@ -20,7 +20,7 @@ carry no provenance claim.
 import html
 
 from .i18n import GLOSSARY_EN, GLOSSARY_ZH
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .layout import BASE_CSS, SHELL_CSS, SHELL_JS, side_nav
 
 #: (icon id, zh label, en label, zh blurb, en blurb, terms) — order is page order.
 _GROUPS: list[tuple[str, str, str, str, str, list[str]]] = [
@@ -228,20 +228,20 @@ def _label(term: str, en: bool) -> str:
 _STYLE = (
     BASE_CSS
     + """
-.gsearch{display:flex;gap:10px;align-items:center;margin:14px 0 0;max-width:860px}
-.gsearch input{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:8px;
-padding:8px 12px;font-size:.9rem;color:var(--fg)}
-.gsearch input:focus{outline:2px solid var(--accent);outline-offset:1px}
-.gl-count{font-size:.78rem;color:var(--faint);white-space:nowrap}
-.totop{margin-left:auto;color:var(--muted);text-decoration:none;font-size:.8rem}
-.totop:hover{color:var(--accent)}
-.gl{display:grid;gap:10px;margin:0}
-.gl .card{background:var(--panel);border:1px solid var(--border);border-radius:9px;
-padding:13px 15px;min-width:0;transition:border-color .15s}
+.gsearch{display:flex;gap:var(--sp3);align-items:center;margin:var(--sp3) 0 0;max-width:860px}
+/* metrics come from the canonical ``input`` rule in ``THEME_CSS``; a search field
+   in a flex row grows instead of filling. */
+.gsearch input{flex:1;min-width:0}
+.gl-count{font:600 var(--fs-xs)/1.5 var(--mono);color:var(--muted);white-space:nowrap}
+.totop{margin-left:auto;color:var(--muted);text-decoration:none;font-size:var(--fs-sm)}
+.totop:hover{color:var(--accent-text)}
+.gl{display:grid;gap:var(--sp3);margin:0}
+.gl .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r2);
+padding:13px 15px;min-width:0;transition:border-color var(--dur) var(--ease)}
 .gl .card:hover{border-color:var(--border-strong)}
-.gl dt{font-weight:600;font-size:.88rem;color:var(--fg);overflow-wrap:anywhere}
-.gl dt .alias{font:400 .78rem/1.5 var(--mono);color:var(--faint);margin-left:7px}
-.gl dd{margin:5px 0 0;color:var(--muted);font-size:.82rem;line-height:1.7}
+.gl dt{font-weight:600;font-size:var(--fs-body);color:var(--fg);overflow-wrap:anywhere}
+.gl dt .alias{font:400 var(--fs-xs)/1.5 var(--mono);color:var(--muted);margin-left:7px}
+.gl dd{margin:5px 0 0;color:var(--muted);font-size:var(--fs-sm);line-height:1.7}
 @media(max-width:960px){
 .cols-4,.cols-3,.gl{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -301,7 +301,10 @@ def render(locale: str = "zh") -> str:
     lang = "en" if en else "zh"
     other = "/glossary" if en else "/en/glossary"
     lang_label = "中文" if en else "EN"
-    base = "/en" if en else ""
+
+    # The letter-group anchors as ``side_nav`` leaf entries: the same ``heads``
+    # list drives the page's section ids, so the rail cannot drift from the body.
+    subnav = tuple((f"#g{idx:02d}", head[2] if en else head[1]) for idx, head in enumerate(heads, 1))
 
     out: list[str] = []
     add = out.append
@@ -325,25 +328,7 @@ __ICON_SPRITE__
 <span class="tag">{p("现场词汇表", "field vocabulary")}</span>
 </div>
 <nav class="snav">
-<div class="grp">{p("FDE 学习者", "FDE learners")}</div>
-<a href="{base}/">{p("功能总览", "Overview")}</a>
-<a href="{base}/course">{p("入门课程", "Intro course")}</a>
-<a href="{base}/glossary" class="active">{p("名词解释", "Glossary")}</a>
-<div class="subnav">"""
-    )
-    for idx, head in enumerate(heads, 1):
-        add(f'<a href="#g{idx:02d}">{head[2] if en else head[1]}</a>')
-    add(
-        f"""</div>
-<a href="{base}/certification">{p("认证中心", "Certification")}</a>
-<div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
-<a href="{base}/sop">{p("SOP 全文", "SOP full text")}</a>
-<a href="{"/catalog/en/index.html" if en else "/catalog/index.html"}">{p("技能手册库", "Skills handbook")}</a>
-<a href="{base}/docs/readme">{p("仓库文档", "Repo docs")}</a>
-<div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
-<a href="{base}/console">{p("Engagement 控制台", "Engagement console")}</a>
-<div class="grp">{p("外部", "External")}</div>
-<a href="{"/GTM/en/index.html" if en else "/GTM/index.html"}">{p("GTM 官网", "GTM site")}</a>
+{side_nav("glossary", en=en, subnav=subnav)}
 </nav>
 <div class="side-foot">
 <a class="lang" href="{other}">{lang_label}</a>

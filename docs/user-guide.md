@@ -92,6 +92,7 @@ fde-scope web    # → http://127.0.0.1:8080
 | gate 列表 | `fde-scope gate list --profile manufacturing` |
 | 现场记录 | `fde-scope engage journal <id> --kind research --note "…"` |
 | 移交包 | `fde-scope handoff <id> --accept`（生成 runbook + 移交包） |
+| 移交包·边界/终止条件 | `fde-scope handoff <id> --boundary "…" --termination "…" --accept`（G7③④，只出 warning） |
 | 技能沉淀 | `fde-scope skill add / list / review / publish / export` |
 
 ### 处理 gate 拦截
@@ -99,6 +100,12 @@ fde-scope web    # → http://127.0.0.1:8080
 `advance` 被拦截时会打印 blockers 清单（如「sponsor 不足 2 人」）。正常做法是
 补齐条件（通过 Web 控制台 Context tab 或 `POST /api/engagements/{eid}/context`
 更新现场信息）后再次 advance。
+
+blocker 之外还有 **warning**：它印在同一屏（`⚠️` 行），但**不改退出码、不让
+`passed` 变 false**。10 个 gate 全都有 warning 路径——例如 `slo` 的「缺告警路由」、
+`functional_safety` 的「PLr 已定义但未记录达成 PL」、`handoff_signoff` 的「移交包未
+记录适用边界（G7③）/ 终止条件（G7④）」。**「门禁绿了」不等于「这一屏没人该读
+警告**——脚本里要判干净，用 `--json` 看 `warnings` 数组是否为空，别只看退出码。
 
 确有例外时可强制推进：
 
@@ -113,7 +120,12 @@ curl -X POST http://127.0.0.1:8080/api/engagements/<id>/advance \
 ```
 
 注意：**force 只是豁免拦截，gate 照常评估并记录**——例外会留在审计日志里，
-不会混同于干净通过。被拦截时系统还会自动生成一条 gate_hint 技能草稿，
+不会混同于干净通过。**但留痕只走 Web API 这条路**：`audit.jsonl` 的写点全部在
+`fde_scope/web/app.py`（`engagement.advance` 的 detail 里带 `reason` / `operator`），
+CLI 的 `engage advance --force` 不进审计，只落 Python 日志。实测：CLI 连推 5 次
+force 后 `<data root>/.fde_scope/` 下没有 `audit.jsonl`。**需要可追溯的例外，
+就从 Web API 推进**；只在 CLI 上 force，事后查不到是谁批的。
+被拦截时系统还会自动生成一条 gate_hint 技能草稿，
 可用 `fde-scope skill review` 查看完善。
 
 ### 导出审计
@@ -152,8 +164,8 @@ curl -X DELETE http://127.0.0.1:8080/api/engagements/<id> \
 
 | 变量 | 作用 | 备注 |
 |---|---|---|
-| `FDE_SCOPE_API_TOKEN` | Web API 认证 token | 设置后所有非白名单路由要求 `Authorization: Bearer` 或 `X-API-Key`；不设置则认证关闭（本地单机模式） |
-| `FDE_SCOPE_ALLOW_REMOTE` | 允许绑定非回环地址 | 需显式设为 `1`，否则 `fde-scope web --host 0.0.0.0` 被拒绝 |
+| `FDE_SCOPE_API_TOKEN` | Web API 认证 token | 设置后所有非白名单路由要求 `Authorization: Bearer` 或 `X-API-Key`；不设置则认证关闭，但只对回环地址到达的请求放开——经非 loopback 地址访问的数据路由一律 403 |
+| `FDE_SCOPE_ALLOW_REMOTE` | 允许绑定非回环地址 | 需显式设为 `1`，否则 `fde-scope web --host 0.0.0.0` 被拒绝；设了它还不够，`FDE_SCOPE_API_TOKEN` 缺失同样拒绝启动 |
 | `FDE_SCOPE_HOME` | 数据根目录 | 不设则按「CWD 含数据 → 应用目录 → CWD」解析 |
 | `FDE_SCOPE_LOG_LEVEL` | 日志级别 | 默认 `WARNING`；`DEBUG` 可见 gate 评估细节 |
 | `FDE_SCOPE_MIMO_API_KEY` | MiMo Token Plan 凭据 | `tp-` 前缀；可选 `FDE_SCOPE_MIMO_BASE_URL` / `FDE_SCOPE_MIMO_MODEL` |
@@ -206,11 +218,21 @@ tar czf fde-backup-$(date +%F).tgz .fde_scope/ reports/
 `export FDE_SCOPE_HOME=/path/to/数据根` 固定位置（macOS App 就是这么做的）。
 
 **7. 想绑定 `0.0.0.0` 给局域网用被拒绝？**
-这是安全设计：先设 `FDE_SCOPE_API_TOKEN` 开启认证，再
-`FDE_SCOPE_ALLOW_REMOTE=1 fde-scope web --host 0.0.0.0`。
+这是安全设计：两个条件都得满足——先 `export FDE_SCOPE_API_TOKEN="$(openssl rand -hex 32)"`
+开启认证，再 `FDE_SCOPE_ALLOW_REMOTE=1 fde-scope web --host 0.0.0.0`。只设 opt-in
+而不设 token 同样 exit 2：opt-in 声明的是「我愿意监听这张网卡」，不是「关掉认证」。
+绕过 CLI 直接 `uvicorn fde_scope.web.app:app` 启动时，中间件仍会在每个请求上兜底：
+未设 token 且请求是从非 loopback 地址收到的 → 403（回环路径不受影响，见下条）。
 仅建议在受信内网这么做；公网暴露暂不提供额外防护（HTTPS 终止、SSO 等见路线图 P5）。
 
-**8. gate 被拦、看不懂 blocker 是什么意思？**
+**8. 前面挂了 nginx，本机 127.0.0.1 也能访问，怎么办？**
+`scope["server"]` 判的是「连接被 accept 时落在哪个地址」，同机反向代理落在回环上，
+因此这条路径不会被 403 拦。把 nginx 当作必须自己鉴权的入口：要么给
+`FDE_SCOPE_API_TOKEN` 设上值、由代理转发 `X-API-Key`，要么用 nginx 的
+`auth_request`/Basic Auth 拦住 `/api/`；不要把免 token 的回环口直接暴露出去。
+`--proxy-headers` 只改写 `client`（来源），不会改写 `server`，不会被伪造成本地请求。
+
+**9. gate 被拦、看不懂 blocker 是什么意思？**
 Web 控制台 engagement 详情页的「引导」tab 会把每个 blocker 翻译成
 「下一步做什么」的白话清单，并给出当前阶段的产出物列表与技能手册深链；
 无需 FDE 驻场也能自行补齐条件。

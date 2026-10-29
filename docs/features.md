@@ -6,7 +6,7 @@
 > 两类场景。构建在 AgentScope 2.0 之上。
 >
 > 本文档是完整功能清单。所有条目均为有测试覆盖的可执行代码;数量类承诺
-> (18 阶段 / 10 门禁 / 69 路由…)由
+> (18 阶段 / 10 门禁 / 86 路由…)由
 > [架构守卫测试](../tests/test_architecture_guard.py) 钉死。
 >
 > English version: [`docs/features-en.md`](features-en.md)
@@ -81,6 +81,15 @@ flowchart LR
 - **支持 `advance` / `rollback` / `--force`**:强制推进仍评估并记录,例外留审计痕迹。
 - **现场记录(Journal)**:research / implementation / optimization 三类记录,
   一键沉淀为技能。
+- **复盘(SLA 时钟,只读)**:`fde-scope engage retrospective <id>` /
+  `GET /api/engagements/{eid}/retrospective` / 控制台「复盘」tab——把 audit 流
+  (`engagement.create/advance/rollback/gate_evaluate`)重放成阶段时间线(访问
+  次数、各阶段停留,含进行中的访问),对照契约时限(≤14d 集成 / ≤90d 上线 /
+  ≤120d 退场;`assets["success_criteria_sla"]` 可逐项目覆盖,来源逐条标注)给出
+  met/missed/at_risk/on_track,并统计 gate 评估次数与首过率。诚实降级:审计流
+  重放终态与当前阶段不一致时置 `timeline_consistent=false`;无审计事件的历史
+  项目退化为 context-only,不编造历史。CLI 变更命令(init/advance/rollback、
+  gate check)与 web 同名事件留痕(`actor: "cli"`),零新持久化。
 
 ## 2. 十个可执行门禁 `engagement/gates/`
 
@@ -98,7 +107,7 @@ flowchart LR
 | `air_gap` | 🏭 | 离线部署姿态在 connect 阶段定论(不能事后 phone home) |
 | `shift_handover` | 🏭 | 多班次现场需要数字化交接日志 + 每班次 runbook |
 | `slo` | 🏢 | SLO/SLA + 错误预算 + 告警路由(缺路由 → warning) |
-| `handoff_signoff` | 🏢 | 交接包:runbook + eval 报告 + SLO + 培训材料,客户已接受 |
+| `handoff_signoff` | 🏢 | 交接包:runbook + eval 报告 + SLO + 培训材料,客户已接受;适用边界(G7③)/ 终止条件(G7④)缺失 → warning,不阻塞 |
 
 **执行流:**
 
@@ -130,7 +139,7 @@ flowchart TD
 | 表面 | 形态 | 功能 |
 |---|---|---|
 | CLI | `fde-scope` | 13 组命令:connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web 控制台 | FastAPI 单页,69 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图、认证中心(三家平台考试细则+考点大纲+样题+渠道尽调清单,逐条标注来源等级)、名词解释(全部术语按主题分组,同页卡片+即时搜索)、入门课程(Level 1 全部 25 篇课程文档按源文件渲染同页,文内引用改写为站内链接)、SOP 全文(源文件本地渲染,小节导航+表格)、技能手册库(生成门户站内挂载)、仓库文档(README 与 docs/ 20 篇本地渲染,GitHub 式锚点与图片全部站内化)、GTM 官网(成品站站内挂载,全部外链改写为站内路由或纯文本)——左栏不再有任何外跳 |
+| Web 控制台 | FastAPI 单页,86 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图、认证中心(三家平台考试细则+考点大纲+样题+渠道尽调清单,逐条标注来源等级)、名词解释(全部术语按主题分组,同页卡片+即时搜索)、入门课程(Level 1 全部 26 篇课程文档按源文件渲染同页,文内引用改写为站内链接;页内实验判分:G0 自检 + D1–D8 逐日机器判分,与 CLI `course check` 同一 `run_lab`,一次性工作区不碰真实数据)、SOP 全文(源文件本地渲染,小节导航+表格)、技能手册库(生成门户站内挂载)、仓库文档(README 与 docs/ 20 篇本地渲染,GitHub 式锚点与图片全部站内化)、GitHub 资源(抓取仓库全量建档、许可×相关度双轴筛选、站内搜索,上游地址一律纯文本不出站)、作品集登记(审校规则逐条带教案出处与可信度分级,页面刻意不列任何登记条目,登记与审校走 token 之后的三个接口)、复盘(engagement 详情内「复盘」tab:SLA 时钟+阶段时间线+gate 统计,只读)、干系人只读分享(第二种凭据:链接里带 per-engagement token,明文只显示一次、落盘 sha256,轮换即吊销;`/share/{eid}` 渲染进度+SLA+门禁现况+客户签收——签收只写 `share.ack` 审计证据,不推进状态机,正式验收仍走 authed accept 流程;无效链接一律 404 不探测)、GTM 官网(成品站站内挂载,全部外链改写为站内路由或纯文本)——左栏不再有任何外跳 |
 | QwenPaw PawApp | 桌面插件 | `/api/fde-scope` 下 18 路由 + 3 个 agent 工具 + skill provider,与 Web 同一引擎 |
 | macOS App | universal2 DMG | 双击即用;同一 FastAPI 对象(127.0.0.1:8737),单实例守护 + 健康检查 + 崩溃兜底 |
 
@@ -286,7 +295,7 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 | 零门槛可验证 | "安装五小时,演示两分钟" | 无 key、无 Docker、无 AgentScope 也能跑通核心证据链 |
 | 凭据只在环境变量 | key 泄进 manifest/报告/日志 | 架构不变量 + 守卫测试强制 |
 | 认证中心 | 渠道准入与认证细则散在各厂商站点,口径不一、无法交叉核对 | 三家平台考试规格 + 考点大纲 + 样题 + 尽调清单同页呈现,每个数字标 official/noted/gap,查不到的就写查不到 |
-| 入门课程 | 课程 Markdown 散在仓库里,新人不知道从哪读、读的是不是最新 | `/course` 把 `course-level-1/` 的 25 篇文档按源文件原样渲染(章节锚点 + 文件内链改写 + 任务清单可读化),产物与仓库零复制、零漂移 |
+| 入门课程 | 课程 Markdown 散在仓库里,新人不知道从哪读、读的是不是最新 | `/course` 把 `course-level-1/` 的 26 篇文档按源文件原样渲染(章节锚点 + 文件内链改写 + 任务清单可读化),产物与仓库零复制、零漂移 |
 
 ## 17. 尚未完成(Roadmap)
 

@@ -92,9 +92,13 @@ fde-scope corpus --input examples/quickstart_csv/sample_tickets.csv \
 fde-scope web          # http://127.0.0.1:8080/course  and  /en/course
 ```
 
-`fde-scope web` binds loopback only. Binding elsewhere is refused unless you set
-`FDE_SCOPE_ALLOW_REMOTE=1` — the local workbench has no authentication by design,
-so exposing it would expose your engagements and journals to the network.
+`fde-scope web` binds loopback only, and the local workbench runs without a token
+by design. Going beyond loopback costs two things: `FDE_SCOPE_ALLOW_REMOTE=1`
+opts into the bind, and `FDE_SCOPE_API_TOKEN` must hold a secret token — neither
+implies the other, so the CLI refuses a non-loopback bind that has only the first.
+The middleware enforces the same rule per request: with no token configured, a
+request that arrived on a non-loopback address gets 403, even if the server was
+started with `uvicorn` directly instead of through the CLI.
 
 **Optional, and only optional.** Adding `--llm` to `corpus` synthesizes gap-filling
 samples with MiMo; it reads `FDE_SCOPE_MIMO_API_KEY` **from the environment**. Keys

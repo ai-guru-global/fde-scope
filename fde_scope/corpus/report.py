@@ -11,6 +11,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from ..fsutil import atomic_write_text
 from .types import CorpusReport
 
 # Templates ship inside the package so the rendered report works regardless
@@ -39,6 +40,5 @@ def render_html(report: CorpusReport) -> str:
 def save_html(report: CorpusReport, path: str | Path) -> Path:
     """Render and write the report to ``path``."""
     p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(render_html(report), encoding="utf-8")
+    atomic_write_text(p, render_html(report))
     return p

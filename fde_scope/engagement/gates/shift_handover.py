@@ -8,7 +8,7 @@ flying blind when the agent misbehaves.
 from __future__ import annotations
 
 from ..context import EngagementContext
-from .base import Gate, GateResult
+from .base import Gate, GateResult, asset_record
 
 
 class ShiftHandoverGate(Gate):
@@ -27,8 +27,10 @@ class ShiftHandoverGate(Gate):
                 notes=["单班次现场，shift handover 不适用"],
             )
 
-        handover = ctx.assets.get("shift_handover")
-        if not handover:
+        handover, invalid = asset_record(ctx.assets, "shift_handover")
+        if invalid:
+            blockers.append(invalid)
+        elif not handover:
             blockers.append(f"{ctx.site.shift_count} 班次现场，未集成班次交接流程")
         else:
             if not handover.get("digital_log_integrated"):

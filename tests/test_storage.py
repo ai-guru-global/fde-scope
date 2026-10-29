@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from fde_scope import paths, storage
 from fde_scope.engagement import Engagement, EngagementContext
 from fde_scope.storage import (
     FileStorage,
@@ -33,6 +34,64 @@ def test_env_selects_sqlite(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_unknown_backend_falls_back_to_file(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FDE_SCOPE_STORAGE", "postgresql")
     assert isinstance(get_storage_backend(), FileStorage)
+
+
+# -- sqlite connection pooling ----------------------------------------------------
+def test_sqlite_backend_is_pooled_per_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolving the backend per request re-opened the database and re-ran the
+    WAL + schema setup for every engagement operation (300 saves: ~50ms versus
+    ~3ms pooled). One connection per database is the contract."""
+    monkeypatch.setenv("FDE_SCOPE_STORAGE", "sqlite")
+    monkeypatch.chdir(tmp_path)
+    first = get_storage_backend()
+    second = get_storage_backend()
+    assert first is second
+    assert first._conn is second._conn
+    assert first.db_path == (tmp_path / ".fde_scope" / "engagements.db").resolve()
+
+
+def test_pool_re_resolves_a_moved_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pooling must not pin the first database: ``paths`` is deliberately
+    re-resolved per call, so a moved root has to yield a different backend."""
+    monkeypatch.setenv("FDE_SCOPE_STORAGE", "sqlite")
+    homes = [tmp_path / "home-a", tmp_path / "home-b"]
+    for home in homes:
+        home.mkdir()
+    backends = []
+    for home in homes:
+        monkeypatch.setenv("FDE_SCOPE_HOME", str(home))
+        backends.append(get_storage_backend())
+    be_a, be_b = backends
+    assert be_a is not be_b
+    assert be_a.db_path.parent == (homes[0] / ".fde_scope").resolve()
+    assert be_b.db_path.parent == (homes[1] / ".fde_scope").resolve()
+
+
+def test_close_evicts_the_pooled_instance(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A closed instance left in the pool would hand the next caller a dead
+    connection; after eviction the next resolution builds a usable one."""
+    monkeypatch.setenv("FDE_SCOPE_STORAGE", "sqlite")
+    monkeypatch.chdir(tmp_path)
+    be = get_storage_backend()
+    be.save_engagement(_ctx("eng-pool1"))
+    be.close()
+    fresh = get_storage_backend()
+    assert fresh is not be
+    assert fresh.load_engagement("eng-pool1").customer == "Acme"
+
+
+def test_close_is_idempotent(tmp_path: Path) -> None:
+    be = SQLiteStorage(tmp_path / "twice.db")
+    be.close()
+    be.close()
+
+
+def test_direct_instances_are_not_pooled(tmp_path: Path) -> None:
+    """Constructing SQLiteStorage by hand (tests, migration tooling) stays
+    independent of the pool, so closing one cannot evict another."""
+    be = SQLiteStorage(tmp_path / "outside.db")
+    be.close()
+    assert str((tmp_path / "outside.db").resolve()) not in storage._SQLITE_POOL
 
 
 # -- FileStorage ---------------------------------------------------------------
@@ -190,11 +249,37 @@ def test_migrate_file_to_sqlite(tmp_path: Path) -> None:
         file_be.save_engagement(_ctx(eid))
     summary = migrate_file_to_sqlite(tmp_path / "mig.db")
     assert summary["migrated"] == 2
+    assert summary["skipped"] == 0
     # source files stay in place (one-way copy, not a move)
     assert len(list((tmp_path / ".fde_scope" / "engagements").glob("*.json"))) == 2
     sqlite_be = SQLiteStorage(tmp_path / "mig.db")
     assert sorted(c.id for c in sqlite_be.list_engagements()) == ["eng-m1", "eng-m2"]
     sqlite_be.close()
+
+
+def test_migrate_counts_unreadable_sources_as_skipped(tmp_path: Path) -> None:
+    """``list_engagements`` drops a corrupt file silently. A migration that
+    copied 2 of 3 files has to say so, not report 2 as the whole story."""
+    file_be = FileStorage()
+    file_be.save_engagement(_ctx("eng-m3"))
+    file_be.save_engagement(_ctx("eng-m4"))
+    (tmp_path / ".fde_scope" / "engagements" / "eng-bad.json").write_text("{not json", encoding="utf-8")
+    summary = migrate_file_to_sqlite(tmp_path / "mig2.db")
+    assert summary == {
+        "migrated": 2,
+        "skipped": 1,
+        "db_path": str((tmp_path / "mig2.db").resolve()),
+    }
+    # the skipped file is left for the operator to look at
+    assert (tmp_path / ".fde_scope" / "engagements" / "eng-bad.json").exists()
+
+
+def test_migrate_reports_the_key_it_actually_wrote_to(tmp_path: Path) -> None:
+    """The summary must point at the database the rows landed in, which is not
+    the default path when ``--db`` was given."""
+    summary = migrate_file_to_sqlite(tmp_path / "elsewhere.db")
+    assert Path(summary["db_path"]).exists()
+    assert summary["db_path"] != str(paths.engagements_db())
 
 
 def test_cli_storage_migrate(tmp_path: Path) -> None:

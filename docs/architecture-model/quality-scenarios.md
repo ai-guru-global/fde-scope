@@ -31,10 +31,10 @@
 |---|---|
 | 刺激 | 用户执行 `fde-scope web --host 0.0.0.0` 做局域网演示并保持运行 |
 | 环境 | 公司/家庭局域网，含客户 PII 语料的 `.fde_scope/` |
-| 当前响应证据 | 全部 26 路由零认证；创建/journal/skills/forge 均为写操作 |
-| 缺口 | 无警告、无 opt-in 门、无 token 选项 |
-| 目标响应 | 非 loopback 绑定 ≥1 层防护：醒目警告 → 要求 `FDE_SCOPE_ALLOW_REMOTE=1`；后续可选静态 token |
-| 度量 | 另一设备 curl `/api/engagements` 返回 401/403 或启动即被环境变量门拦截 |
+| 当前响应证据 | 两层门（2026-10-06 实测）：CLI 在非回环绑定缺 token 时 exit 2；`ApiTokenAuthMiddleware` 逐请求判 `scope["server"]`，未设 token 且请求从非回环地址到达 → 403，设了 token 则非白名单路由 401/200。同一 `0.0.0.0` 监听器：本机 127.0.0.1 → 200，局域网地址 → 403 |
+| 缺口 | 单 token 无用户维度（谁做了什么靠 `operator` 自报进审计）；免 token 的回环模式下本机浏览器仍可被跨站表单 POST 打到；同机反向代理落在回环上、不被中间件拦，需自行鉴权 |
+| 目标响应 | ✅ 已达成：非回环路径要么有 token 要么拒绝服务，且默认绑回环。后续 P5：多用户/RBAC、CSRF、代理侧鉴权文档化 |
+| 度量 | 另一设备 curl `/api/engagements` 返回 403（无 token）或 401（有 token）；`fde-scope web --host <ip>` 无 token → exit 2。回归：`tests/test_web_auth.py` |
 
 ## QAV-EVO-1 · 演进性：AgentScope 上游破坏性升级（对应 R7）
 

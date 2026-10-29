@@ -16,6 +16,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..fsutil import atomic_write_text
 from ..logutil import get_logger
 from ..ontology.extract import ConceptExtractor
 from .agents import QualityGate, SchemaNormalizer, build_stages
@@ -190,8 +191,7 @@ class CorpusForge:
 def save_report_json(report: CorpusReport, path: str | Path) -> Path:
     """Write a CorpusReport to JSON for downstream tooling."""
     p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(report.model_dump_json(indent=2, exclude_none=True), encoding="utf-8")
+    atomic_write_text(p, report.model_dump_json(indent=2, exclude_none=True))
     return p
 
 
@@ -206,9 +206,7 @@ def load_items_jsonl(path: str | Path) -> list[CorpusItem]:
 
 
 def save_items_jsonl(items: list[CorpusItem], path: str | Path) -> Path:
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", encoding="utf-8") as fh:
-        for item in items:
-            fh.write(item.model_dump_json() + "\n")
-    return p
+    """Persist a split as JSONL. Scrubbed upstream, atomic on the way out."""
+    payload = "".join(item.model_dump_json() + "\n" for item in items)
+    atomic_write_text(Path(path), payload)
+    return Path(path)

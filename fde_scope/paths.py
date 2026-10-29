@@ -75,6 +75,11 @@ def ontology_dir(create: bool = False) -> Path:
     return _under_root("ontology", create=create)
 
 
+def showcase_dir(create: bool = False) -> Path:
+    """``<root>/.fde_scope/showcase`` — 作品集登记条目（结营公开面的登记侧）。"""
+    return _under_root("showcase", create=create)
+
+
 def uploads_dir(create: bool = False) -> Path:
     """``<root>/.fde_scope/uploads`` — uploaded raw files."""
     return _under_root("uploads", create=create)

@@ -43,4 +43,52 @@
 6. **守护机制**：`tests/test_third_party_licenses.py` 解析 `pyproject.toml`
    的直接依赖并断言每个包在 `NOTICE` 中有条目，新增依赖漏审计会导致 CI 变红。
 
-> 本文件为工程自查记录，不构成法律意见；商业化分发前请法务复核带 ★ 的包。
+## 逐字镜像正文（Vendored third-party content）
+
+审计日期：2026-10-06 · 方法：GitHub API `license.spdx_id`（经 `fde_scope/resources/models.py`
+归一为 `NONE` / `NOASSERTION` / 真实 SPDX）· 范围：`docs/github-resources/mirror/` 全部
+逐字镜像的 markdown 正文（不是代码依赖，与上表同构记录）。
+
+只有 **宽松许可 AND relevance ≠ noise** 的仓库才被逐字镜像（`mirror_gate`）；`NONE` /
+`NOASSERTION` / copyleft 仓库只存元数据 + 我们自撰的双语摘要，正文一律不复制。当前建档
+804 个仓库、逐字镜像 12 个仓库、镜像文件 99 个（`make check-resources` 打印、
+`tests/test_resources_guard.py` 钉死）。commit 为抓取时快照，`make fetch-resources` 可重放刷新。
+
+| 仓库 | License | commit（抓取时） | 风险等级 | 镜像路径 |
+|---|---|---|---|---|
+| pierpaolo28/Awesome-FDE-Roadmap | MIT | 24d652e | 低 | `mirror/pierpaolo28__Awesome-FDE-Roadmap/` |
+| suboss87/FDEOps | MIT | ed184c8 | 低 | `mirror/suboss87__FDEOps/` |
+| guocong-bincai/ai-interview-guide | MIT | cdb5d0f | 低 | `mirror/guocong-bincai__ai-interview-guide/` |
+| calmrocks/ai-engineer-notebooks | MIT | 3bf1d77 | 低 | `mirror/calmrocks__ai-engineer-notebooks/` |
+| global-fde/awesome-fde-resources | CC-BY-4.0 | 27e9877 | 低-中 | `mirror/global-fde__awesome-fde-resources/` |
+| libaice/Awesome-FDE | MIT | b9135a9 | 低 | `mirror/libaice__Awesome-FDE/` |
+| gxfde/fde-workbench | MIT | 5ded7b3 | 低 | `mirror/gxfde__fde-workbench/` |
+| memovai/openfde | MIT | fda7b06 | 低 | `mirror/memovai__openfde/` |
+| dataPro-lgtm/fde-interview-fieldbook | MIT | 6b851a9 | 低 | `mirror/dataPro-lgtm__fde-interview-fieldbook/` |
+| Dan-Cleary/fdestack | MIT | 5524460 | 低 | `mirror/Dan-Cleary__fdestack/` |
+| LowyShin/giip-fde-agent | Apache-2.0 | 83d1dd0 | 低 | `mirror/LowyShin__giip-fde-agent/` |
+| goday-org/FDE-Handbook | MIT | 229db7b | 低 | `mirror/goday-org__FDE-Handbook/` |
+
+上游 URL 一律为 `https://github.com/<owner>/<repo>`；`/resources`、`/en/resources`
+与静态门户里每条 URL 渲染成不可点的 `<code>` 纯文本（无任何出站 `href="http`），
+每个镜像文件的字节头 provenance 块记录 repo / license / commit / upstream path。
+
+补充结论：
+
+7. **正文镜像与依赖分开记录**：12 个逐字镜像仓库全部为 MIT / Apache-2.0 / CC-BY-4.0
+   等宽松许可，与 MIT 主许可兼容；其中 **CC-BY-4.0（global-fde/awesome-fde-resources）**
+   附带署名义务，已通过每个镜像文件的 provenance 头 + `NOTICE`「Vendored third-party
+   content」条目 + 本表三重满足。copyleft / 无许可正文从未进入仓库。
+8. **NOTICE 措辞已随之修正**：`NOTICE` 顶部原文「no third-party source code is
+   vendored」在镜像 markdown 之后仍成立（镜像的是 prose 而非 source code），故把范围
+   明确收窄为 *source code*，并另起「Vendored third-party content」逐仓库列出 SPDX、
+   commit 与本地路径。
+9. **镜像面守护机制**：`tests/test_resources_guard.py`（`make test`）与
+   `scripts/check_resources_catalog.py`（`make check-resources`）四向核对
+   README ⇔ manifest ⇔ 磁盘 ⇔ NOTICE：每个 `mirror: true` 条目必须对应真实镜像目录
+   与 `files[]`、许可必须 `is_permissive` 且 relevance ≠ noise、每个镜像文件必须带
+   provenance 头、`NONE`/`NOASSERTION` 永不出现 `mirror: true`、NOTICE 必须列出每个
+   镜像仓库。新增镜像漏审计或漏 NOTICE 条目会导致 CI 变红。
+
+> 本文件为工程自查记录，不构成法律意见；商业化分发前请法务复核带 ★ 的包，以及上表
+> CC-BY-4.0 条目的署名呈现方式。

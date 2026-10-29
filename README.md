@@ -66,6 +66,31 @@ flowchart LR
 It is **not** an agent application — it's an FDE's workbench: a CLI, a Web UI,
 and a Python library that turns the SOP from a checklist into enforced engineering.
 
+## ⏱ 最短安装路径 · The shortest path in
+
+**先说结论，因为它不好听**：本项目**没有**"一条命令装完"的路径。实测于 2026-10-08（工具实测档）：
+PyPI 上 `fde-scope` 与 `fde_scope` 均返回 **404**（未发布），仓库 `releases` 列表**为空**（无预打包产物）。
+对照开源同行的 `npx` 一键分发，这条差距被如实记在 [`course-level-1/24`](course-level-1/24-开源对标与来源清单.md) §6 第 2/3 条，
+并作为短板登记在 [`course-level-1/13`](course-level-1/13-GTM页面与竞品对比.md) §6 第 11 项。
+
+按"你想干什么"选一条最短的：
+
+| 你想干什么 | 最短路径 | 前置 |
+|---|---|---|
+| **只读课程，什么都不装** | 直接在 GitHub 读 [`course-level-1/`](course-level-1/) 下的 Markdown（Level 1 全本，¥0 永久公开） | 会点链接 |
+| **跑通一条链路**（学员 / 评估者） | `git clone` → `uv sync` → `uv run fde-scope course doctor` | Python ≥3.11 + uv |
+| **没有 uv** | `git clone` → `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` | Python ≥3.11 |
+| **要界面** | 上面任一条之后：`fde-scope web` → `http://127.0.0.1:8080` | — |
+
+`course doctor` 是**开工前自检**：它检查环境、示例数据与零 key 路径，跑完给你 G0 的通过/提醒/失败计数——
+不通的地方它会说缺什么。全程**不要 Docker、不要 GPU、不要 API key**
+（课程侧的承诺见 [`11`](course-level-1/11-工具与环境准备.md) §4.1 与 [`13`](course-level-1/13-GTM页面与竞品对比.md) §1.3）。
+
+> **关于 agent 运行时中立**：本项目只服务自己的 CLI / Web / 库，没有为 Cursor、Copilot 之类的
+> 第三方 agent 提供适配层。课程产物本身是 Markdown 与 JSON，可以带进任何工具——
+> 但"带进去之后还帮你判门禁"这件事，目前只有 `fde-scope` 自己做。差距与计划见
+> [`24`](course-level-1/24-开源对标与来源清单.md) §6 第 3 条。
+
 ## 📸 At a glance
 
 ![FDE Scope engagement console — engagement dashboard, gate inspector, context cards, corpus forge, KPI explorer and report browser in one page](docs/images/overview.png)
@@ -251,7 +276,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 **Surfaces**
 
 - [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web)
-- [x] Web console — FastAPI, 69 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
+- [x] Web console — FastAPI, 86 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
 - [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 3 agent tools, skill provider
 - [x] macOS app — double-click DMG (universal2, signed/notarized release path, same console as `fde-scope web`)
 
@@ -275,7 +300,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 flowchart TB
     subgraph surfaces["Surfaces · 四个入口,同一引擎同一数据根"]
         CLI["fde-scope CLI<br/>13 组命令"]
-        WEB["web/ FastAPI 控制台<br/>69 路由 · 单页"]
+        WEB["web/ FastAPI 控制台<br/>86 路由 · 单页"]
         PAW["pawapp/ QwenPaw 插件<br/>/api/fde-scope · 18 路由"]
         MAC["macOS App<br/>universal2 DMG"]
     end
@@ -341,7 +366,7 @@ flowchart TB
 | 6 | `skills/` | Methodology capture (draft → published → archived, dual-format export) | ❌ |
 | 7 | `integrations/` | QwenPaw bundle export + ACP adapter + manifest validator | ❌ |
 | 8 | `ontology/` | Semantic layer: TBox schemas + SKOS concepts + ABox stores, SHACL-lite validation, JSON-LD 1.1 export | ❌ |
-| **Web** | `web/` | FastAPI engagement console (69 routes, single-page, JSON APIs) | ❌ |
+| **Web** | `web/` | FastAPI engagement console (86 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
 
@@ -360,11 +385,12 @@ fde-scope/
 │   ├── skills/           # methodology capture (draft → published → archived)
 │   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
 │   ├── ontology/         # TBox schemas + SKOS concepts + ABox stores + JSON-LD export (data/*.yaml built-ins)
-│   └── web/              # FastAPI engagement console (69 routes)
+│   └── web/              # FastAPI engagement console (86 routes)
 ├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
 ├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
 ├── GTM/                  # product / GTM landing page (single-file HTML)
 ├── docs/                 # architecture, SOP, API mapping + 101-page skills catalog
+│                         #   + github-resources/ (verbatim mirror + static portal)
 ├── examples/             # quickstart data + seed_mock_engagements.py
 ├── samples/              # sample datasets
 ├── reports/              # generated runbooks / corpus reports (produced by corpus & seed scripts)
@@ -386,7 +412,7 @@ fde-scope/
 | `air_gap` | 🏭 | Offline deployment posture settled at connect time (not phone-home) |
 | `shift_handover` | 🏭 | Multi-shift sites need digital handover log + per-shift runbook |
 | `slo` | 🏢 | SLO/SLA + error budget + alert route (missing route → warning) |
-| `handoff_signoff` | 🏢 | Handoff package: runbook + eval report + SLO + training material, customer accepted |
+| `handoff_signoff` | 🏢 | Handoff package: runbook + eval report + SLO + training material, customer accepted; boundary (G7③) / termination (G7④) missing → warning, never a blocker |
 
 Gates are executable code, not checklists, and the difference is mechanical
 rather than rhetorical:
@@ -446,7 +472,9 @@ machine-readable source, and the guard tests fail when they drift:
    verbatim (`>=2.0.4.post1,<3` today); re-measure per version before widening.
 7. **Web mutating 路由必须过认证依赖。** 新增 `web/` 路由时确认未被 auth
    白名单（`fde_scope/web/auth.py` 的 `PUBLIC_PATHS`）误放；token 只从
-   `FDE_SCOPE_API_TOKEN` env 读。
+   `FDE_SCOPE_API_TOKEN` env 读。**认证关闭只对回环生效**：未设 token 时，
+   从非 loopback 地址到达的请求必须 403（中间件逐请求判 `scope["server"]`，
+   覆盖绕过 CLI 直接起服务的情形），CLI 另外拒绝无 token 的非回环绑定。
 
 Verification anchors: `make test` ·
 `pytest tests/test_architecture_guard.py` (contract pins) ·

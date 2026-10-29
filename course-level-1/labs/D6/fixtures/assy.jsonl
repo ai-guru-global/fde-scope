@@ -1,0 +1,1 @@
+{"station":"ASSY-HUMANOID-01","availability":0.78,"performance":0.72,"quality":0.91,"uptime_hours":140,"failures":7,"repair_hours":21,"good_units":1280,"started_units":1410,"defects":130,"opportunities_per_unit":5,"grasp_successes":1100,"grasp_attempts":1500,"tasks_succeeded":1300,"tasks_attempted":1500,"interventions":45,"cycles":1400}

@@ -7,7 +7,7 @@ related_targets: []
 
 # GTM board surface brief
 
-Scope and mode: GTM/index.html, Persuade. The project's only marketing surface; static HTML, no build step, bilingual EN-primary with ZH sublines.
+Scope and mode: GTM/index.html, Persuade. The project's only marketing surface. Authored once in `GTM/index.bilingual.html`; `GTM/i18n_split.py` emits two monolingual artifacts, `GTM/index.html` (zh) and `GTM/en/index.html` (en). No bundler, no runtime dependencies.
 
 Audience and job: FDE team leads evaluating a SOP engine; practicing FDEs wanting a workbench; OSS developers judging methodology; enterprise decision-makers needing compliance evidence. Job: believe "the full SOP, enforced" within seconds and take the role-appropriate action.
 
@@ -17,7 +17,7 @@ Proof: 4 zones / 18 phases / 10 executable gates (from fde_scope/engagement/phas
 
 Constraints: both languages legible; works offline (self-hosted woff2 in GTM/fonts/, platform CJK fallback); prefers-reduced-motion honored; WCAG AA contrast.
 
-Chosen direction: Shift Board (seed 773793ef). The page is the plant scheduling board; the profile switch re-renders board state per scenario; signature motion is mechanical slot-in, stamp thud, andon blink; direct keys 1-0 jump to gates.
+Chosen direction: Workbench (the repo's Carbon-derived enterprise workbench ramp — `fde_scope/web/layout.py` THEME_CSS, mirrored light-only here). The page is still the plant scheduling board: the profile switch re-renders board state per scenario, keys 1-0 jump to gates, and the signature motion is the three real keyframes — `set-in` slot-in, `rise`, and the `pulse` andon blink on a blocked gate.
 
 Memorable moment: the blocked DEPLOY T-card with its red verdict "advance → REFUSED", and the profile switch that ghosts the industrial-only phases on ticket.
 

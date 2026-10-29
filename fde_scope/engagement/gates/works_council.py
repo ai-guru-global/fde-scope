@@ -10,7 +10,7 @@ labor as a first-class gate, not an afterthought.
 from __future__ import annotations
 
 from ..context import EngagementContext
-from .base import Gate, GateResult
+from .base import Gate, GateResult, asset_record
 
 
 class WorksCouncilGate(Gate):
@@ -29,8 +29,10 @@ class WorksCouncilGate(Gate):
                 notes=["现场无 works council 代表，本 gate 不适用"],
             )
 
-        approval = ctx.assets.get("works_council_approval")
-        if not approval:
+        approval, invalid = asset_record(ctx.assets, "works_council_approval")
+        if invalid:
+            blockers.append(invalid)
+        elif not approval:
             blockers.append("works council 已在场，但未记录共决审批（BetrVG §87）—— deployment 可被吊销")
         else:
             if approval.get("status") == "denied":

@@ -40,7 +40,7 @@
 - **⑮ flywheel_productization**：把"人形机器人碰撞恢复"语料回流核心产品。
 
 ### Zone D · Handoff / Exit
-- **⑯ ops_handoff** → **⑰ knowledge_transfer**（移交包：runbook+eval+SLO+模型卡+培训）→ **⑱ disengage (handoff_signoff gate)**：客户书面接受后 ≤120d 退场。
+- **⑯ ops_handoff** → **⑰ knowledge_transfer**（移交包：runbook+eval+SLO+模型卡+培训，另记适用边界 G7③ / 终止条件 G7④）→ **⑱ disengage (handoff_signoff gate)**：客户书面接受后 ≤120d 退场。四件套缺任一件即 blocker；③④ 只出 ⚠️——工业现场尤其要把"这套碰撞恢复在哪些工位不成立"写进包里，绿门禁不会替你写。
 
 ## KPI 实测（profile=manufacturing）
 

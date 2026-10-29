@@ -95,8 +95,11 @@ Homepage = "https://github.com/ai-guru-global/fde-scope"
 packages = ["fde_scope"]
 # /course reads the Level-1 lessons at runtime from a repo-root directory, which
 # a wheel would not otherwise contain. Ship it as package data so an installed
-# app serves the same 25 chapters; web/course.py prefers the repo checkout (the
+# app serves the same lessons; web/course.py prefers the repo checkout (the
 # source of truth while developing) and falls back to this copy.
+# Measured 2026-10-08 (uv build --wheel): course-level-1/ holds 47 *.md
+# (26 top-level lessons + 20 labs + 1 en) and the wheel carries all 47 —
+# missing: none, extra: none. Re-measure this line when a lesson lands.
 force-include = { "course-level-1" = "fde_scope/_data/course-level-1" }
 
 [tool.hatch.build.targets.sdist]
@@ -106,7 +109,9 @@ include = ["fde_scope", "course-level-1", "README.md", "pyproject.toml"]
 source = ["fde_scope"]
 
 [tool.coverage.report]
-# Q1 gate: 92% today; keep 2 points of headroom so routine churn does not flip CI.
+# Gate at 90. Measured 2026-10-07: 85.11% overall, and 91.22% for fde_scope/ once
+# course/, resources/ and web/resources.py leave the denominator — see the
+# "Release gate" section of CHANGELOG.md for the attribution table.
 fail_under = 90
 show_missing = true
 skip_covered = true

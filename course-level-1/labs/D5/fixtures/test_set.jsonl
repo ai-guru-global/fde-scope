@@ -1,0 +1,5 @@
+{"id": "c-001", "input": "我要退货，怎么操作？", "category": "退款售后", "expected_output": "指导退货流程", "baseline_handle_time_seconds": 480.0}
+{"id": "c-002", "input": "我的快递到哪了", "category": "物流查询", "expected_output": "查询物流状态", "baseline_handle_time_seconds": 480.0}
+{"id": "c-003", "input": "这家店的服务太差了！我要投诉", "category": "门店投诉", "expected_output": "记录投诉并升级", "escalated": true, "baseline_handle_time_seconds": 480.0}
+{"id": "c-004", "input": "积分怎么兑换", "category": "会员积分", "expected_output": "说明积分规则", "baseline_handle_time_seconds": 480.0}
+{"id": "c-005", "input": "我要退货咯，咋个弄嘞", "category": "退款售后", "expected_output": "指导退货流程", "baseline_handle_time_seconds": 480.0}

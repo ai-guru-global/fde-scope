@@ -142,6 +142,48 @@ def test_engage_rollback_unknown_phase_friendly_error(tmp_path: Path, monkeypatc
     assert "Traceback" not in result.stdout
 
 
+def test_cli_mutations_leave_an_audit_trail(tmp_path: Path, monkeypatch) -> None:
+    """CLI init/advance/rollback 与 web 同名事件——复盘重放两条入口都认。"""
+    from fde_scope import audit
+
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["engage", "init", "--customer", "Acme", "--profile", "ticket"])
+    eid = "eng-acme-ticket"
+    runner.invoke(app, ["engage", "advance", eid])
+    runner.invoke(app, ["engage", "rollback", eid, "--to", "qualification"])
+    actions = [e["action"] for e in audit.read_events(eid)]
+    assert actions == ["engagement.create", "engagement.advance", "engagement.rollback"]
+    rollback_detail = next(e for e in audit.read_events(eid) if e["action"] == "engagement.rollback")
+    assert rollback_detail["actor"] == "cli"
+    assert rollback_detail["detail"]["from_phase"] == "stakeholder_map"
+    assert rollback_detail["detail"]["to_phase"] == "qualification"
+
+
+def test_engage_retrospective_json_and_markdown_out(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    eid = "eng-acme-ticket"
+    runner.invoke(app, ["engage", "init", "--customer", "Acme", "--profile", "ticket"])
+    runner.invoke(app, ["engage", "advance", eid])
+    out = tmp_path / "reports" / "retro.md"
+    result = runner.invoke(app, ["engage", "retrospective", eid, "--json", "--out", str(out)])
+    assert result.exit_code == 0, result.stdout
+    body = json.loads(result.stdout)
+    assert body["engagement_id"] == eid
+    assert body["start_source"] == "engagement.create"  # CLI init 现在也留痕
+    assert body["advances_ok"] == 1
+    assert body["timeline_consistent"] is True
+    assert [m["key"] for m in body["sla"]] == ["first_integration", "production", "disengage"]
+    assert out.exists()
+    assert "复盘报告" in out.read_text(encoding="utf-8")
+
+
+def test_engage_retrospective_unknown_engagement(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["engage", "retrospective", "eng-ghost"])
+    assert result.exit_code == 2
+    assert "not found" in result.stdout
+
+
 # ---------------------------------------------------------------------------
 # skills（技能/方法论沉淀）
 # ---------------------------------------------------------------------------

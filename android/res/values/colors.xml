@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Workbench ramp (light). Mirrors fde_scope/web/layout.py THEME_CSS :root,
+     converted from OKLCH to sRGB. Keep names and values in step with the web
+     surface; Android has no per-token dark theme, values-night supplies it. -->
 <resources>
-    <color name="fde_bg">#F5F6F8</color>
+    <color name="fde_bg">#F2F4F7</color>
     <color name="fde_panel">#FFFFFF</color>
-    <color name="fde_panel2">#EBEDF0</color>
-    <color name="fde_fg">#171C22</color>
-    <color name="fde_muted">#555B64</color>
-    <color name="fde_faint">#646971</color>
-    <color name="fde_border">#DBDEE2</color>
-    <color name="fde_border_strong">#B9BEC4</color>
-    <color name="fde_accent">#1C6B91</color>
-    <color name="fde_accent_2">#005A7F</color>
+    <color name="fde_panel2">#E6E8EB</color>
+    <color name="fde_fg">#17181B</color>
+    <color name="fde_muted">#505356</color>
+    <color name="fde_faint">#616367</color>
+    <color name="fde_border">#DDDFE1</color>
+    <color name="fde_border_strong">#84868A</color>
+    <color name="fde_accent">#0A5EFA</color>
+    <color name="fde_accent_2">#0053E9</color>
     <color name="fde_accent_ink">#FBFCFD</color>
     <color name="fde_code">#EEF0F3</color>
 </resources>

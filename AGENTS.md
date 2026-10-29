@@ -31,7 +31,12 @@ changing engagement, deploy or persistence code. Full context:
    widening.
 7. **Web mutating 路由必须过认证依赖。** 新增 `fde_scope/web/` 路由时确认未被
    auth 白名单（`fde_scope/web/auth.py` 的 `PUBLIC_PATHS`）误放；token 只从
-   `FDE_SCOPE_API_TOKEN` env 读，绝不进文件/日志/响应。
+   `FDE_SCOPE_API_TOKEN` env 读，绝不进文件/日志/响应。**认证关闭只对回环生效**：
+   未设 token 时从非 loopback 地址到达的请求必须 403（`ApiTokenAuthMiddleware`
+   逐请求判 `scope["server"]`，即连接被 accept 时落在哪个地址——不是 `--host`
+   绑定值，客户端不可伪造，也覆盖绕过 CLI 直接 `uvicorn`/`gunicorn` 的启动）；
+   `fde-scope web` 另外要求非回环绑定同时有 `FDE_SCOPE_ALLOW_REMOTE=1` 和 token。
+   同机反向代理落在回环上，不会被这层拦——代理必须自己鉴权。
 
 ## Dangerous operations (ask first / require a test)
 

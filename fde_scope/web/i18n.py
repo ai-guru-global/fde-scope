@@ -421,37 +421,14 @@ I18N_PAIRS: list[tuple[str, str]] = [
         '<a class="lang" href="/en/console" title="English version" aria-label="Switch to English">EN</a>',
         '<a class="lang" href="/console" title="中文版" aria-label="切换到中文">中文</a>',
     ),
-    # -- shared nav fragments ------------------------------------------------
-    # Local reading pages — the rail keeps the reader in the app.
-    ('<a href="/sop">SOP 全文</a>', '<a href="/en/sop">SOP full text</a>'),
-    (
-        '<a href="/catalog/index.html">技能手册库</a>',
-        '<a href="/catalog/en/index.html">Skills handbook</a>',
-    ),
-    ('<a href="/docs/readme">仓库文档</a>', '<a href="/en/docs/readme">Repo docs</a>'),
-    ('<a href="/GTM/index.html">GTM 官网</a>', '<a href="/GTM/en/index.html">GTM site</a>'),
+    # -- language chrome that is not part of the rail ------------------------
+    # The four-band site tree itself is compiled per locale by
+    # ``layout.side_nav`` (see the ``__SIDE_NAV__`` note in ``app.py``), so its
+    # labels and paths have no pairs here on purpose. A pair list cannot express
+    # ``/catalog/en/index.html`` — the English path is not ``/en`` plus a prefix
+    # — and the 31 rows removed to get here are exactly how the eight hand-copied
+    # rails drifted out of agreement with each other.
     ("切换深浅主题", "Toggle light/dark theme"),
-    # -- sidebar tiers (identical markup on the overview and the console) ----
-    ('<div class="grp">FDE 学习者</div>', '<div class="grp">FDE learners</div>'),
-    ('<div class="grp">FDE 工程师</div>', '<div class="grp">FDE engineers</div>'),
-    ('<div class="grp">FDE 工作台</div>', '<div class="grp">FDE workbench</div>'),
-    # -- overview: sidebar nav ----------------------------------------------
-    ('<a href="/" class="active">功能总览</a>', '<a href="/en/" class="active">Overview</a>'),
-    ('<a href="/console">Engagement 控制台</a>', '<a href="/en/console">Engagement console</a>'),
-    ('<a href="/course">入门课程</a>', '<a href="/en/course">Intro course</a>'),
-    ('<a href="/certification">认证中心</a>', '<a href="/en/certification">Certification</a>'),
-    ('<a href="/glossary">名词解释</a>', '<a href="/en/glossary">Glossary</a>'),
-    ('<div class="grp">外部</div>', '<div class="grp">External</div>'),
-    ('<a href="#sop">完整 SOP</a>', '<a href="#sop">Full SOP</a>'),
-    ('<a href="#gates">合规 Gate</a>', '<a href="#gates">Compliance gates</a>'),
-    ('<a href="#connectors">数据连接器</a>', '<a href="#connectors">Data connectors</a>'),
-    ('<a href="#ontology">Ontology 语义层</a>', '<a href="#ontology">Ontology layer</a>'),
-    ('<a href="#modules">功能模块</a>', '<a href="#modules">Modules</a>'),
-    ('<a href="#arch">架构清单</a>', '<a href="#arch">Architecture</a>'),
-    ('<a href="#practices">最佳实践</a>', '<a href="#practices">Best practices</a>'),
-    ('<a href="#kpi">制造业 KPI</a>', '<a href="#kpi">Manufacturing KPIs</a>'),
-    ('<a href="#quickstart">快速上手</a>', '<a href="#quickstart">Quick start</a>'),
-    ('<a href="#scenarios">两种场景</a>', '<a href="#scenarios">Two scenarios</a>'),
     # -- overview: hero ------------------------------------------------------
     ("<h2>FDE 的完整现场工作台</h2>", "<h2>The complete field workbench for FDEs</h2>"),
     (
@@ -611,8 +588,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ('<div class="name">UI 层</div>', '<div class="name">UI layer</div>'),
     (
-        "CLI（Typer，全延迟导入）· Web 控制台（69 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
-        "CLI (Typer, fully lazy imports) · Web console (69 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
+        "CLI（Typer，全延迟导入）· Web 控制台（86 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
+        "CLI (Typer, fully lazy imports) · Web console (86 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
         "macOS app (double-click DMG — this console).",
     ),
     ('<div class="name">SOP 层</div>', '<div class="name">SOP layer</div>'),
@@ -744,20 +721,10 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "<span>测试套件 CI 全绿（含架构守护测试 6 项契约）· 零配置可跑</span>",
         "<span>Test suite green in CI (including 6 architecture-guard contracts) · runs with zero config</span>",
     ),
-    # -- dashboard: header + sidebar ----------------------------------------------
-    # the console's site menu lives in its sidebar too, but its own home link
-    # carries no class="active" (the console link does), so it needs its own pair
-    ('<a href="/">功能总览</a>', '<a href="/en/">Overview</a>'),
-    (
-        '<a href="/console" class="active">Engagement 控制台</a>',
-        '<a href="/en/console" class="active">Engagement console</a>',
-    ),
-    # keyed on the go('…') call: a bare 技能库</button> key would also match
-    # the ">去技能库</button>" pair further down and corrupt it first
-    ("go('workbench')\">工作台</button>", "go('workbench')\">Workbench</button>"),
-    ("go('skills')\">技能库</button>", "go('skills')\">Skills</button>"),
-    ("go('deploy')\">Agent 部署</button>", "go('deploy')\">Agent deploy</button>"),
-    ("go('ontology')\">本体库</button>", "go('ontology')\">Ontology</button>"),
+    # -- dashboard: header ---------------------------------------------------------
+    # The console's sidebar tree is compiled by ``layout.side_nav`` for both
+    # locales, including the five ``go('…')`` view buttons, so nothing from the
+    # rail is translated here (see the note above ``切换深浅主题``).
     # -- dashboard: new engagement form -------------------------------------------
     ("<label>客户</label>", "<label>Customer</label>"),
     (
@@ -807,8 +774,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ('<div class="k">待审草稿</div>', '<div class="k">Drafts to review</div>'),
     (">阶段分布</span>", ">Phase mix</span>"),
     (
-        '<h2>最近沉淀 <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go(\'skills\')">去沉淀 →</button></h2>',
-        '<h2>Recent skills <button class="ghost" style="margin-left:8px;font-size:.7rem" onclick="go(\'skills\')">Add skill →</button></h2>',
+        '<h2>最近沉淀 <button class="ghost sm" style="margin-left:var(--sp2)" onclick="go(\'skills\')">去沉淀 →</button></h2>',
+        '<h2>Recent skills <button class="ghost sm" style="margin-left:var(--sp2)" onclick="go(\'skills\')">Add skill →</button></h2>',
     ),
     (
         "还没有 engagement —— 用上面的表单创建第一条。",
@@ -926,11 +893,11 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ("<h2>注意事项</h2>", "<h2>Good to know</h2>"),
     (
-        '<b style="color:var(--fg)">数据源优先级</b>：Agent 级 <code>toolkit.sources</code> → tenant <code>sources</code> → 隐式字段（ticket 下 <code>ticket_api</code> 隐式喂 zammad/salesforce）。三处都没配的工具诚实标注 <span class="pill" style="color:var(--bad)">unbound</span>，不进 Toolkit、不假装可用。',
+        '<b style="color:var(--fg)">数据源优先级</b>：Agent 级 <code>toolkit.sources</code> → tenant <code>sources</code> → 隐式字段（ticket 下 <code>ticket_api</code> 隐式喂 zammad/salesforce）。三处都没配的工具诚实标注 <span class="pill bad">unbound</span>，不进 Toolkit、不假装可用。',
         '<b style="color:var(--fg)">Data-source precedence</b>: agent-level <code>toolkit.sources</code> → tenant '
         "<code>sources</code> → implicit fields (for ticket, <code>ticket_api</code> implicitly feeds "
-        'zammad/salesforce). Tools configured nowhere are honestly marked <span class="pill" '
-        'style="color:var(--bad)">unbound</span> — they never enter the Toolkit, no pretending.',
+        "zammad/salesforce). Tools configured nowhere are honestly marked "
+        '<span class="pill bad">unbound</span> — they never enter the Toolkit, no pretending.',
     ),
     (
         '<b style="color:var(--fg)">审批模式决定未匹配工具的命运</b>：绑定工具自动获得 ALLOW 规则；conservative / balanced 未匹配 → ASK（HITL 人工确认），autonomous → DENY。默认 deny 恒含 access_other_tenant / delete_any / exec_shell。',
@@ -1379,8 +1346,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
         '<button onclick="uploadEvidence()">Upload evidence</button>',
     ),
     (
-        '<div class="hint mt6">上传需要 pro / enterprise 许可（feature: evidence）；未授权时接口返回 402 与升级指引。</div>',
-        '<div class="hint mt6">Uploading requires a pro / enterprise licence (feature: evidence); without it '
+        '<div class="hint mt1">上传需要 pro / enterprise 许可（feature: evidence）；未授权时接口返回 402 与升级指引。</div>',
+        '<div class="hint mt1">Uploading requires a pro / enterprise licence (feature: evidence); without it '
         "the API returns 402 with upgrade guidance.</div>",
     ),
     ("${icon('i-alert')}加载失败：", "${icon('i-alert')}Failed to load: "),
@@ -1403,6 +1370,31 @@ I18N_PAIRS: list[tuple[str, str]] = [
     (
         '<div class="row"><label>客户已验收</label><input type="checkbox" id="ho-accept"></div>',
         '<div class="row"><label>Customer accepted</label><input type="checkbox" id="ho-accept"></div>',
+    ),
+    (
+        '<div class="row"><label>适用边界<br><span class="meta">G7③</span></label>'
+        '<textarea id="ho-boundary" rows="2" placeholder="这套方案在哪些条件下不成立：未覆盖的门店类型、'
+        '数据不回传的加盟商、历史样本不足的新品……留空则保留上次记录"></textarea></div>',
+        '<div class="row"><label>Applicability boundary<br><span class="meta">G7③</span></label>'
+        '<textarea id="ho-boundary" rows="2" placeholder="Where the solution stops holding: store types not '
+        "covered, franchisees that never send POS data, SKUs without enough history… blank keeps the previous "
+        'entry"></textarea></div>',
+    ),
+    (
+        '<div class="row"><label>终止条件<br><span class="meta">G7④</span></label>'
+        '<textarea id="ho-termination" rows="2" placeholder="什么情况下停用并回退、由谁判定：SLO 连续两个'
+        '窗口破线、schema 变更后未重训……留空则保留上次记录"></textarea></div>',
+        '<div class="row"><label>Termination condition<br><span class="meta">G7④</span></label>'
+        '<textarea id="ho-termination" rows="2" placeholder="When to stop and roll back, and who decides: SLO '
+        "breached in two consecutive windows, retrain missed after a schema change… blank keeps the previous "
+        'entry"></textarea></div>',
+    ),
+    (
+        '<div class="hint mt1">G7③④ 缺失不阻塞门禁，但 <code>gate check --gate handoff_signoff</code> '
+        "会给出 ⚠️ 警告——接手方没人知道边界，等于没有边界。</div>",
+        '<div class="hint mt1">Missing G7③/④ does not block the gate, but <code>gate check '
+        "--gate handoff_signoff</code> raises a ⚠️ warning — if nobody on the receiving side knows the "
+        "boundary, there is no boundary.</div>",
     ),
     ("${icon('i-rocket')} 生成交接包</button>", "${icon('i-rocket')} Build handoff package</button>"),
     (
@@ -1466,8 +1458,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ('<div class="empty">校验中…</div>', '<div class="empty">Validating…</div>'),
     ("<h2>校验 · ", "<h2>Validation · "),
-    (">✅ 通过（0 个 ONTO-* 错误）<", ">✅ Pass (0 ONTO-* errors)<"),
-    ("'✅ 无破坏性变更'", "'✅ No breaking changes'"),
+    (">通过（0 个 ONTO-* 错误）<", ">Pass (0 ONTO-* errors)<"),
+    ("'无破坏性变更'", "'No breaking changes'"),
     ("<b>${(r.errors||[]).length} 个错误</b>", "<b>${(r.errors||[]).length} errors</b>"),
     (
         "<thead><tr><th>错误码</th><th>主体</th><th>说明</th></tr></thead>",
@@ -1477,8 +1469,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ("toast('请选择两个 schema','warn')", "toast('Pick two schemas first','warn')"),
     ("toast('旧 schema 与新 schema 相同','warn')", "toast('Old and new schema are the same','warn')"),
     (
-        "⛔ ${(r.breaking||[]).length} 个破坏性变更（D1-D4）",
-        "⛔ ${(r.breaking||[]).length} breaking changes (D1-D4)",
+        "${(r.breaking||[]).length} 个破坏性变更（D1-D4）",
+        "${(r.breaking||[]).length} breaking changes (D1-D4)",
     ),
     (
         "<thead><tr><th>级别</th><th>主体</th><th>说明</th></tr></thead>",
@@ -1587,8 +1579,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "<thead><tr><th>Job</th><th>Schedule</th><th>Threshold</th><th>Kind</th></tr></thead>",
     ),
     (
-        '<span class="pill" style="color:var(--bad)">已过期 → community</span>',
-        '<span class="pill" style="color:var(--bad)">expired → community</span>',
+        '<span class="pill bad">已过期 → community</span>',
+        '<span class="pill bad">expired → community</span>',
     ),
     ("key 来源：", "Key source: "),
     ("（env / 文件 / 无——只报来源，不显示 key）", "(env / file / none — the source only, never the key)"),
@@ -1598,7 +1590,6 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ("<label>席位</label>", "<label>Seats</label>"),
     (" · 到期 ", " · expires "),
-    ("onclick=\"go('ops')\">运维</button>", "onclick=\"go('ops')\">Ops</button>"),
     (
         "// -- 运维（连接器 / eval / flywheel / license） ---------------------------",
         "// -- ops (connectors / eval / flywheel / license) --------------------------",
@@ -1632,6 +1623,64 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "The numbers here only demonstrate the layout.</p>",
     ),
     ("核心可用 · 工业 IO 已接入", "core usable · industrial IO wired in"),
+    # -- retrospective tab (复盘) ----------------------------------------------
+    ("（", " ("),
+    ("）", ")"),
+    (">复盘</button>", ">Retro</button>"),
+    # -- read-only share (干系人只读分享) ---------------------------------------
+    ("<h2>只读分享</h2>", "<h2>Read-only share</h2>"),
+    (">生成链接</button>", ">Create link</button>"),
+    (">吊销链接</button>", ">Revoke link</button>"),
+    ("已启用 · 前缀 ", "enabled · prefix "),
+    (": '未启用';", ": 'not enabled';"),
+    ("链接（只显示这一次）：", "Link (shown only once): "),
+    (
+        "复制给干系人后本页不再显示 token；重新生成即吊销旧链接。",
+        "Share the link with the stakeholder; this page will not show the token again. "
+        "Regenerating revokes the old link.",
+    ),
+    ("= '已吊销';", "= 'revoked';"),
+    (
+        "给干系人一条只读链接：进度 + SLA + 门禁现况 + 客户签收（签收是审计证据，不推进状态机）。token 只显示一次，落盘的是 sha256。",
+        "Give stakeholders a read-only link: progress + SLA + gate status + customer "
+        "acknowledgement (the acknowledgement is audit evidence, it never advances the state "
+        "machine). The token is shown once; only its sha256 is stored.",
+    ),
+    ("契约覆盖", "asset override"),
+    ("默认", "default"),
+    ('<div class="k">已历时</div>', '<div class="k">Elapsed</div>'),
+    ('<div class="k">gate 首过率</div>', '<div class="k">gate first-pass</div>'),
+    ('<div class="k">推进/被拦/强制</div>', '<div class="k">adv/blocked/forced</div>'),
+    ('<div class="k">回滚</div>', '<div class="k">rollbacks</div>'),
+    ("<h2>SLA 时钟</h2>", "<h2>SLA clock</h2>"),
+    ("<h2>阶段时间线</h2>", "<h2>Phase timeline</h2>"),
+    ("<h2>Gate 统计</h2>", "<h2>Gate stats</h2>"),
+    ("<th>里程碑</th>", "<th>Milestone</th>"),
+    ("<th>契约</th>", "<th>Contract</th>"),
+    ("<th>状态</th>", "<th>Status</th>"),
+    ("<th>说明</th>", "<th>Note</th>"),
+    ("<th>阶段</th>", "<th>Phase</th>"),
+    ("<th>访问</th>", "<th>Visits</th>"),
+    ("<th>累计</th>", "<th>Total</th>"),
+    ("<th>首次进入</th>", "<th>First entered</th>"),
+    ("<th>当前</th>", "<th>Current</th>"),
+    ("<th>评估</th>", "<th>Evals</th>"),
+    ("<th>首过</th>", "<th>First pass</th>"),
+    ("<th>通过</th>", "<th>Passes</th>"),
+    ("<th>最新</th>", "<th>Latest</th>"),
+    ("<th>来源</th>", "<th>Source</th>"),
+    ("时间锚: ", "Anchor: "),
+    ("数据源: ", "Sources: "),
+    (
+        "审计流重放终态与当前阶段不一致——时间线可能缺失早期事件，以下数据仅供参考。",
+        "The audit replay does not end at the engagement's current phase — the trail may be missing "
+        "early events; treat the numbers below as indicative only.",
+    ),
+    (
+        "评估次数与首过来自审计流（audit.jsonl）；无审计事件的历史项目只显示 context 里的最新状态（context-only），不编造历史。",
+        "Evaluation counts and first-pass come from the audit trail (audit.jsonl); projects without audit "
+        "events only show the latest state recorded in the context (context-only) — history is never invented.",
+    ),
 ]
 
 _PAIRS_SORTED = sorted(I18N_PAIRS, key=lambda pair: len(pair[0]), reverse=True)

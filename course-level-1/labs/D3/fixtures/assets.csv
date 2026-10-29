@@ -1,0 +1,6 @@
+name,type,vendor,protocol,criticality
+焊装主线 PLC,PLC,Siemens,S7,high
+总装拧紧枪工位 12,装配执行器,Atlas Copco,PROFINET,medium
+AGV 车队 #3,物流机器人,客户自研,5G,high
+视觉质检相机 Q3,工业相机,Basler,GigE Vision,medium
+OPC UA 汇聚网关,网关,Kepware,OPC UA,high

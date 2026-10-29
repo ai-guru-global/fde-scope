@@ -121,3 +121,19 @@ def gtm_site_dir() -> Path | None:
     """
     d = Path(__file__).resolve().parents[2] / "GTM"
     return d if d.is_dir() else None
+
+
+def resources_site_dir() -> Path | None:
+    """The GitHub-resources asset root (``docs/github-resources/``), or None.
+
+    Mounted at ``/gh-resources`` with ``html=True``: the generated portal sits
+    under ``site/`` and the verbatim mirrors under ``mirror/``, both relative to
+    this root, so a portal link like ``../mirror/…`` resolves whether the site
+    is opened from disk or served here. We return the *root* rather than
+    ``site/`` so the mount exists as soon as the mirrors land — the portal is
+    built later by ``scripts/build_resources_site.py``. A wheel install ships no
+    ``docs/`` and gets None, so the rail's ``/gh-resources`` links fall through
+    to an in-app notice instead of a 404 (mirrors the ``/catalog`` precedent).
+    """
+    d = Path(__file__).resolve().parents[2] / "docs" / "github-resources"
+    return d if d.is_dir() else None

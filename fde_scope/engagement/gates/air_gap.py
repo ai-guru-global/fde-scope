@@ -8,7 +8,7 @@ telemetry egress. This gate verifies the deployment plan honors that.
 from __future__ import annotations
 
 from ..context import EngagementContext
-from .base import Gate, GateResult
+from .base import Gate, GateResult, asset_record
 
 
 class AirGapGate(Gate):
@@ -26,7 +26,9 @@ class AirGapGate(Gate):
 
         blockers: list[str] = []
         warnings: list[str] = []
-        plan = ctx.assets.get("air_gap_plan", {})
+        plan, invalid = asset_record(ctx.assets, "air_gap_plan")
+        if invalid:
+            blockers.append(invalid)
 
         if not plan.get("edge_hardware"):
             blockers.append("air-gapped 部署未指定 edge 硬件（GPU 服务器/边缘盒子）")

@@ -31,7 +31,27 @@ so the tile says both.
 
 from __future__ import annotations
 
-from .layout import BASE_CSS, SHELL_CSS, SHELL_JS
+from .layout import BASE_CSS, SHELL_CSS, SHELL_JS, side_nav
+
+#: The page's ``<section id>`` outline as ``(anchor, label_zh, label_en)``, in
+#: document order. The rail is compiled from this list and a guard test asserts
+#: every anchor here resolves to an ``id=`` in the rendered document, so the
+#: two cannot drift apart silently.
+_SECTIONS: tuple[tuple[str, str, str], ...] = (
+    ("landscape", "认证全景", "Landscape"),
+    ("specs", "认证细则", "Exam specs"),
+    ("aliyun", "阿里云认证", "Alibaba Cloud"),
+    ("outline", "考点大纲", "Exam outline"),
+    ("papers", "真题与样题", "Papers"),
+    ("guide", "备考指南", "Study guide"),
+    ("channel", "渠道准入", "Channel admission"),
+    ("sources", "数据来源", "Sources"),
+)
+
+
+def _rail_subnav(en: bool) -> tuple[tuple[str, str], ...]:
+    return tuple((f"#{anchor}", en_label if en else zh_label) for anchor, zh_label, en_label in _SECTIONS)
+
 
 # ---------------------------------------------------------------------------
 # Sources — rendered as the provenance table, and the reason each claim is OK.
@@ -225,52 +245,65 @@ _DUE_DILIGENCE: list[tuple[str, str]] = [
 _STYLE = (
     BASE_CSS
     + """
-.status{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:2px 9px;border:1px solid var(--border);
-border-radius:999px;font:500 11px/1.6 var(--mono);color:var(--muted)}
-.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+/* a status is a label with a state dot, not a capsule: ``--r1`` corner, the
+   ``--fs-xs`` ramp step, an on-grid margin. 999px + 11px was the third banned pill
+   in this system. The neutral dot takes ``--muted`` — an unassessed row is a real
+   state, not decoration, so it clears the 3:1 graphic bar like ``.s-ok`` does. */
+.status{display:inline-flex;align-items:center;gap:6px;margin-top:var(--sp2);padding:2px 9px;
+border:1px solid var(--border-strong);border-radius:var(--r1);
+font:600 var(--fs-xs)/1.5 var(--mono);color:var(--muted)}
+.status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
 .s-ok::before{background:var(--good)}
 .s-partial::before{background:var(--warn)}
 .s-stub::before{background:var(--bad)}
-.step-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.zone{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:14px 16px;min-width:0}
-.zone .ztag{font:600 10.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
-.zone .zname{font-size:.95rem;font-weight:650;margin:6px 0 10px}
-.zone ol{margin:0;padding:0;list-style:none;font-size:.82rem;color:var(--muted)}
+.step-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--sp3)}
+.zone{background:var(--panel);border:1px solid var(--border);border-radius:var(--r2);
+padding:14px 16px;min-width:0}
+.zone .ztag{font:600 var(--fs-xs)/1.5 var(--mono);letter-spacing:var(--track-kicker);text-transform:uppercase;
+color:var(--accent-text)}
+.zone .zname{font-size:var(--fs-body);font-weight:650;margin:6px 0 10px}
+.zone ol{margin:0;padding:0;list-style:none;font-size:var(--fs-sm);color:var(--muted)}
 .zone li{display:flex;align-items:flex-start;gap:7px;padding:5px 0;border-top:1px solid var(--border);line-height:1.5}
 .zone li:first-child{border-top:0}
-.zone li b{color:var(--fg);font:600 .76rem/1.5 var(--mono)}
-.kpi-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--muted)}
+.zone li b{color:var(--fg);font:600 var(--fs-xs)/1.5 var(--mono)}
+.kpi-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;
+border-bottom:1px solid var(--border);font-size:var(--fs-sm);color:var(--muted)}
 .kpi-row:last-child{border:0}
-.kpi-row .v{font:700 .85rem var(--mono);color:var(--fg);text-align:right}
-.tier{display:inline-flex;align-items:center;font:600 10px/1.7 var(--mono);letter-spacing:.08em;padding:1px 8px;
-border-radius:999px;border:1px solid var(--border);color:var(--muted);text-transform:uppercase;white-space:nowrap}
+.kpi-row .v{font:700 var(--fs-sm) var(--mono);color:var(--fg);text-align:right}
+/* tier is a label, not a capsule: hairline boundary, 2px corner, mono 12px.
+   999px pills were the second instance of the banned shape in this system. */
+.tier{display:inline-flex;align-items:center;font:600 var(--fs-xs)/1.7 var(--mono);
+letter-spacing:var(--track-label);padding:1px 8px;border-radius:var(--r1);border:1px solid var(--border-strong);
+text-transform:uppercase;white-space:nowrap}
 .tier.official{color:var(--good);border-color:color-mix(in oklab,var(--good) 42%,var(--border))}
 .tier.noted{color:var(--warn);border-color:color-mix(in oklab,var(--warn) 42%,var(--border))}
 .tier.gap{color:var(--bad);border-color:color-mix(in oklab,var(--bad) 42%,var(--border))}
-.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;background:var(--panel)}
-table.tbl{width:100%;border-collapse:collapse;font-size:.83rem}
+.tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--r2);background:var(--panel)}
+table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
 table.tbl th,table.tbl td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
-table.tbl th{font:600 .7rem/1.5 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+table.tbl th{font:600 var(--fs-xs)/1.5 var(--mono);letter-spacing:var(--track-label);text-transform:uppercase;color:var(--muted);white-space:nowrap}
 table.tbl tr:last-child td{border-bottom:0}
 table.tbl td b{color:var(--fg)}
-table.tbl td.num{font:700 .82rem var(--mono);color:var(--fg);white-space:nowrap}
-table.tbl td .cite{font:.76rem/1.6 var(--mono);color:var(--muted);overflow-wrap:anywhere}
-.wrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:.82rem}
+table.tbl td.num{font:700 var(--fs-sm) var(--mono);color:var(--fg);white-space:nowrap}
+table.tbl td .cite{font:var(--fs-xs)/1.6 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.wrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:var(--fs-sm)}
 .wrow:first-child{border-top:0}
 .wrow .wl{flex:1;min-width:0;color:var(--muted)}
-.wrow .wbar{flex:none;width:104px;height:6px;border-radius:99px;background:var(--panel2);overflow:hidden}
-.wrow .wbar i{display:block;height:100%;background:var(--accent);border-radius:99px}
-.wrow .wv{font:700 .8rem var(--mono);color:var(--fg);white-space:nowrap;width:38px;text-align:right}
-.qa{background:var(--panel);border:1px solid var(--border);border-radius:9px;margin:0}
-.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:.88rem;list-style:none;
+/* meters are data marks: square ends, radius 0. 99px stadium caps read as
+   decorative pills at 6px tall. */
+.wrow .wbar{flex:none;width:104px;height:6px;border-radius:var(--r0);background:var(--layer-02);overflow:hidden}
+.wrow .wbar i{display:block;height:100%;background:var(--accent);border-radius:var(--r0)}
+.wrow .wv{font:700 var(--fs-sm) var(--mono);color:var(--fg);white-space:nowrap;width:38px;text-align:right}
+.qa{background:var(--panel);border:1px solid var(--border);border-radius:var(--r2);margin:0}
+.qa summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:var(--fs-sm);list-style:none;
 display:flex;gap:10px;align-items:flex-start;line-height:1.6}
 .qa summary::-webkit-details-marker{display:none}
-.qa summary::before{content:"Q";font:700 10.5px/1.7 var(--mono);color:var(--accent);border:1px solid var(--border);
-border-radius:5px;padding:0 5px;flex:none;margin-top:2px}
-.qa summary:hover{color:var(--accent)}
-.qa .ans{padding:0 16px 14px 44px;color:var(--muted);font-size:.83rem;line-height:1.7}
+.qa summary::before{content:"Q";font:700 var(--fs-xs)/1.7 var(--mono);color:var(--accent-text);
+border:1px solid var(--border-strong);border-radius:var(--r1);padding:0 5px;flex:none;margin-top:2px}
+.qa summary:hover{color:var(--accent-text)}
+.qa .ans{padding:0 16px 14px 44px;color:var(--muted);font-size:var(--fs-sm);line-height:1.7}
 .qa .ans b{color:var(--fg)}
-.chk{list-style:none;margin:0;padding:0;font-size:.83rem;color:var(--muted)}
+.chk{list-style:none;margin:0;padding:0;font-size:var(--fs-sm);color:var(--muted)}
 .chk li{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--border);line-height:1.55}
 .chk li:first-child{border-top:0}
 .chk li .ic-xs{color:var(--accent);margin-top:4px}
@@ -349,33 +382,7 @@ __ICON_SPRITE__
     <span class="tag">{p("认证 · 渠道准入", "certification · channel admission")}</span>
   </div>
   <nav class="snav">
-    <div class="grp">{p("FDE 学习者", "FDE learners")}</div>
-    <a href="{"/en/" if en else "/"}">{p("功能总览", "Overview")}</a>
-    <a href="{"/en/course" if en else "/course"}">{p("入门课程", "Intro course")}</a>
-    <a href="{"/en/glossary" if en else "/glossary"}">{p("名词解释", "Glossary")}</a>
-    <a href="{"/en/certification" if en else "/certification"}" class="active">{
-        p("认证中心", "Certification")
-    }</a>
-    <div class="subnav">
-      <a href="#landscape">{p("认证全景", "Landscape")}</a>
-      <a href="#specs">{p("认证细则", "Exam specs")}</a>
-      <a href="#aliyun">{p("阿里云认证", "Alibaba Cloud")}</a>
-      <a href="#outline">{p("考点大纲", "Exam outline")}</a>
-      <a href="#papers">{p("真题与样题", "Papers")}</a>
-      <a href="#guide">{p("备考指南", "Study guide")}</a>
-      <a href="#channel">{p("渠道准入", "Channel admission")}</a>
-      <a href="#sources">{p("数据来源", "Sources")}</a>
-    </div>
-    <div class="grp">{p("FDE 工程师", "FDE engineers")}</div>
-    <a href="{"/en/sop" if en else "/sop"}">{p("SOP 全文", "SOP full text")}</a>
-    <a href="{"/catalog/en/index.html" if en else "/catalog/index.html"}">{
-        p("技能手册库", "Skills handbook")
-    }</a>
-    <a href="{"/en/docs/readme" if en else "/docs/readme"}">{p("仓库文档", "Repo docs")}</a>
-    <div class="grp">{p("FDE 工作台", "FDE workbench")}</div>
-    <a href="{"/en/console" if en else "/console"}">{p("Engagement 控制台", "Engagement console")}</a>
-    <div class="grp">{p("外部", "External")}</div>
-    <a href="{"/GTM/en/index.html" if en else "/GTM/index.html"}">{p("GTM 官网", "GTM site")}</a>
+{side_nav("certification", en=en, subnav=_rail_subnav(en))}
   </nav>
   <div class="side-foot">
     <a class="lang" href="{other}" title="{badge_title}" aria-label="{badge_label}">{badge}</a>

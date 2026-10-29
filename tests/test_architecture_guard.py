@@ -13,6 +13,7 @@ advertise it.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -122,13 +123,18 @@ def _done_keyword(item: str) -> str | None:
 
 _CONSOLE_SOURCES = ("fde_scope/web/app.py", "fde_scope/web/guided_api.py")
 _ROUTE_DECORATOR = r"@(?:app|router)\.(get|post|put|delete|patch|websocket)\(\s*[\"']([^\"']+)"
-# Both decorators are conditional fallbacks for an in-repo asset directory: each
-# is registered only when catalog_site_dir() / gtm_site_dir() is None, i.e. in an
-# installed app. A checkout serves those two prefixes with a StaticFiles mount
-# instead, so its runtime table has two fewer entries while answering the same
-# paths. The declared count (57) is therefore the install-invariant number to
-# advertise — the served count (55 in a checkout) would understate the surface.
-_CONDITIONAL_ASSET_FALLBACKS = {("get", "/catalog/{rest:path}"), ("get", "/GTM/{rest:path}")}
+# All three decorators are conditional fallbacks for an in-repo asset
+# directory: each is registered only when catalog_site_dir() / gtm_site_dir() /
+# resources_site_dir() is None, i.e. in an installed app. A checkout serves those
+# three prefixes with a StaticFiles mount instead, so its runtime table has three
+# fewer entries while answering the same paths. The declared count (77) is
+# therefore the install-invariant number to advertise — the served count (69 in a
+# checkout) would understate the surface.
+_CONDITIONAL_ASSET_FALLBACKS = {
+    ("get", "/catalog/{rest:path}"),
+    ("get", "/GTM/{rest:path}"),
+    ("get", "/gh-resources/{rest:path}"),
+}
 
 
 def _declared_routes() -> list[tuple[str, str]]:
@@ -211,3 +217,53 @@ def test_feature_list_roadmaps_agree_with_readme_checkboxes() -> None:
             continue
         assert keyword not in zh_roadmap, f"README marks {keyword!r} done; zh roadmap still lists it"
         assert keyword not in en_roadmap, f"README marks {keyword!r} done; en roadmap still lists it"
+
+
+def test_no_bare_writes_outside_the_atomic_primitive() -> None:
+    """AGENTS.md invariant 4, statically.
+
+    Two reasons the primitive is mandatory, both verified rather than
+    assumed: crash consistency (a truncated record is worse than the previous
+    one), and file mode — ``tempfile.mkstemp`` creates at 0600 while
+    ``Path.write_text`` creates at 0644, and the files in question (uploads
+    before the scrub stage ran, evidence scans, runbooks, export bundles)
+    carry customer-derived content.
+
+    ``fsutil`` itself implements the primitive, so it is the sole exemption.
+    Append-only modes stay legal everywhere: the audit journal deliberately
+    appends (a rewrite would race concurrent entries away).
+
+    A module that does not parse is reported as an offender rather than raised:
+    the guard cannot see into a file the interpreter cannot read, and such a
+    file cannot ship either.
+    """
+    src = REPO_ROOT / "fde_scope"
+    exempt = {(src / "fsutil.py").resolve()}
+    offenders: list[str] = []
+    for path in sorted(src.rglob("*.py")):
+        if path.resolve() in exempt:
+            continue
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except SyntaxError as exc:
+            offenders.append(f"{rel}:{exc.lineno} does not parse: {exc.msg}")
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Attribute) and func.attr in ("write_text", "write_bytes"):
+                offenders.append(f"{rel}:{node.lineno} .{func.attr}()")
+            elif isinstance(func, ast.Name) and func.id == "open" and len(node.args) >= 2:
+                mode = node.args[1]
+                if (
+                    isinstance(mode, ast.Constant)
+                    and isinstance(mode.value, str)
+                    and any(c in mode.value for c in "wx+")
+                ):
+                    offenders.append(f"{rel}:{node.lineno} open(..., {mode.value!r})")
+    assert not offenders, (
+        "bare writes must go through fsutil.atomic_write_text/atomic_write_bytes; "
+        "an unparseable module must be fixed before it can ship\n" + "\n".join(offenders)
+    )

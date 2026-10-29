@@ -252,6 +252,18 @@ BLOCKER_ADVICE: dict[str, list[tuple[str, str, str]]] = {
             "取得客户对移交包的书面接受，把 handoff_package.customer_accepted 置 true——不得未签收就退场。",
             "assets:handoff_package",
         ),
+        (
+            "适用边界",
+            "G7③：在 CLI 用 fde-scope handoff <id> --boundary '…'，或在交接 tab 填「适用边界」，"
+            "写明哪些门店/品类/数据源不在方案射程内。留空等于把判断责任悄悄推给了接手的人。",
+            "tab:handoff",
+        ),
+        (
+            "终止条件",
+            "G7④：填「终止条件」——什么信号出现就停用并回退、由谁判定（例：bad_case_rate 连续两个"
+            "窗口破线则停用建议、回人工）。没有终止条件的 pilot 会变成无限 pilot。",
+            "tab:handoff",
+        ),
     ],
 }
 

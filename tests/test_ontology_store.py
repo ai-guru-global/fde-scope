@@ -55,6 +55,43 @@ def test_corrupt_workspace_file_skipped(tmp_path: Path) -> None:
     assert store.load_schema("bad") is None
 
 
+def test_traversal_ids_refused(tmp_path: Path) -> None:
+    """Schema/store ids reach the store from HTTP path parameters."""
+    import pytest
+
+    from fde_scope.fsutil import UnsafeIdentifier
+
+    store = OntologyStore(root=tmp_path)
+    # ``..`` is deliberately absent: ids reach safe_child already suffixed
+    # ("...yaml"), so it degrades to a harmless literal name instead of an
+    # escape. What must be refused is anything carrying a separator or a NUL.
+    for evil in ("../../escape", "a/b", "..\\escape", "\x00escape"):
+        with pytest.raises(UnsafeIdentifier):
+            store.load_schema(evil)
+        with pytest.raises(UnsafeIdentifier):
+            store.load_store(evil)
+
+
+def test_schema_id_from_yaml_body_cannot_escape(tmp_path: Path) -> None:
+    """The write side is the sharper edge: ``id`` inside a parsed YAML chosen
+    the destination file, so a hostile schema could land anywhere on disk."""
+    import pytest
+
+    from fde_scope.fsutil import UnsafeIdentifier
+
+    store = OntologyStore(root=tmp_path)
+    evil = OntologySchema(
+        id="../../escaped",
+        version="0.1.0",
+        base_iri="https://example.com/",
+        namespaces=[],
+    )
+    with pytest.raises(UnsafeIdentifier):
+        store.save_schema(evil)
+    assert not (tmp_path / "escaped.yaml").exists()
+    assert not (tmp_path.parent / "escaped.yaml").exists()
+
+
 def test_list_precedence_workspace_over_builtin(tmp_path: Path) -> None:
     store = OntologyStore(root=tmp_path)
     entries = {e["id"]: e for e in store.list_schemas()}

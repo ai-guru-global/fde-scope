@@ -7,7 +7,7 @@
 > `manufacturing` profile). Built on AgentScope 2.0.
 >
 > This is the full feature list. Every item is executable code with test
-> coverage; the count-level promises (18 phases / 10 gates / 69 routes…) are
+> coverage; the count-level promises (18 phases / 10 gates / 86 routes…) are
 > pinned by the [architecture guard suite](../tests/test_architecture_guard.py).
 >
 > 中文版:[`docs/features.md`](features.md)
@@ -88,6 +88,19 @@ Zone D: 16–18).
   records — exceptions leave an audit trail.
 - **On-site journal**: research / implementation / optimization records,
   one-click capture into the skills library.
+- **Retrospective (SLA clock, read-only)**: `fde-scope engage retrospective
+  <id>` / `GET /api/engagements/{eid}/retrospective` / the console "Retro" tab —
+  replays the audit stream (`engagement.create/advance/rollback/gate_evaluate`)
+  into a phase timeline (visits, per-phase dwell including the open visit),
+  checks it against the contract deadlines (≤14d first integration / ≤90d
+  production / ≤120d disengage; per-engagement override via
+  `assets["success_criteria_sla"]`, source labelled per milestone) into
+  met/missed/at_risk/on_track, and reports gate evaluation counts and
+  first-pass rate. Honest degradation: a replay that does not end at the
+  current phase sets `timeline_consistent=false`; projects without an audit
+  trail fall back to context-only — history is never invented. CLI mutation
+  commands (init/advance/rollback, `gate check`) write the same audit events
+  as the web layer (`actor: "cli"`). Zero new persistence.
 
 ## 2. Ten executable gates `engagement/gates/`
 
@@ -106,7 +119,7 @@ passage.
 | `air_gap` | 🏭 | Offline deployment posture settled at connect time (no phone-home later) |
 | `shift_handover` | 🏭 | Multi-shift sites need a digital handover log + per-shift runbook |
 | `slo` | 🏢 | SLO/SLA + error budget + alert route (missing route → warning) |
-| `handoff_signoff` | 🏢 | Handoff package complete, customer accepted |
+| `handoff_signoff` | 🏢 | Handoff package complete, customer accepted; boundary (G7③) / termination (G7④) missing → warning, not a blocker |
 
 **Enforcement flow:**
 
@@ -139,7 +152,7 @@ from a clean pass.
 | Surface | Form | What it does |
 |---|---|---|
 | CLI | `fde-scope` | 13 command groups: connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web console | FastAPI single page, 69 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, guided mode (plain-language phase guidance, deliverable checklists, blocker→next-step translation, catalog deep links, AI-drafted context, goal→task plan), six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser, certification centre (exam specs, public outlines, sample items and a channel due-diligence checklist for three platforms, every figure graded by provenance), glossary (every term grouped by theme as same-page cards with instant search, kept out of the prose), Level-1 course (all 25 course documents rendered from source on one page, in-text citations rewritten to in-app links), SOP full text (rendered locally from source, section navigation and tables), skills handbook (the generated portal mounted in-app), repo docs (README plus 20 docs/ pages rendered locally, GitHub-style anchors and images served in-app), GTM site (the finished landing page mounted in-app with every external link rewritten to in-app routes or plain text) — the rail no longer jumps off-site |
+| Web console | FastAPI single page, 86 routes | Engagement dashboard (advance/rollback/blockers), gate inspector, guided mode (plain-language phase guidance, deliverable checklists, blocker→next-step translation, catalog deep links, AI-drafted context, goal→task plan), six context cards, corpus forge (≤10 MiB upload), KPI explorer, report browser, agent deploy preflight, read-only ontology browser, certification centre (exam specs, public outlines, sample items and a channel due-diligence checklist for three platforms, every figure graded by provenance), glossary (every term grouped by theme as same-page cards with instant search, kept out of the prose), Level-1 course (all 26 course documents rendered from source on one page, in-text citations rewritten to in-app links; in-page lab grading: G0 check plus per-day machine grading for D1–D8 through the same `run_lab` as the CLI's `course check`, in a throwaway workspace that never touches real data), SOP full text (rendered locally from source, section navigation and tables), skills handbook (the generated portal mounted in-app), repo docs (README plus 20 docs/ pages rendered locally, GitHub-style anchors and images served in-app), GitHub resources (the harvested repositories fully catalogued, filtered on two orthogonal axes — licence × relevance — with in-app search and every upstream URL rendered as non-clickable text), portfolio registry (the rubric compiled from the same tuple the auditor evaluates, every rule carrying its citation and credibility tier; the page lists no entries by design, while registration and audit live on three token-gated endpoints), retrospective (a "Retro" tab in the engagement detail: SLA clock + phase timeline + gate stats, read-only), stakeholder read-only share (a second credential: the link carries a per-engagement token, shown once in plaintext and stored as sha256 — regenerating revokes the old link; `/share/{eid}` renders progress + SLA + gate status + customer acknowledgement — the acknowledgement only writes `share.ack` audit evidence and never advances the state machine, formal acceptance stays on the authed accept flow; invalid links always answer 404 so nothing can be probed), GTM site (the finished landing page mounted in-app with every external link rewritten to in-app routes or plain text) — the rail no longer jumps off-site |
 | QwenPaw PawApp | Desktop plugin | 18 routes under `/api/fde-scope` + 3 agent tools + skill provider, same engine |
 | macOS App | universal2 DMG | Double-click; same FastAPI object (127.0.0.1:8737), single-instance guard + health check + crash fallback |
 
@@ -316,7 +329,7 @@ ruff check fde_scope tests && ruff format --check fde_scope tests
 | Zero-config verifiable | "Five hours to install, two minutes to demo" | No key, no Docker, no AgentScope to run the evidence chain |
 | Credentials env-var only | Keys leak into manifests/reports/logs | Architecture invariant + guard tests |
 | Certification centre | Channel-admission and exam specs are scattered across vendor sites and can't be cross-checked | Exam specs, public outlines, sample items and a due-diligence checklist for three platforms on one page; every figure graded official/noted/gap and gaps stated rather than filled |
-| Level-1 course | Course Markdown sits loose in the repo; newcomers don't know where to start or whether they're reading the current copy | `/course` renders the 25 `course-level-1/` documents straight from source (chapter anchors, rewritten internal links, readable task checklists) with no copy and no drift |
+| Level-1 course | Course Markdown sits loose in the repo; newcomers don't know where to start or whether they're reading the current copy | `/course` renders the 26 `course-level-1/` documents straight from source (chapter anchors, rewritten internal links, readable task checklists) with no copy and no drift |
 
 ## 17. Not done yet (roadmap)
 

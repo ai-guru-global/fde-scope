@@ -12,7 +12,8 @@ storage without touching the web layer:
   row per engagement with indexed summary columns and the full
   ``EngagementContext.model_dump_json`` payload. WAL mode, one
   ``check_same_thread=False`` connection guarded by a lock, one transaction
-  per mutation.
+  per mutation. The connection is pooled per database file (see
+  :func:`_pooled_sqlite`) rather than opened per request.
 
 Backend selection is env-driven: ``FDE_SCOPE_STORAGE=file|sqlite``
 (default ``file``). Selection is re-read on every call (like
@@ -140,20 +141,40 @@ CREATE TABLE IF NOT EXISTS archived_engagements (
 
 
 class SQLiteStorage:
-    """SQLite backend: one row per engagement, WAL, lock-guarded connection."""
+    """SQLite backend: one row per engagement, WAL, lock-guarded connection.
+
+    Instances are pooled by :func:`_pooled_sqlite`, so ``close()`` must evict
+    the pooled entry: a closed-but-still-pooled instance would hand the next
+    caller a ``sqlite3.ProgrammingError`` on a dead connection.
+    """
 
     def __init__(self, db_path: str | Path | None = None) -> None:
         self._path = Path(db_path) if db_path else paths.engagements_db()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self._closed = False
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.executescript(_SCHEMA)
 
+    @property
+    def db_path(self) -> Path:
+        """Location of the database file this backend owns."""
+        return self._path
+
     def close(self) -> None:
+        """Close the connection and drop this instance from the pool.
+
+        Idempotent: sharing a pooled instance means a second caller can very
+        plausibly reach ``close()`` after the first one already ran it.
+        """
         with self._lock:
+            if self._closed:
+                return
             self._conn.close()
+            self._closed = True
+        _forget_sqlite(self)
 
     @staticmethod
     def _row(ctx: EngagementContext, now: str) -> tuple:
@@ -244,34 +265,81 @@ class SQLiteStorage:
         return f"sqlite://{self._path}#archived_engagements/{eid}"
 
 
+_SQLITE_POOL: dict[str, SQLiteStorage] = {}
+_POOL_LOCK = threading.Lock()
+
+
+def _pooled_sqlite(db_path: str | Path | None = None) -> SQLiteStorage:
+    """One SQLiteStorage — and therefore one sqlite connection — per database.
+
+    ``get_storage_backend()`` used to build a fresh instance on every call, so
+    every engagement read or write re-opened the database and re-ran
+    ``PRAGMA journal_mode=WAL`` plus the whole ``executescript(_SCHEMA)`` setup:
+    measured 300 saves at ~50ms throwaway versus ~3ms pooled. Refcounting did
+    reclaim the throwaway connections (despite the name, this was churn rather
+    than a descriptor leak), and an instance that outlives its statement — in a
+    traceback, or on any runtime without immediate refcounting — stays open.
+    Keying the pool on the *resolved* path keeps ``fde_scope.paths`` semantics:
+    a moved data root resolves to a different key instead of pinning the first
+    database forever.
+    """
+    key = str((Path(db_path) if db_path else paths.engagements_db()).resolve())
+    with _POOL_LOCK:
+        # __init__ takes the instance lock, so this is pool → instance order.
+        # close() releases the instance lock before reaching back in, so no
+        # thread ever holds them in the opposite order.
+        existing = _SQLITE_POOL.get(key)
+        if existing is not None:
+            return existing
+        created = SQLiteStorage(key)
+        _SQLITE_POOL[key] = created
+        return created
+
+
+def _forget_sqlite(backend: SQLiteStorage) -> None:
+    """Drop a closed instance so the next caller gets a live connection."""
+    key = str(backend.db_path.resolve())
+    with _POOL_LOCK:
+        if _SQLITE_POOL.get(key) is backend:
+            del _SQLITE_POOL[key]
+
+
 def get_storage_backend() -> StorageBackend:
     """Resolve the active backend from ``FDE_SCOPE_STORAGE`` (default file).
 
     Re-resolved on every call — like ``fde_scope.paths`` — so tests and
-    entry points can change the environment between calls.
+    entry points can change the environment between calls. ``FileStorage`` is
+    stateless so a fresh instance costs nothing; ``SQLiteStorage`` holds a
+    connection and comes from the pool.
     """
     name = os.environ.get(ENV_STORAGE, "file").strip().lower() or "file"
     if name == "file":
         return FileStorage()
     if name == "sqlite":
-        return SQLiteStorage()
+        return _pooled_sqlite()
     logger.warning("unknown %s=%r — falling back to file storage", ENV_STORAGE, name)
     return FileStorage()
 
 
-def migrate_file_to_sqlite(db_path: str | Path | None = None) -> dict:
+def migrate_file_to_sqlite(db_path: str | Path | None = None) -> dict[str, object]:
     """One-way migration: copy every file-backend engagement into SQLite.
 
     Source files are left in place; existing SQLite rows are overwritten.
-    Returns a summary ``{"migrated": n, "skipped": m, "db_path": ...}``.
+    Returns ``{"migrated": n, "skipped": m, "db_path": ...}``, where
+    ``skipped`` counts ``*.json`` files that ``FileStorage.list_engagements()``
+    dropped as unreadable — a migration that copies 3 of 5 files must not
+    report 3 as the whole story.
     """
     src = FileStorage()
-    dst = SQLiteStorage(db_path)
+    contexts = src.list_engagements()
+    on_disk = len(list(paths.engagements_dir().glob("*.json")))
+    dst = _pooled_sqlite(db_path)
     migrated = 0
-    try:
-        for ctx in src.list_engagements():
-            dst.save_engagement(ctx)
-            migrated += 1
-    finally:
-        dst.close()
-    return {"migrated": migrated, "db_path": str(dst._path)}
+    for ctx in contexts:
+        dst.save_engagement(ctx)
+        migrated += 1
+    return {
+        "migrated": migrated,
+        "skipped": max(on_disk - len(contexts), 0),
+        "db_path": str(dst.db_path),
+    }

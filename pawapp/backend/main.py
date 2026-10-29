@@ -382,7 +382,12 @@ async def draft_runbook(eid: str, ctx=Depends(get_ctx)) -> dict:
 
 
 @router.post("/handoff/{eid}")
-def handoff_package(eid: str, accept: bool = Form(False)) -> dict:
+def handoff_package(
+    eid: str,
+    accept: bool = Form(False),
+    boundary: str | None = Form(None),
+    termination: str | None = Form(None),
+) -> dict:
     """Assemble the knowledge-transfer package (picks up the drafted
     runbook when present)."""
     from fde_scope.engagement import build_handoff_package
@@ -392,6 +397,8 @@ def handoff_package(eid: str, accept: bool = Form(False)) -> dict:
     package = build_handoff_package(
         eng.ctx,
         runbook_path=str(runbook) if runbook.exists() else None,
+        boundary=boundary,
+        termination=termination,
         customer_accepted=accept,
     )
     _save_engagement(eng)

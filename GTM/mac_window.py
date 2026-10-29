@@ -4,7 +4,9 @@
 Input: 2x viewport captures (2880x1800) from headless Chrome.
 Output: same file name in this directory (GTM/images/) with a macOS title
 bar (traffic lights + centered title), rounded corners and a hairline
-border, matching the Enterprise Light design system in design.md.
+border. The frame is OS window chrome; the page captured inside it carries
+the Workbench ramp (fde_scope/web/layout.py THEME_CSS), which the GTM board
+mirrors light-only.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ BAR_H = 52 * SCALE
 RADIUS = 10 * SCALE
 TITLE_SIZE = 13 * SCALE
 
-BAR_RGB = (240, 240, 243)  # matches design.md surface tone
+BAR_RGB = (240, 240, 243)  # macOS title-bar chrome, not brand tokens
 BAR_LINE = (216, 216, 221)
 BORDER = (198, 198, 206)
 TITLE_RGB = (86, 86, 94)

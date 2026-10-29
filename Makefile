@@ -1,4 +1,4 @@
-.PHONY: install install-dev install-full test test-cov lint run clean help check-catalog check-local build-site
+.PHONY: install install-dev install-full test test-cov lint run clean help check-catalog check-local build-site fetch-resources check-resources build-resources-site
 
 # Use the project venv when it exists. A bare `python3` on macOS resolves to
 # Homebrew's interpreter, which has none of the deps: `make test` died at
@@ -39,6 +39,18 @@ check-local: ## Also reconcile catalog ✅/📦 status against ~/.qoder installs
 
 build-site: ## Rebuild docs/skills-catalog/site/index.html portal (run after editing catalog)
 	$(PYTHON) scripts/build_catalog_site.py
+
+# GitHub FDE resources (docs/github-resources/). fetch hits the network via `gh`
+# (OFFLINE=1 replays manifest/snapshot without touching the network, for CI);
+# check reconciles README ⇄ manifest ⇄ disk ⇄ NOTICE; build renders the portal.
+fetch-resources: ## Harvest FDE GitHub repos → manifest + verbatim mirror (OFFLINE=1 for no-network)
+	$(PYTHON) scripts/fetch_github_resources.py $(if $(OFFLINE),--offline,)
+
+check-resources: ## Validate docs/github-resources (counts, mirror⇔manifest, provenance, NOTICE)
+	$(PYTHON) scripts/check_resources_catalog.py
+
+build-resources-site: ## Rebuild docs/github-resources/site/ portal (zh + en) from the manifest
+	$(PYTHON) scripts/build_resources_site.py
 
 run: ## Print CLI help (entrypoint)
 	$(PYTHON) -m fde_scope.cli --help

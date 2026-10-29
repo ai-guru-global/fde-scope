@@ -8,8 +8,14 @@
 目标：堵住企业安全评审第一关（差距 B1/B3/B4）。
 
 - [x] Web 层 API token 认证：`FDE_SCOPE_API_TOKEN` 设置后所有路由要求
-  `Authorization: Bearer` / `X-API-Key`；未设置保持本地单机现状；`/api/health` 除外
+  `Authorization: Bearer` / `X-API-Key`；未设置只对回环请求放开；`/api/health` 除外
   （新增 `fde_scope/web/auth.py`）
+- [x] 2026-10-06 收紧默认值：认证关闭不再随 `FDE_SCOPE_ALLOW_REMOTE=1` 一起生效——
+  CLI 要求非回环绑定同时有 token（缺则 exit 2），中间件逐请求按 `scope["server"]`
+  （连接被 accept 时落在哪个地址）兜底，未设 token 且从非回环地址到达 → 403。
+  绕过 CLI 直接 `uvicorn`/`gunicorn` 启动同样受这层保护；回归见
+  `tests/test_web_auth.py`（22 项），行为说明见 `docs/user-guide.md` FAQ 7/8 与
+  `docs/api-reference.md` 认证节
 - [x] 审计事件：advance / force advance / gate 评估 / skill 发布落审计日志
   （新增 `fde_scope/audit.py`，追加写 `.fde_scope/audit.jsonl`，凭据不进日志）
 - [x] engagement load/save 进程内按 eid 加锁（`fde_scope/web/deps.py`）
@@ -94,6 +100,37 @@
 - [x] 客户侧文档：最终用户手册、API 参考（OpenAPI 导出）、onboarding 指南（2026-09-28 完成：`docs/user-guide.md` 用户手册、`docs/api-reference.md` 路由级 API 参考（逐条对照 `web/app.py` + `web/guided_api.py`，OpenAPI 导出本身未做）、`docs/onboarding-customer.md` 现场部署/安全基线/接入决策树/验收模板；README 文档区已索引）
 - [x] 第三方依赖 license 审计 + NOTICE 文件（2026-09-28 完成：根目录 `NOTICE` + `docs/license-audit.md` + `tests/test_third_party_licenses.py` 守护；发现 mysql-connector-python GPLv2+FOSS 例外、asyncua LGPLv3+、paho-mqtt EPL-2.0/BSD 双许可，均为 optional extra）
 - [x] 法务：真实公司名 mock 清理（见差距 B5，2026-09-28 修复）
+
+### 开源/商业边界决策（2026-10-06 提出，⚠️ 未定，需维护者拍板）
+
+公开前的实测基线：`pyproject.toml` 声明 `license = { text = "MIT" }`，根目录有真
+MIT `LICENSE`（署名 Allen Galler）与 `NOTICE`，两者**都已进入发行件**
+（wheel `fde_scope-0.1.0.dist-info/licenses/`、sdist 顶层，2026-10-06 `python -m build` 实测）。
+本轮未改动任何许可证文本，也未新增 CLA。
+
+矛盾点在于上面第 85 行「双许可（开源核心 + 企业版功能开关）」这条已选定的形态，
+与「整个包 MIT」不兼容：**MIT 授予任何人再分发与商用权，因此同一个 MIT 发行件里的
+功能开关不构成商业边界**。`fde_scope/license.py:3` 自己也这么承认——docstring 原句
+`This is an *honesty mechanism, not DRM*`，`SECURITY.md` 进一步把它列为"商业档位，不是安全控制"。
+现状能守住的只有**信任与升级服务**（离线签发、无在线校验），守不住代码复制。
+单机版与多用户企业版两条路都要走，就必须先把边界放到正确的那一层：
+
+| 方案 | 边界落在哪 | 代价 | 适合什么 |
+|---|---|---|---|
+| A 维持 MIT，企业能力另发一个包 | 仓库/发行件（`fde-scope` MIT + `fde-scope-enterprise` 专有） | 需要维护私有仓库与共享内部层的版本同步 | 真正想卖多用户/RBAC/SSO，且接受"核心可被自由 fork" |
+| B 核心改 Apache-2.0 | 许可证文本 | 需要全部贡献者同意再授权；工业侧 OEM/集成商更认这个（含明示专利授权） | 目标是被客户采购方接受，而非防止 fork |
+| C 核心 Apache-2.0 + 企业层 ELv2/BUSL | 分层许可证 | 需明确"哪些目录属于企业层"，且改许可证要复测 `NOTICE`/第三方 license 守护 `tests/test_third_party_licenses.py` | 与 A 同类，但企业层与核心同仓 |
+
+推荐：**A 或 C**，因为 P5 的多租户/RBAC/SSO 一旦落地必然是与核心不同代码路径的能力，
+放在同一个 MIT 包里只会让第 85 行的宣称与实际可执行的权利不一致。
+B 可单独执行且与 A/C 不冲突（核心换 Apache-2.0 不改变企业层的授权问题）。
+
+需要澄清的一点（实测，非推测）：**客户可见文本目前并没有宣称这个排他边界**——
+`grep -rn "开源核心" README.md GTM/index.html` 无命中，该表述只存在于本文件第 85 行与
+`docs/commercialization-gap-analysis.md:145` 两份内部规划文档。所以公开前必改的是
+**这两份文档里的一句话**（写成"MIT 开源 + 付费服务/另发的企业包"这类当前许可证
+真正支持的表述），而不是先改许可证。若维持第 85 行现状直接 public，等于把一份
+内部未自洽的形态描述公开在仓库里。
 
 ## P5 — 规模化
 

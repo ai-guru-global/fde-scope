@@ -25,8 +25,10 @@ Run from the repo root:
 
     .venv/bin/python examples/seed_mock_engagements.py
 
-The script writes one JSON context per engagement into ``.fde_scope/engagements``
-(the same directory the Web UI reads). Gate records are produced by the real
+The script writes one JSON context per engagement into
+``fde_scope.paths.engagements_dir()`` — the same directory the Web UI reads, so
+``FDE_SCOPE_HOME`` redirects the seed exactly as it redirects every other entry
+point (remediation B1). Gate records are produced by the real
 engines (``Engagement.evaluate_gate``) so they are always self-consistent with
 the context; only ``checked_at`` is back-dated to a plausible timeline.
 """
@@ -38,6 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from fde_scope import paths  # noqa: E402
 from fde_scope.corpus.report import save_html  # noqa: E402
 from fde_scope.corpus.types import (  # noqa: E402
     CorpusItem,
@@ -66,10 +69,6 @@ from fde_scope.skills.models import (  # noqa: E402
 from fde_scope.skills.service import SkillService  # noqa: E402
 from fde_scope.skills.store import SkillStore  # noqa: E402
 
-_OUT_DIR = Path(".fde_scope/engagements")
-_SKILLS_DIR = Path(".fde_scope/skills")
-_REPORTS_DIR = Path("reports")
-
 
 def _st(name: str, role: str, sponsor: bool = False, metric: str = "") -> Stakeholder:
     return Stakeholder(name=name, role=role, is_sponsor=sponsor, success_metric=metric)
@@ -89,8 +88,8 @@ def _run_gates(eng: Engagement, timeline: dict[str, str]) -> None:
 
 
 def _save(eng: Engagement) -> Path:
-    _OUT_DIR.mkdir(parents=True, exist_ok=True)
-    return eng.ctx.save(_OUT_DIR / f"{eng.ctx.id}.json")
+    out = paths.engagements_dir(create=True)
+    return eng.ctx.save(out / f"{eng.ctx.id}.json")
 
 
 def _split(name: str, n: int, category: str = "语料样本") -> CorpusSplit:
@@ -131,10 +130,10 @@ def _write_reports(
     behave exactly like real FDE outputs; the Web UI serves them under
     ``/reports/``. Returns (runbook_path, corpus_report_path).
     """
-    _REPORTS_DIR.mkdir(exist_ok=True)
+    reports = paths.reports_dir(create=True)
     runbook_path = f"reports/{slug}-runbook.md"
     corpus_path = f"reports/{slug}-corpus.html"
-    (_REPORTS_DIR / f"{slug}-runbook.md").write_text(
+    (reports / f"{slug}-runbook.md").write_text(
         render_runbook(ctx, agent_name=f"{slug}-agent"), encoding="utf-8"
     )
     coverage = CoverageReport(category_counts=categories, target_per_category=target_per_category)
@@ -151,7 +150,7 @@ def _write_reports(
         dropped=dropped,
         pii_entities_masked=pii,
     )
-    save_html(report, _REPORTS_DIR / f"{slug}-corpus.html")
+    save_html(report, reports / f"{slug}-corpus.html")
     # deep assets: deliverables + eval + monitoring posture
     ctx.assets.update(
         {
@@ -222,6 +221,14 @@ def teaverse() -> EngagementContext:
         runbook_path=runbook_path,
         eval_report_path=corpus_path,
         training_material="店长培训包 v2（16 场）",
+        boundary=(
+            "覆盖 32.4k 门店样本训出的 86 个 SKU 常规订货预测；新开店首周、促销叠加日、"
+            "以及未回传 POS 数据的加盟门店不在射程内——这三类继续人工下单，agent 只给参考不外发。"
+        ),
+        termination=(
+            "bad_case_rate 连续两个 14d 窗口 >10%（SLO 上限），或 POS 字段 schema 变更后 30d 内"
+            "未完成重训——任一命中即停用订货建议、回退人工下单，由供应链总监判定，案例退回 knowledge_transfer。"
+        ),
         customer_accepted=True,
     )
     eng = Engagement(ctx)
@@ -1602,7 +1609,7 @@ def _seed_skills() -> dict[str, str]:
     Returns a ``key -> skill id`` map so journal entries can link to the
     records they produced (the console shows the link as 💡).
     """
-    svc = SkillService(SkillStore(_SKILLS_DIR))
+    svc = SkillService(SkillStore(paths.skills_dir(create=True)))
     existing = {r.title: r for r in svc.search(status=None, limit=500)}
     ids: dict[str, str] = {}
     for spec in _SKILL_LIBRARY:
@@ -2281,17 +2288,17 @@ def main() -> None:
         riverbend,
         whitelake,
     ]
-    paths: list[Path] = []
+    written: list[Path] = []
     for b in builders:
         eng = Engagement(b())
         _apply_journal(eng.ctx, skill_ids)
-        paths.append(_save(eng))
-    for p in paths:
+        written.append(_save(eng))
+    for p in written:
         print(f"seeded {p}")
     print(
-        f"\n{len(paths)} engagements → {_OUT_DIR.resolve()}\n"
+        f"\n{len(written)} engagements → {paths.engagements_dir().resolve()}\n"
         f"{len(_SKILL_LIBRARY)} skills ({sum(1 for s in _SKILL_LIBRARY if s['published'])} published, "
-        f"{sum(1 for s in _SKILL_LIBRARY if not s['published'])} drafts) → {_SKILLS_DIR.resolve()}"
+        f"{sum(1 for s in _SKILL_LIBRARY if not s['published'])} drafts) → {paths.skills_dir().resolve()}"
     )
 
 

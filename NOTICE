@@ -6,7 +6,10 @@ fde-scope is licensed under the MIT License (see LICENSE).
 This product includes third-party software components. All components are
 used as unmodified Python package dependencies (dynamic references at
 install/runtime); no third-party source code is vendored into this
-repository.
+repository. Documentation bodies from permissively-licensed GitHub
+repositories are mirrored verbatim under `docs/github-resources/mirror/`;
+those are prose, not source code, and each is listed under "Vendored
+third-party content" below with its licence and provenance.
 
 Direct dependencies
 -------------------
@@ -50,6 +53,31 @@ Development-only (never shipped in the runtime install):
 - pytest — MIT — test runner.
 - pytest-cov — MIT — coverage plugin.
 - httpx — BSD-3-Clause — test client for the web app.
+
+Vendored third-party content
+----------------------------
+
+Markdown documentation bodies mirrored verbatim into
+`docs/github-resources/mirror/` — only repositories whose licence is
+permissive AND whose relevance is not `noise` are mirrored (see
+`fde_scope/resources/models.py`). Repos with `NONE` / `NOASSERTION` /
+copyleft licences keep metadata + our own bilingual summary only; their
+bodies are NOT copied. Each mirrored file carries a provenance header with
+its commit and upstream path. Commit shas below are the snapshot at fetch
+time; re-run `make fetch-resources` to refresh.
+
+- pierpaolo28/Awesome-FDE-Roadmap — MIT — 24d652e — `mirror/pierpaolo28__Awesome-FDE-Roadmap/`
+- suboss87/FDEOps — MIT — ed184c8 — `mirror/suboss87__FDEOps/`
+- guocong-bincai/ai-interview-guide — MIT — cdb5d0f — `mirror/guocong-bincai__ai-interview-guide/`
+- calmrocks/ai-engineer-notebooks — MIT — 3bf1d77 — `mirror/calmrocks__ai-engineer-notebooks/`
+- global-fde/awesome-fde-resources — CC-BY-4.0 — 27e9877 — `mirror/global-fde__awesome-fde-resources/`
+- libaice/Awesome-FDE — MIT — b9135a9 — `mirror/libaice__Awesome-FDE/`
+- gxfde/fde-workbench — MIT — 5ded7b3 — `mirror/gxfde__fde-workbench/`
+- memovai/openfde — MIT — fda7b06 — `mirror/memovai__openfde/`
+- dataPro-lgtm/fde-interview-fieldbook — MIT — 6b851a9 — `mirror/dataPro-lgtm__fde-interview-fieldbook/`
+- Dan-Cleary/fdestack — MIT — 5524460 — `mirror/Dan-Cleary__fdestack/`
+- LowyShin/giip-fde-agent — Apache-2.0 — 83d1dd0 — `mirror/LowyShin__giip-fde-agent/`
+- goday-org/FDE-Handbook — MIT — 229db7b — `mirror/goday-org__FDE-Handbook/`
 
 Notes
 -----

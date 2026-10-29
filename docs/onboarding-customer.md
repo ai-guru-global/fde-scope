@@ -9,7 +9,7 @@
 | 形态 | 适用 | 前提 | 说明 |
 |---|---|---|---|
 | **单机桌面** | POC、单个工程师/客户经理使用 | Python ≥ 3.11；`pip install -e ".[web]"` | `fde-scope web` 默认绑 `127.0.0.1:8080`，无需认证即可用；macOS 另有双击即用的 DMG（同一控制台） |
-| **内网服务器** | 客户团队多人共用、长期运行 | 一台内网 Linux/macOS 主机；Python ≥ 3.11 | **必须**先设 `FDE_SCOPE_API_TOKEN` 开启认证，再 `FDE_SCOPE_ALLOW_REMOTE=1 fde-scope web --host 0.0.0.0`；建议前面加反向代理做 HTTPS |
+| **内网服务器** | 客户团队多人共用、长期运行 | 一台内网 Linux/macOS 主机；Python ≥ 3.11 | **两个条件缺一不可**：`FDE_SCOPE_API_TOKEN` 设上 token，再加 `FDE_SCOPE_ALLOW_REMOTE=1 fde-scope web --host 0.0.0.0`；只设 opt-in 会 exit 2。建议前面加反向代理做 HTTPS，并由代理自己鉴权（见第 2 节） |
 | **PawApp 插件** | 已部署 QwenPaw 桌面宿主的团队 | QwenPaw 宿主（私有软件） | 同一引擎、同一数据根的原生前端，18 条路由挂在 `/api/fde-scope` |
 
 单机定位说明：当前版本**无多用户/RBAC**（见路线图 P5）。多人共用时以
@@ -20,7 +20,12 @@
 - [ ] **设置 API token**：`export FDE_SCOPE_API_TOKEN="$(openssl rand -hex 32)"`。
       只放环境变量，不写进任何配置文件、脚本仓库或聊天记录。
 - [ ] **仅受信网络暴露**：未设 token 前不要加 `FDE_SCOPE_ALLOW_REMOTE=1`；
-      公网暴露暂不提供额外防护（HTTPS/SSO 见 P5）。
+      现在的默认是「认证只在回环上关闭」——即便有人绕过 CLI 用
+      `uvicorn`/`gunicorn` 直接起服务，从非回环地址到达的请求也会被中间件
+      拒绝（403）。公网暴露暂不提供额外防护（HTTPS/SSO 见 P5）。
+- [ ] **反向代理确认**：同机代理（nginx 等）转发落在回环上，中间件那层 403
+      拦不住它。代理必须自己鉴权：转发 `X-API-Key`，或用 `auth_request`/
+      Basic Auth 拦住 `/api/`；不要把免 token 的 127.0.0.1 口直接暴露出去。
 - [ ] **数据根目录权限**：确认数据根（`FDE_SCOPE_HOME` 或启动目录）下
       `.fde_scope/` 与 `reports/` 对运行账号可写、对无关账号不可读
       （`chmod 700` 级别；engagement JSON 明文含干系人姓名/电话）。
@@ -111,7 +116,12 @@ LLM **完全可选**：不配则语料合成、质量评分、runbook、引导�
 - [ ] 适用 gate 全部通过且无未说明的 force 例外（`GET /api/engagements/{eid}/gates`
       全绿；审计日志中每条 force advance 都有 reason + operator）
 - [ ] 移交包齐全且客户验收：runbook + eval 报告 + SLO + 培训材料，
-      `handoff` 已带 `accept=true` 执行并留 `handoff.accepted` 审计事件
+      另含**适用边界（G7③）与终止条件（G7④）**——这两件只出 ⚠️、不阻塞门禁，
+      所以 gate 绿了仍可能没写，须单独核 `reports/handoff_package_{eid}.json` 里
+      `boundary` / `termination` 两个键非空。
+      `POST /api/engagements/{eid}/handoff` 带 `accept=true` 执行并留 `handoff.accepted`
+      审计事件（**审计只有 Web API 这条路会写**；CLI `fde-scope handoff` 只落
+      runbook 与档案，不写 `audit.jsonl`——要留痕就走 Web）
 - [ ] FAT/SAT 签字扫描件等证据已附加（`GET .../evidence` 非空，sha256 入审计）
 - [ ] 审计可导出：`GET /api/engagements/{eid}/audit/export` 产出 Markdown 报告
 - [ ] SLO 已定义且告警路由到位（`slo` gate 通过）

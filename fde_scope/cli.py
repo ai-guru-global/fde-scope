@@ -2,7 +2,8 @@
 
 Five subcommands mirror the FDE workflow: ``connect`` → ``corpus`` →
 ``deploy`` → ``eval`` → ``flywheel``. Scriptable output: ``deploy``, ``eval``,
-``kpi``, ``engage status``/``list``, ``skill list``, ``gate check`` and the
+``kpi``, ``engage status``/``list``/``retrospective``/``stakeholder list``/``criterion list``/
+``slo list``/``site show``, ``skill list``, ``gate check`` and the
 ``ontology`` read/validate commands accept ``--json`` (plain JSON on stdout,
 no rich markup). ``--version`` and ``--install-completion`` work app-wide.
 """
@@ -12,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 from contextlib import suppress
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +22,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__, paths
+from .fsutil import atomic_write_text
 
 if TYPE_CHECKING:
     from .config import AgentSpec, TenantConfig
@@ -65,6 +68,16 @@ console = Console()
 
 def _banner(title: str) -> None:
     console.print(f"\n[bold cyan]FDE Scope[/bold cyan] v{__version__} — {title}\n")
+
+
+def _echo_json(payload: object) -> None:
+    """Write a JSON document to stdout verbatim.
+
+    ``--json`` promises "plain JSON, no rich markup" (see the module docstring):
+    rich re-wraps long string values at the console width, which makes the output
+    unparseable, so machine-readable payloads bypass the console entirely.
+    """
+    typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +150,6 @@ def connect(
         f"channels={schema.detected_channels} · "
         f"sample_size={len(sample)}"
     )
-
-    from .fsutil import atomic_write_text
 
     out = paths.data_root() / "samples" / "preview.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -559,6 +570,13 @@ def engage_init(
     ctx = EngagementContext(id=eid, customer=customer, profile=profile)
     eng = Engagement(ctx)
     _save_engagement(eng)
+    from . import audit
+
+    audit.log_event(
+        "engagement.create",
+        actor="cli",
+        detail={"engagement_id": eid, "customer": customer, "profile": profile},
+    )
     console.print(f"✅ Engagement [bold]{eid}[/bold] created (profile={profile})")
     console.print(f"   phase: {eng.ctx.current_phase} · zone: {eng.ctx.current_zone.value}")
     console.print(f"   visible phases: {len(eng.ctx.visible_phases)}")
@@ -602,6 +620,7 @@ def engage_advance(
     force: bool = typer.Option(False, "--force", help="Record gate result but don't block"),
 ) -> None:
     """Advance to the next SOP phase (gate-enforced)."""
+    from . import audit
     from .engagement import AdvanceBlocked
 
     eng = _load_engagement(engagement_id)
@@ -611,12 +630,22 @@ def engage_advance(
         console.print(f"[red]❌ ADVANCE BLOCKED[/red] — phase={eng.ctx.current_phase}")
         console.print(exc.result.summary())
         _save_engagement(eng)
+        audit.log_event(
+            "engagement.advance",
+            actor="cli",
+            detail={"engagement_id": engagement_id, "force": force, "advanced": False},
+        )
         _maybe_suggest_skill(engagement_id, eng.ctx.current_phase, list(exc.result.blockers))
         raise typer.Exit(1) from exc
     except StopIteration as exc:
         console.print("[yellow]Engagement already complete.[/yellow]")
         raise typer.Exit(0) from exc
     _save_engagement(eng)
+    audit.log_event(
+        "engagement.advance",
+        actor="cli",
+        detail={"engagement_id": engagement_id, "force": force, "advanced": True},
+    )
     _maybe_capture("advance", engagement_id, phase_slug=eng.ctx.current_phase)
     console.print(f"✅ Advanced → [cyan]{nxt.slug}[/cyan] ({nxt.name}) · zone={nxt.zone.value}")
 
@@ -627,7 +656,10 @@ def engage_rollback(
     to_phase: str = typer.Option(..., "--to", help="Target phase slug"),
 ) -> None:
     """Roll the engagement back to an earlier phase."""
+    from . import audit
+
     eng = _load_engagement(engagement_id)
+    from_phase = eng.ctx.current_phase
     try:
         target = eng.rollback(to_phase)
     except KeyError:
@@ -637,7 +669,35 @@ def engage_rollback(
         console.print(f"[red]Invalid rollback:[/red] {exc}")
         raise typer.Exit(2) from None
     _save_engagement(eng)
+    audit.log_event(
+        "engagement.rollback",
+        actor="cli",
+        detail={"engagement_id": engagement_id, "from_phase": from_phase, "to_phase": target.slug},
+    )
     console.print(f"⏪ Rolled back → [cyan]{target.slug}[/cyan] ({target.name})")
+
+
+@engage_app.command("retrospective")
+def engage_retrospective(
+    engagement_id: str = typer.Argument(..., help="Engagement id"),
+    as_json: bool = typer.Option(False, "--json", help="Print the report as plain JSON (no rich markup)"),
+    out: Path | None = typer.Option(None, "--out", "-o", help="同时把 Markdown 报告写到该路径"),
+) -> None:
+    """复盘：SLA 时钟 + 阶段时间线 + gate 统计（audit 流 + context，只读）。"""
+    from rich.markdown import Markdown
+
+    from . import audit
+    from .engagement.retrospective import build_retrospective, render_markdown
+
+    eng = _load_engagement(engagement_id)
+    report = build_retrospective(eng.ctx, list(audit.read_events(engagement_id)))
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(out, render_markdown(report))
+    if as_json:
+        console.print_json(report.model_dump_json())
+        return
+    console.print(Markdown(render_markdown(report)))
 
 
 @engage_app.command("list")
@@ -715,6 +775,228 @@ def engage_journal(
 
 
 # ---------------------------------------------------------------------------
+# Pre-engagement inputs — the fields the Zone A gates read
+#
+# ``site`` / ``stakeholders`` / ``success_criteria`` / ``slos`` used to be
+# writable only from the web console, so a CLI-only learner could never drive a
+# Zone A gate red or green. These writers go through the same pydantic models
+# and the same atomic save; they touch *facts*, never the state machine itself
+# (phase / journal / gate_records stay owned by Engagement.advance).
+# ---------------------------------------------------------------------------
+stakeholder_app = typer.Typer(
+    name="stakeholder", help="干系人地图（SuccessCriteriaGate 读取）。", no_args_is_help=True
+)
+criterion_app = typer.Typer(
+    name="criterion", help="合同化成功标准（SuccessCriteriaGate 读取）。", no_args_is_help=True
+)
+slo_app = typer.Typer(name="slo", help="SLO 定义（SloGate 读取）。", no_args_is_help=True)
+site_app = typer.Typer(name="site", help="现场勘察事实（SiteSurveyGate 读取）。", no_args_is_help=True)
+engage_app.add_typer(stakeholder_app)
+engage_app.add_typer(criterion_app)
+engage_app.add_typer(slo_app)
+engage_app.add_typer(site_app)
+
+
+@stakeholder_app.command("add")
+def stakeholder_add(
+    engagement_id: str = typer.Argument(...),
+    name: str = typer.Option(..., "--name", "-n"),
+    role: str = typer.Option(..., "--role", "-r"),
+    sponsor: bool = typer.Option(False, "--sponsor", help="标记为发起人（需要 ≥2 位才能过关）"),
+    success_metric: str = typer.Option("", "--success-metric", help="这位发起人在乎的可度量指标"),
+) -> None:
+    """Add a stakeholder to the engagement's stakeholder map."""
+    from .engagement.context import Stakeholder
+
+    eng = _load_engagement(engagement_id)
+    person = Stakeholder(name=name, role=role, is_sponsor=sponsor, success_metric=success_metric)
+    eng.ctx.stakeholders.append(person)
+    _save_engagement(eng)
+    mark = "👑 sponsor" if person.is_sponsor else person.role
+    console.print(f"✅ 干系人 [bold]{person.name}[/bold]（{mark}）已记录")
+    sponsors = sum(1 for s in eng.ctx.stakeholders if s.is_sponsor)
+    console.print(f"   当前发起人 {sponsors} 位（要求 ≥2，防 Sponsor Collapse）")
+
+
+@stakeholder_app.command("list")
+def stakeholder_list(
+    engagement_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json", help="Print the stakeholder list as plain JSON"),
+) -> None:
+    """Show the stakeholder map."""
+    eng = _load_engagement(engagement_id)
+    rows = [s.model_dump() for s in eng.ctx.stakeholders]
+    if as_json:
+        _echo_json({"engagement_id": engagement_id, "stakeholders": rows})
+        return
+    _banner(f"stakeholders · {engagement_id}")
+    if not rows:
+        console.print("[yellow]暂无干系人。[/yellow]")
+        console.print('  添加: fde-scope engage stakeholder add <id> --name "..." --role "..." --sponsor')
+        return
+    table = Table(title="Stakeholders")
+    for col in ("name", "role", "sponsor", "success_metric"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(r["name"], r["role"], "✅" if r["is_sponsor"] else "—", r["success_metric"] or "—")
+    console.print(table)
+
+
+@criterion_app.command("add")
+def criterion_add(
+    engagement_id: str = typer.Argument(...),
+    text: str = typer.Option(..., "--text", "-t", help="一条可度量成功标准（含数字 + 时间，客户能自己验收）"),
+) -> None:
+    """Add a contractual success criterion."""
+    eng = _load_engagement(engagement_id)
+    stripped = text.strip()
+    if not stripped:
+        console.print("[red]成功标准不能为空。[/red]")
+        raise typer.Exit(2)
+    if stripped in eng.ctx.success_criteria:
+        console.print(f"[red]重复的成功标准:[/red] {stripped}")
+        raise typer.Exit(2)
+    eng.ctx.success_criteria.append(stripped)
+    _save_engagement(eng)
+    console.print(f"✅ 成功标准 {len(eng.ctx.success_criteria)} 条已记录")
+    import re
+
+    if not re.search(r"\d", stripped):
+        console.print("[yellow]⚠️  这条没有数字——「提升体验」类形容词无法验收（门禁 G2 会打回）[/yellow]")
+
+
+@criterion_app.command("list")
+def criterion_list(
+    engagement_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json", help="Print the criteria as plain JSON"),
+) -> None:
+    """Show the agreed success criteria."""
+    eng = _load_engagement(engagement_id)
+    if as_json:
+        _echo_json({"engagement_id": engagement_id, "success_criteria": eng.ctx.success_criteria})
+        return
+    _banner(f"success criteria · {engagement_id}")
+    if not eng.ctx.success_criteria:
+        console.print("[yellow]暂无成功标准（= 无限 pilot 反模式入口）。[/yellow]")
+        return
+    for i, c in enumerate(eng.ctx.success_criteria, 1):
+        console.print(f"  {i}. {c}")
+
+
+@slo_app.command("add")
+def slo_add(
+    engagement_id: str = typer.Argument(...),
+    name: str = typer.Option(..., "--name", "-n"),
+    target: str = typer.Option(..., "--target", help="目标值，例如 可用性 99.5% / P95 ≤ 2s"),
+    error_budget: str = typer.Option("", "--error-budget", help="错误预算，例如 月 21.6min"),
+    alert_route: str = typer.Option("", "--alert-route", help="谁 / 哪个渠道 / 多久响应"),
+    window: str = typer.Option("28d", "--window", help="测量窗口"),
+) -> None:
+    """Define an SLO (target + error budget + alert route)."""
+    from .engagement.context import SLOSpec
+
+    eng = _load_engagement(engagement_id)
+    slo = SLOSpec(name=name, target=target, error_budget=error_budget, alert_route=alert_route, window=window)
+    eng.ctx.slos.append(slo)
+    _save_engagement(eng)
+    console.print(f"✅ SLO [bold]{slo.name}[/bold] 已定义 · target={slo.target} · window={slo.window}")
+    if not slo.alert_route:
+        console.print("[yellow]⚠️  未填告警路由——门禁 G6 要求「谁在什么时候被叫醒」写清楚[/yellow]")
+
+
+@slo_app.command("list")
+def slo_list(
+    engagement_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json", help="Print the SLOs as plain JSON"),
+) -> None:
+    """Show the defined SLOs."""
+    eng = _load_engagement(engagement_id)
+    rows = [s.model_dump() for s in eng.ctx.slos]
+    if as_json:
+        _echo_json({"engagement_id": engagement_id, "slos": rows})
+        return
+    _banner(f"slos · {engagement_id}")
+    if not rows:
+        console.print("[yellow]暂无 SLO。[/yellow]")
+        return
+    table = Table(title="SLOs")
+    for col in ("name", "target", "window", "error_budget", "alert_route"):
+        table.add_column(col)
+    for r in rows:
+        table.add_row(r["name"], r["target"], r["window"], r["error_budget"] or "—", r["alert_route"] or "—")
+    console.print(table)
+
+
+@site_app.command("set")
+def site_set(
+    engagement_id: str = typer.Argument(...),
+    location: str | None = typer.Option(None, "--location", help="现场地址 / 勘察记录（缺失 = blocker）"),
+    network: list[str] = typer.Option([], "--network", help="网络拓扑，可重复传入"),
+    shift_count: int | None = typer.Option(None, "--shift-count", help="班次数（>1 而未记网络会告警）"),
+    ot_it_separated: bool | None = typer.Option(None, "--ot-it-separated/--no-ot-it-separated"),
+    air_gapped: bool | None = typer.Option(None, "--air-gapped/--no-air-gapped"),
+    works_council: bool | None = typer.Option(
+        None, "--works-council/--no-works-council", help="是否有职工代表参与（DACH 场景）"
+    ),
+    assets_file: str | None = typer.Option(
+        None, "--assets-file", help="JSON/JSONL/CSV 资产清单（name/type/vendor/protocol/criticality）"
+    ),
+    notes: str | None = typer.Option(None, "--notes"),
+) -> None:
+    """Record / update site-survey facts gathered on the gemba walk."""
+    eng = _load_engagement(engagement_id)
+    site = eng.ctx.site
+    changed: list[str] = []
+    for field_name, value in (
+        ("location", location),
+        ("shift_count", shift_count),
+        ("ot_it_separated", ot_it_separated),
+        ("air_gapped", air_gapped),
+        ("works_council_represented", works_council),
+        ("notes", notes),
+    ):
+        if value is not None:
+            setattr(site, field_name, value)
+            changed.append(field_name)
+    if network:
+        site.networks = list(network)
+        changed.append("networks")
+    if assets_file:
+        assets = _load_rows(assets_file)
+        site.assets = [a if isinstance(a, dict) else {"name": str(a)} for a in assets]
+        changed.append("assets")
+    _save_engagement(eng)
+    console.print(
+        f"✅ 现场事实已记录（{', '.join(changed) if changed else '无字段变更'}）"
+        f" · location={site.location or '(空)'} · 资产 {len(site.assets)} 项 · 班次 {site.shift_count}"
+    )
+    if site.shift_count > 1 and not site.networks:
+        console.print("[yellow]⚠️  多班次现场但未记录网络拓扑[/yellow]")
+
+
+@site_app.command("show")
+def site_show(
+    engagement_id: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json", help="Print the site facts as plain JSON"),
+) -> None:
+    """Show the recorded site-survey facts."""
+    eng = _load_engagement(engagement_id)
+    if as_json:
+        _echo_json({"engagement_id": engagement_id, "site": eng.ctx.site.model_dump()})
+        return
+    _banner(f"site · {engagement_id}")
+    site = eng.ctx.site
+    console.print(f"location: [bold]{site.location or '—'}[/bold]")
+    console.print(
+        f"OT/IT 隔离: {site.ot_it_separated} · 网闸/气隙: {site.air_gapped} · 班次: {site.shift_count}"
+    )
+    console.print(f"网络: {', '.join(site.networks) or '—'}")
+    console.print(f"资产: {len(site.assets)} 项 · 职工代表: {site.works_council_represented}")
+    if site.notes:
+        console.print(f"notes: {site.notes}")
+
+
+# ---------------------------------------------------------------------------
 # gate subcommands
 # ---------------------------------------------------------------------------
 @gate_app.command("list")
@@ -739,18 +1021,46 @@ def gate_check(
     gate_slug: str | None = typer.Option(
         None, "--gate", "-g", help="Specific gate slug; omit = current phase's gate"
     ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print the gate result as plain JSON (no rich markup)"
+    ),
 ) -> None:
     """Evaluate a gate against an engagement."""
     eng = _load_engagement(engagement_id)
     slug = gate_slug or eng.phase.gate
     if not slug:
+        if as_json:
+            _echo_json(
+                {
+                    "engagement_id": engagement_id,
+                    "phase": eng.ctx.current_phase,
+                    "gate": None,
+                    "applicable": False,
+                    "passed": True,
+                    "blockers": [],
+                    "warnings": [],
+                }
+            )
         console.print(f"[yellow]Phase '{eng.ctx.current_phase}' has no gate.[/yellow]")
         raise typer.Exit(0)
     result = eng.evaluate_gate(slug)
     _save_engagement(eng)
-    console.print(result.summary())
+    from . import audit
+
+    audit.log_event(
+        "engagement.gate_evaluate",
+        actor="cli",
+        detail={"engagement_id": engagement_id, "gate": slug, "passed": result.passed},
+    )
+    if as_json:
+        _echo_json({"engagement_id": engagement_id, "phase": eng.ctx.current_phase, **asdict(result)})
+    else:
+        console.print(result.summary())
     if not result.passed:
-        _maybe_suggest_skill(engagement_id, slug, list(result.blockers))
+        # The hint is a human convenience; printing it after the payload would
+        # append prose to a stdout that the contract says is JSON-only.
+        if not as_json:
+            _maybe_suggest_skill(engagement_id, slug, list(result.blockers))
         raise typer.Exit(1)
     _maybe_capture("gate_pass", engagement_id, phase_slug=eng.ctx.current_phase)
 
@@ -763,6 +1073,10 @@ def handoff(
     engagement_id: str = typer.Argument(...),
     eval_report: str | None = typer.Option(None, "--eval-report"),
     training: str | None = typer.Option(None, "--training-material"),
+    boundary: str | None = typer.Option(None, "--boundary", help="G7③ 适用边界：这套方案在哪些条件下不成立"),
+    termination: str | None = typer.Option(
+        None, "--termination", help="G7④ 终止条件：什么情况下停用/回退，谁说了算"
+    ),
     llm: bool = typer.Option(
         False, "--llm", help="Draft the runbook with MiMo (needs FDE_SCOPE_MIMO_API_KEY)"
     ),
@@ -774,7 +1088,18 @@ def handoff(
 
     eng = _load_engagement(engagement_id)
     runbook_path = paths.reports_dir() / f"runbook_{engagement_id}.md"
-    runbook_path.parent.mkdir(parents=True, exist_ok=True)
+    # The package is built *first* because the runbook's 移交状态 section reads
+    # ctx.assets["handoff_package"]: assembling it afterwards wrote a customer-
+    # facing runbook that said "❌ 未签" while stdout said the customer accepted.
+    build_handoff_package(
+        eng.ctx,
+        runbook_path=str(runbook_path),
+        eval_report_path=eval_report,
+        training_material=training,
+        boundary=boundary,
+        termination=termination,
+        customer_accepted=accept,
+    )
     model_name = ""
     if llm:
         client = _maybe_llm(require=True)
@@ -782,18 +1107,11 @@ def handoff(
         runbook_md, used_llm = llm_runbook(eng.ctx, client)
     else:
         runbook_md, used_llm = render_runbook(eng.ctx), False
-    runbook_path.write_text(runbook_md, encoding="utf-8")
+    atomic_write_text(runbook_path, runbook_md)
     if used_llm:
         console.print(f"🤖 Runbook drafted by MiMo ({model_name})")
     elif llm:
         console.print("[yellow]Runbook rendered from template (MiMo draft failed)[/yellow]")
-    build_handoff_package(
-        eng.ctx,
-        runbook_path=str(runbook_path),
-        eval_report_path=eval_report,
-        training_material=training,
-        customer_accepted=accept,
-    )
     _save_engagement(eng)
     console.print(f"✅ Handoff package assembled for [bold]{engagement_id}[/bold]")
     console.print(f"   runbook → [green]{runbook_path}[/green]")
@@ -847,6 +1165,11 @@ def storage_migrate(
     console.print(
         f"✅ Migrated [bold]{summary['migrated']}[/bold] engagement(s) → [green]{summary['db_path']}[/green]"
     )
+    if summary["skipped"]:
+        console.print(
+            f"[yellow]Skipped [bold]{summary['skipped']}[/bold] unreadable JSON file(s); "
+            "they stay on disk.[/yellow]"
+        )
     console.print("[dim]Source JSON files left in place; activate with FDE_SCOPE_STORAGE=sqlite.[/dim]")
 
 
@@ -870,19 +1193,6 @@ def profiles() -> None:
     console.print(table)
 
 
-def _host_is_loopback(host: str) -> bool:
-    """True for loopback bind targets. Non-resolvable names are treated as
-    remote — exposing the unauthenticated console requires an explicit opt-in."""
-    if host == "localhost":
-        return True
-    try:
-        import ipaddress
-
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-
 @app.command()
 def web(
     host: str = typer.Option("127.0.0.1", "--host"),
@@ -896,18 +1206,36 @@ def web(
     except ImportError:
         console.print("[red]Web UI needs the 'web' extra:[/red] pip install 'fde-scope[web]'")
         raise typer.Exit(2) from None
-    # Safety gate: the console APIs are unauthenticated by design (single-user
-    # local tool). Binding beyond loopback exposes engagements, journals and
-    # the corpus-upload endpoint to the local network unless explicitly opted in.
-    if not _host_is_loopback(host) and os.environ.get("FDE_SCOPE_ALLOW_REMOTE") != "1":
-        console.print(
-            f"[red]Refusing to bind non-loopback host {host!r}.[/red] "
-            "The workbench has no authentication — engagements, journals and the "
-            "corpus upload API would be reachable from your network.\n"
-            f"[dim]Opt in only on a trusted network:[/dim] "
-            f"[bold]FDE_SCOPE_ALLOW_REMOTE=1[/bold] fde-scope web --host {host}"
-        )
-        raise typer.Exit(2)
+    from .web.auth import ENV_VAR, host_is_loopback, token_is_configured
+
+    # Two independent gates on a non-loopback bind: FDE_SCOPE_ALLOW_REMOTE
+    # opts into the bind itself, FDE_SCOPE_API_TOKEN makes the console safe to
+    # expose. Neither implies the other, so clearing both is what serving
+    # beyond loopback costs — an opt-in flag must not be able to disable auth.
+    if not host_is_loopback(host):
+        if os.environ.get("FDE_SCOPE_ALLOW_REMOTE") != "1":
+            console.print(
+                f"[red]Refusing to bind non-loopback host {host!r}.[/red] "
+                "The workbench would be reachable from your network with its "
+                "engagements, journals and corpus upload API.\n"
+                f"[dim]Opt in only on a trusted network:[/dim] "
+                f"[bold]FDE_SCOPE_ALLOW_REMOTE=1[/bold] fde-scope web --host {host}"
+            )
+            raise typer.Exit(2)
+        if not token_is_configured():
+            console.print(
+                f"[red]Refusing to bind non-loopback host {host!r} without a token.[/red] "
+                f"[bold]{ENV_VAR}[/bold] is unset, so every route would be served "
+                "unauthenticated — customer engagements, journals and the corpus "
+                "upload API included.\n"
+                "[dim]Set a secret token (it is read from the environment only, never "
+                "written to a file or log), then:[/dim] "
+                f"[bold]export {ENV_VAR}=<token>; FDE_SCOPE_ALLOW_REMOTE=1[/bold] "
+                f"fde-scope web --host {host}\n"
+                "[dim]Or keep the console loopback and authenticate at a reverse "
+                "proxy.[/dim]"
+            )
+            raise typer.Exit(2)
     console.print(f"🚀 Launching [cyan]http://{host}:{port}[/cyan]")
     uvicorn.run(
         "fde_scope.web.app:app",
@@ -1262,9 +1590,7 @@ def skill_export(
     out = out or str(paths.skills_export_dir())
     out_dir = Path(out)
     for f in files:
-        p = out_dir / f.name
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(f.content, encoding="utf-8")
+        atomic_write_text(out_dir / f.name, f.content)
     console.print(f"✅ 导出 {len(files)} 个文件 → [green]{out_dir}[/green] ({fmt})")
 
 
@@ -1418,8 +1744,6 @@ def ontology_export(
     if out is None:
         console.print(text)
     else:
-        from .fsutil import atomic_write_text
-
         atomic_write_text(out, text + "\n")
         console.print(f"✅ Exported {fmt} → [green]{out}[/green]")
 
@@ -1550,13 +1874,145 @@ def license_issue(
         console.print(f"[red]Cannot issue license:[/red] {exc}")
         raise typer.Exit(2) from None
     if out:
-        from .fsutil import atomic_write_text
-
         atomic_write_text(Path(out), key + "\n")
         console.print(f"✅ License key for [bold]{customer}[/bold] ({tier}) → [green]{out}[/green]")
     else:
         console.print(f"license key for [bold]{customer}[/bold] ({tier}, seats={seats}):\n{key}")
     console.print(f"[dim]signed with ${ENV_LICENSE_SECRET} (never stored)[/dim]")
+
+
+# ---------------------------------------------------------------------------
+# course（Level-1 八天 lab：G0 环境自检 + 逐日机器判分）
+# ---------------------------------------------------------------------------
+course_app = typer.Typer(
+    name="course",
+    help="[Course] Level-1 八天 lab：G0 环境自检、逐日机器判分（判分依据 03/06）。",
+    no_args_is_help=True,
+)
+app.add_typer(course_app)
+
+
+def _print_plain(text: str) -> None:
+    """Print grader output verbatim.
+
+    Every line here carries literal ``[G1/success-criteria]`` tags. With rich
+    markup on, those parse as style tags and silently vanish — a student would
+    read a report whose gate names disappeared, so this path disables markup.
+    """
+    console.print(text, markup=False, highlight=False)
+
+
+@course_app.command("doctor")
+def course_doctor(
+    as_json: bool = typer.Option(False, "--json", help="Print the G0 report as plain JSON"),
+) -> None:
+    """G0 入学门自检：解释器、包、教案目录、数据目录、可选依赖。
+
+    退出码非 0 = 有必答项没过，lab 还跑不了。API key / Docker / AgentScope 是
+    可选项，只报状态不算失败（06 §2「不需要」）。
+    """
+    from .course.doctor import doctor_report
+
+    code, items, payload = doctor_report()
+    if as_json:
+        _echo_json(payload)
+        raise typer.Exit(code)
+    _banner("course doctor · G0 入学门")
+    for item in items:
+        _print_plain(item.line())
+    counts = payload["summary"]
+    tail = f"{counts['ok']} 通过 · {counts['warn']} 提醒 · {counts['info']} 可选 · {counts['fail']} 失败"
+    if payload["ok"]:
+        console.print(f"\n[green]✅ G0 通过[/green]（{tail}）可以开 D1。")
+    else:
+        console.print(
+            f"\n[red]❌ G0 未通过[/red]（{tail}）阻塞项："
+            + "、".join(payload["blockers"])
+            + "——按上面 💡 修完再跑一次。"
+        )
+    raise typer.Exit(code)
+
+
+@course_app.command("labs")
+def course_labs() -> None:
+    """列出 8 天的 lab、门禁、产出与判分项数。"""
+    from .course.catalog import LABS
+    from .course.checks import ManualCheck
+
+    _banner("course labs · D1..D8")
+    table = Table(title="Level-1 labs", expand=True)
+    for column in ("天", "门禁", "今日产出", "机器项", "人工项", "标题"):
+        table.add_column(column, overflow="fold")
+    for lab in LABS:
+        manual = sum(1 for check in lab.checks if isinstance(check, ManualCheck))
+        table.add_row(
+            lab.day,
+            lab.gate,
+            lab.deliverable,
+            str(len(lab.checks) - manual),
+            str(manual),
+            lab.title,
+        )
+    console.print(table)
+    scored = sum(1 for lab in LABS for check in lab.checks if not isinstance(check, ManualCheck))
+    manual = sum(1 for lab in LABS for check in lab.checks if isinstance(check, ManualCheck))
+    console.print(f"\n合计：{scored} 个机器判分项 + {manual} 个人工项（人工项不进分母）。")
+
+
+@course_app.command("check")
+def course_check(
+    day: str = typer.Argument("all", help="D1…D8 或 all"),
+    as_json: bool = typer.Option(False, "--json", help="Print results as plain JSON"),
+    keep: bool = typer.Option(False, "--keep", help="保留临时工作目录并在结果里打印路径"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="逐条打印执行的命令与输出"),
+) -> None:
+    """跑一天的机器判分（在临时目录里，不碰你的数据目录）。
+
+    分数只由已有 CLI 表面决定：退出码、打印原话、--json/落盘文件。
+    冷跑会在「写作项」上红——starter 里 TODO 还在就是没写完，这是设计。
+    """
+    from .course.catalog import lab_for
+    from .course.verifier import run_all, run_lab
+
+    if day.lower() in ("all", "every", "*"):
+        results = run_all(keep=keep, verbose=verbose)
+    else:
+        try:
+            lab = lab_for(day)
+        except KeyError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(2) from None
+        results = [run_lab(lab, keep=keep, verbose=verbose)]
+
+    if as_json:
+        _echo_json(
+            {
+                "labs": [result.as_dict() for result in results],
+                "passed": sum(result.passed for result in results),
+                "failed": sum(result.failed for result in results),
+                "manual": sum(result.manual for result in results),
+                "ok": all(result.ok for result in results),
+            }
+        )
+        raise typer.Exit(0 if all(result.ok for result in results) else 1)
+
+    for result in results:
+        for line in result.lines():
+            _print_plain(line)
+        console.print("")
+    passed = sum(result.passed for result in results)
+    failed = sum(result.failed for result in results)
+    manual = sum(result.manual for result in results)
+    if failed:
+        console.print(
+            f"[red]❌ {passed}/{passed + failed} 机器项通过[/red]，{failed} 项红 · "
+            f"另有 {manual} 项人工评分（不进分母）"
+        )
+    else:
+        console.print(
+            f"[green]✅ {passed}/{passed + failed} 机器项全绿[/green] · 另有 {manual} 项人工评分（见 📝）"
+        )
+    raise typer.Exit(0 if not failed else 1)
 
 
 if __name__ == "__main__":
