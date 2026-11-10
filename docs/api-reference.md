@@ -323,9 +323,9 @@ status ∈ `draft | published | archived`。
 | `/reports/*` | 生成的 runbook / 语料报告 / 审计导出（StaticFiles；**不在白名单**，认证开启时需 token） |
 | `/catalog/*` | 技能手册库静态站（仓库含生成产物时挂载；两个 `index.html` 在白名单，其余需 token） |
 
-## 路由全量对照（69 条 served）
+## 路由全量对照（83 条 served）
 
-上面各节按功能挑选讲解，**不声称穷举**；本节是穷举锚点：69 条 served
+上面各节按功能挑选讲解，**不声称穷举**；本节是穷举锚点：83 条 served
 `(verb, path)` 逐条列出，与 `app.openapi()` 一一对应。
 
 **本表没有测试守卫**（`test_architecture_guard.py` 只核对代码里的声明数与
@@ -370,7 +370,7 @@ PY
 - 另有 3 条安装态兜底 `GET /GTM/{rest:path}`、`GET /catalog/{rest:path}`、
   `GET /gh-resources/{rest:path}` **不在本表**：wheel 内由 `fde_scope/_data/` 提供、
   源码 checkout 里由 `StaticFiles` 挂载承担，因此不出现在 `app.openapi()` 中
-  （声明 72 − served 69 = 这 3 条）。
+  （代码声明 86 − 出现在 `openapi()` 的 83 = 这 3 条）。
 
 | Verb + path | 读/写 | 说明 |
 |---|---|---|
@@ -394,8 +394,16 @@ PY
 | `POST /api/engagements/{eid}/share` | 写 | 生成（或轮换）只读分享 token；**明文只在本次响应出现一次**，落盘 sha256 + 8 位前缀。 |
 | `GET /api/engagements/{eid}/share` | 读 | 分享状态（是否启用、前缀、创建时间）——永不回传 token 本体。 |
 | `DELETE /api/engagements/{eid}/share` | 写 | 吊销分享链接（幂等）。 |
-| `GET /share/{eid}?t=` | 读（share token） | 干系人只读页：进度 + SLA + 门禁现况 + 签收表单。凭据是链接里的 share token（auth 中间件 share 分支校验），无效/撤销/不存在一律 404。 |
-| `POST /share/{eid}/ack?t=` | 写（share token） | 客户签收 → `share.ack` 审计事件（证据，不推进状态机）；正式验收仍走 authed accept 流程。 |
+| `GET /showcase` | 读 | The portfolio registry's public explainer: the rubric, the credibility tiers and how a record is audited. |
+| `GET /en/showcase` | 读 | English variant of the portfolio-registry page (chrome translated, the registry itself is not). |
+| `GET /api/showcase/entries` | 读 | 本机登记清单。刻意不公开：代号与证书编号是识别信息。 |
+| `POST /api/showcase/entries` | 写 | 登记一条作品集记录：代号、期次、等级、证书编号、作品集文件名。 |
+| `GET /api/showcase/entries/{entry_id}/audit` | 读 | 重新审校一条记录：逐条规则重算，返回判定、依据与可信度档位。 |
+| `GET /api/course/doctor` | 读 | G0 入学门自检（环境探测，只读）：解释器、包、教案目录、数据目录。 |
+| `GET /api/course/labs` | 读 | D1–D8 实验注册表：每天的门禁、产出与判分项数（只读元数据）。 |
+| `POST /api/course/labs/{day}/grade` | 写 | 机器判分一天：在一次性工作区里对真实 CLI 跑全部检查（多次子进程，秒级）。 |
+| `GET /share/{eid}`（`?t=` share token） | 读（share token） | 干系人只读页：进度 + SLA + 门禁现况 + 签收表单。凭据是链接里的 share token（auth 中间件 share 分支校验），无效/撤销/不存在一律 404。 |
+| `POST /share/{eid}/ack`（`?t=` share token） | 写（share token） | 客户签收 → `share.ack` 审计事件（证据，不推进状态机）；正式验收仍走 authed accept 流程。 |
 | `GET /api/engagements/{eid}/gates` | 读 | 对当前 context 适用（`applies()`）的每个 gate 实时 `check()`。 † |
 | `GET /api/engagements/{eid}/guided` | 读 | guided 模式只读载荷（阶段建议 + 字段指引）。 † |
 | `POST /api/engagements/{eid}/guided/draft-context` | 写 | AI-draft context cards from a free-text description. Pure draft: nothing is persisted until the user applies it via POST .../context. |
@@ -456,7 +464,7 @@ FastAPI 默认挂载，实测均为 200：
 
 | 路径 | 内容 |
 |---|---|
-| `GET /openapi.json` | 机器可读的 69 条 served 路由 + 全部请求/响应 schema |
+| `GET /openapi.json` | 机器可读的 83 条 served 路由 + 全部请求/响应 schema |
 | `GET /docs` | Swagger UI |
 | `GET /redoc` | ReDoc |
 

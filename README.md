@@ -68,10 +68,17 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 
 ## ⏱ 最短安装路径 · The shortest path in
 
-**先说结论，因为它不好听**：本项目**没有**"一条命令装完"的路径。实测于 2026-10-08（工具实测档）：
-PyPI 上 `fde-scope` 与 `fde_scope` 均返回 **404**（未发布），仓库 `releases` 列表**为空**（无预打包产物）。
-对照开源同行的 `npx` 一键分发，这条差距被如实记在 [`course-level-1/24`](course-level-1/24-开源对标与来源清单.md) §6 第 2/3 条，
+**先说结论，因为它不好听**：本项目**没有**"一条命令装完"的路径。PyPI 上 `fde-scope` 与 `fde_scope`
+目前均返回 **404**（未发布），仓库 `releases` 列表**为空**（无预打包产物）——2026-10-08 与 2026-11-10
+两次实测一致。对照开源同行的 `npx` 一键分发，这条差距被如实记在
+[`course-level-1/24`](course-level-1/24-开源对标与来源清单.md) §6 第 2/3 条，
 并作为短板登记在 [`course-level-1/13`](course-level-1/13-GTM页面与竞品对比.md) §6 第 11 项。
+
+> **发布进度（2026-11-10）**：挡住发布的四道 CI 检查现已全绿——`ruff check .`、
+> `ruff format --check .`、`mypy fde_scope` 通过，覆盖率 **91.07% ≥ 90%**，
+> 全量 **1303 passed / 4 skipped**。`v0.1.0` 本地构建与干净 venv 安装已验证，
+> 但**尚未打 tag、尚未上传 PyPI**（公开是不可逆的一次性动作，`0.1.0` 这个版本号
+> 用掉就不能复用，留给维护者执行）。详见 [`CHANGELOG.md`](CHANGELOG.md) 的发布门。
 
 按"你想干什么"选一条最短的：
 
@@ -783,6 +790,8 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 ## 📄 Documentation
 
 - [`docs/enhancement-plan.md`](docs/enhancement-plan.md) — **全面加强计划与进度台账**：逐页逐功能加强项、每条带 `file:line` 证据、分期路线图（详见 [加强计划](#-加强计划enhancement-plan)）
+- [`docs/workbench-gap-assessment.md`](docs/workbench-gap-assessment.md) — **2026-11-03 实测评估**：工程质量基线、CI/覆盖率/文档漂移，以及“入门学习 / 查阅 skills / 现场履约”三场景差距
+- [`docs/workbench-development-plan.md`](docs/workbench-development-plan.md) — **12 周开发计划**：M0 止血与发布 → M1 安装与入门闭环 → M2 技能检索 → M3 现场工作台 → M4 交付物与客户闭环 → M5 团队与硬化
 - [`docs/features.md`](docs/features.md) — 完整功能清单：18 阶段逐条说明 / 10 门禁执行流 / 连接器成熟度 / "功能 → 优点"速查表（English: [`docs/features-en.md`](docs/features-en.md)）
 - [`docs/user-guide.md`](docs/user-guide.md) — 客户侧快速上手：5 分钟跑通、核心概念、常用操作、env 速查、故障 FAQ
 - [`docs/api-reference.md`](docs/api-reference.md) — Web 控制台 REST API 参考（认证 + 全路由逐条对照代码）
@@ -792,7 +801,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 - [`docs/architecture.md`](docs/architecture.md) — layered design + data flow
 - [`docs/architecture-model/architecture-map.md`](docs/architecture-model/architecture-map.md) — evidence-backed architecture views (L1/L2/L3) + health report + canonical DSL/DOT sources
 - [`docs/skills.md`](docs/skills.md) — 技能沉淀系统：数据模型 / 生命周期 / 三种入口 / 双格式导出
-- [`docs/skills-catalog/README.md`](docs/skills-catalog/README.md) — 101 页 skill 手册库（Zone A–D + 横切 + MCP + 工具），门户 `site/index.html`，`make check-catalog` 门禁 / `make build-site` 重建
+- [`docs/skills-catalog/README.md`](docs/skills-catalog/README.md) — 122 页 skill 手册库（Zone A–D + 横切 + MCP + 工具），门户 `site/index.html`，`make check-catalog` 门禁 / `make build-site` 重建
 - [`GTM/index.html`](GTM/index.html) — 产品 / GTM 落地页（仓库内单文件：定位、功能/架构/实践清单、实机截图）
 - [`docs/llm_integration.md`](docs/llm_integration.md) — MiMo Token Plan integration: 6 touchpoints, fallback semantics, cost model, testing
 - [`docs/qwenpaw_integration.md`](docs/qwenpaw_integration.md) — QwenPaw 集成：配置两层结构 / 导出与校验 / PawApp 桌面形态

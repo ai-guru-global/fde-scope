@@ -231,7 +231,7 @@ DONT_ASK→DENY;默认 deny 恒含 `access_other_tenant` / `delete_any` / `exec_
 - 三入口:手动 `skill add` / gate 阻塞提示(gate_hint 预填草稿)/ advance 自动捕获。
 - 双格式导出:AgentScope 2.0(`Toolkit(skills_or_loaders=...)` 注册)与
   QwenPaw(`customized_skills` 自动发现),符合 Anthropic Agent Skills 规范。
-- Web 完整 skills API + 草稿审阅队列;101 页技能手册库(`docs/skills-catalog/`,
+- Web 完整 skills API + 草稿审阅队列;122 页技能手册库(`docs/skills-catalog/`,
   `make check-catalog` 门禁)。
 
 ## 12. 集成 `integrations/`

@@ -127,8 +127,8 @@ _ROUTE_DECORATOR = r"@(?:app|router)\.(get|post|put|delete|patch|websocket)\(\s*
 # directory: each is registered only when catalog_site_dir() / gtm_site_dir() /
 # resources_site_dir() is None, i.e. in an installed app. A checkout serves those
 # three prefixes with a StaticFiles mount instead, so its runtime table has three
-# fewer entries while answering the same paths. The declared count (77) is
-# therefore the install-invariant number to advertise — the served count (69 in a
+# fewer entries while answering the same paths. The declared count (86) is
+# therefore the install-invariant number to advertise — the served count (83 in a
 # checkout) would understate the surface.
 _CONDITIONAL_ASSET_FALLBACKS = {
     ("get", "/catalog/{rest:path}"),
@@ -236,34 +236,139 @@ def test_no_bare_writes_outside_the_atomic_primitive() -> None:
     A module that does not parse is reported as an offender rather than raised:
     the guard cannot see into a file the interpreter cannot read, and such a
     file cannot ship either.
+
+    Scope covers ``pawapp/backend`` as well: the PawApp is a second HTTP
+    surface over the same data root (uploads, corpus reports, exported skills,
+    runbooks), so it inherited invariant 4 along with the routes. It used to
+    escape this scan — ``fde_scope/`` only — and had four bare writes.
     """
-    src = REPO_ROOT / "fde_scope"
-    exempt = {(src / "fsutil.py").resolve()}
+    roots = [REPO_ROOT / "fde_scope", REPO_ROOT / "pawapp" / "backend"]
+    exempt = {(REPO_ROOT / "fde_scope" / "fsutil.py").resolve()}
     offenders: list[str] = []
-    for path in sorted(src.rglob("*.py")):
-        if path.resolve() in exempt:
-            continue
-        rel = path.relative_to(REPO_ROOT).as_posix()
-        try:
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        except SyntaxError as exc:
-            offenders.append(f"{rel}:{exc.lineno} does not parse: {exc.msg}")
-            continue
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
+    for src in roots:
+        for path in sorted(src.rglob("*.py")):
+            if path.resolve() in exempt:
                 continue
-            func = node.func
-            if isinstance(func, ast.Attribute) and func.attr in ("write_text", "write_bytes"):
-                offenders.append(f"{rel}:{node.lineno} .{func.attr}()")
-            elif isinstance(func, ast.Name) and func.id == "open" and len(node.args) >= 2:
-                mode = node.args[1]
-                if (
-                    isinstance(mode, ast.Constant)
-                    and isinstance(mode.value, str)
-                    and any(c in mode.value for c in "wx+")
-                ):
-                    offenders.append(f"{rel}:{node.lineno} open(..., {mode.value!r})")
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            except SyntaxError as exc:
+                offenders.append(f"{rel}:{exc.lineno} does not parse: {exc.msg}")
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                func = node.func
+                if isinstance(func, ast.Attribute) and func.attr in ("write_text", "write_bytes"):
+                    offenders.append(f"{rel}:{node.lineno} .{func.attr}()")
+                elif isinstance(func, ast.Name) and func.id == "open" and len(node.args) >= 2:
+                    mode = node.args[1]
+                    if (
+                        isinstance(mode, ast.Constant)
+                        and isinstance(mode.value, str)
+                        and any(c in mode.value for c in "wx+")
+                    ):
+                        offenders.append(f"{rel}:{node.lineno} open(..., {mode.value!r})")
     assert not offenders, (
         "bare writes must go through fsutil.atomic_write_text/atomic_write_bytes; "
         "an unparseable module must be fixed before it can ship\n" + "\n".join(offenders)
     )
+
+
+# ---------------------------------------------------------------------------
+# The counts the 2026-11-03 assessment found drifting, now guarded
+# ---------------------------------------------------------------------------
+def test_api_reference_route_claims_match_the_served_routes() -> None:
+    """``docs/api-reference.md`` is the customer-facing exhaustive route table.
+
+    Origin: an earlier guard deliberately did not read this file, so it claimed
+    "69 served" while the app served 83 — and 10 routes (course labs, showcase,
+    share links) were absent from the table entirely. A number in a contract
+    document is a claim; this pins both halves: the advertised count and the
+    membership of the table.
+    """
+    from fde_scope.web.app import app
+
+    served = {(method.upper(), path) for path, ops in app.openapi()["paths"].items() for method in ops}
+    doc = _read("docs/api-reference.md")
+
+    for pattern in (
+        r"## 路由全量对照（(\d+) 条 served）",
+        r"本节是穷举锚点：(\d+) 条 served",
+        r"机器可读的 (\d+) 条 served 路由",
+    ):
+        found = [int(n) for n in re.findall(pattern, doc)]
+        assert found == [len(served)], f"{pattern!r}: documented {found}, app serves {len(served)}"
+
+    section = doc.split("## 路由全量对照")[1].split("| `GET /openapi.json`")[0]
+    documented: set[tuple[str, str]] = set()
+    for line in section.splitlines():
+        for verb, path in re.findall(r"`(GET|POST|PUT|DELETE|PATCH) (/[^`\s（]*)", line):
+            documented.add((verb, path))
+
+    missing = sorted(served - documented)
+    assert not missing, f"served but undocumented in api-reference.md: {missing}"
+    # The three install-only asset fallbacks are documented in prose, not as
+    # table rows (they do not appear in openapi()).
+    extra = sorted(documented - served)
+    assert extra == [
+        ("GET", "/GTM/{rest:path}"),
+        ("GET", "/catalog/{rest:path}"),
+        ("GET", "/gh-resources/{rest:path}"),
+    ], f"api-reference.md documents routes that do not exist: {extra}"
+
+
+def test_skill_catalog_size_claim_matches_the_pages_on_disk() -> None:
+    """README + both feature lists advertise the catalog size.
+
+    Origin: they said 101 pages while the catalog held 122. The catalog's own
+    checker counts pages, so this reads that same ground truth rather than
+    hardcoding a number that will drift again.
+    """
+    # Pages live one directory deep, by section (zone-a-*, zone-b-*, ...), which
+    # is exactly how ``scripts/check_skills_catalog.py`` counts them — reusing
+    # its section list keeps this guard and ``make check-catalog`` in agreement.
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "check_skills_catalog", REPO_ROOT / "scripts" / "check_skills_catalog.py"
+    )
+    assert spec is not None and spec.loader is not None
+    checker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(checker)
+    pages = checker.pages()
+    sources = {
+        "README.md": _read("README.md"),
+        "docs/features.md": _read("docs/features.md"),
+        "docs/features-en.md": _read("docs/features-en.md"),
+    }
+    claims: list[tuple[str, int]] = []
+    for name, text in sources.items():
+        for pattern in (r"(\d+) 页 skill 手册库", r"(\d+) 页技能手册库", r"(\d+) skill handbook pages"):
+            for n in re.findall(pattern, text):
+                claims.append((name, int(n)))
+    assert claims, "no catalog-size claim found; the guard would silently pass"
+    wrong = [(name, n) for name, n in claims if n != len(pages)]
+    assert not wrong, f"catalog has {len(pages)} pages, but these claims disagree: {wrong}"
+
+
+def test_license_docs_do_not_claim_a_dual_license() -> None:
+    """The commercial boundary must match what MIT actually grants.
+
+    Origin: ``docs/commercialization-roadmap.md`` said "双许可（开源核心 +
+    企业版功能开关）——已选定并实现" while ``pyproject.toml`` ships plain MIT,
+    which permits redistribution and commercial use — so a feature flag in the
+    same artifact is not a boundary. The docs now say "MIT 核心 + 付费服务/
+    专有企业包". This guard keeps that phrasing from silently returning.
+    """
+    pyproject = tomllib.loads(_read("pyproject.toml"))
+    assert pyproject["project"]["license"]["text"] == "MIT"
+
+    for name in ("docs/commercialization-roadmap.md", "docs/commercialization-gap-analysis.md"):
+        text = _read(name)
+        # A historical mention is fine only while explicitly labelled as such.
+        for line in text.splitlines():
+            if "双许可（开源核心" in line or "开源核心 + 企业版功能开关" in line:
+                assert any(tag in line for tag in ("错误", "当时", "原「", "历史")), (
+                    f"{name} still presents the dual-license idea as current: {line.strip()[:120]}"
+                )

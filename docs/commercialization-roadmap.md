@@ -82,7 +82,11 @@
 
 ## P4 — 商业形态
 
-- [x] 许可模式决策：双许可（开源核心 + 企业版功能开关）——已选定并实现
+- [x] 许可模式决策（2026-11 修订）：**MIT 开源核心 + 付费服务/另行发布的专有企业包**。
+  这是 MIT 实际支持、且客户可以据此做采购判断的表述。此前本节写作
+  「双许可（开源核心 + 企业版功能开关）」——那是**错误**的：MIT 授予任何人再分发与
+  商用权，因此同一发行件里的功能开关不构成商业边界。下文「开源/商业边界决策」记录
+  了完整推理与三个候选方案。
 - [x] license 模块（2026-09-28 完成）：`fde_scope/license.py` 离线许可——key 格式
   `base64url(payload).base64url(hmac_sha256)`，签名密钥走 `FDE_SCOPE_LICENSE_SECRET`
   （不设则 fail closed 所有 key 无效）；key 从 `FDE_SCOPE_LICENSE_KEY` 或
@@ -101,15 +105,15 @@
 - [x] 第三方依赖 license 审计 + NOTICE 文件（2026-09-28 完成：根目录 `NOTICE` + `docs/license-audit.md` + `tests/test_third_party_licenses.py` 守护；发现 mysql-connector-python GPLv2+FOSS 例外、asyncua LGPLv3+、paho-mqtt EPL-2.0/BSD 双许可，均为 optional extra）
 - [x] 法务：真实公司名 mock 清理（见差距 B5，2026-09-28 修复）
 
-### 开源/商业边界决策（2026-10-06 提出，⚠️ 未定，需维护者拍板）
+### 开源/商业边界决策（2026-10-06 提出 · 2026-11 定稿：选定「MIT 核心 + 付费服务/专有企业包」）
 
 公开前的实测基线：`pyproject.toml` 声明 `license = { text = "MIT" }`，根目录有真
 MIT `LICENSE`（署名 Allen Galler）与 `NOTICE`，两者**都已进入发行件**
 （wheel `fde_scope-0.1.0.dist-info/licenses/`、sdist 顶层，2026-10-06 `python -m build` 实测）。
 本轮未改动任何许可证文本，也未新增 CLA。
 
-矛盾点在于上面第 85 行「双许可（开源核心 + 企业版功能开关）」这条已选定的形态，
-与「整个包 MIT」不兼容：**MIT 授予任何人再分发与商用权，因此同一个 MIT 发行件里的
+矛盾点在于当时第 85 行「双许可（开源核心 + 企业版功能开关）」这条表述，
+与「整个包 MIT」不兼容（该行已于 2026-11 按本节的结论改写）：**MIT 授予任何人再分发与商用权，因此同一个 MIT 发行件里的
 功能开关不构成商业边界**。`fde_scope/license.py:3` 自己也这么承认——docstring 原句
 `This is an *honesty mechanism, not DRM*`，`SECURITY.md` 进一步把它列为"商业档位，不是安全控制"。
 现状能守住的只有**信任与升级服务**（离线签发、无在线校验），守不住代码复制。
@@ -121,16 +125,20 @@ MIT `LICENSE`（署名 Allen Galler）与 `NOTICE`，两者**都已进入发行�
 | B 核心改 Apache-2.0 | 许可证文本 | 需要全部贡献者同意再授权；工业侧 OEM/集成商更认这个（含明示专利授权） | 目标是被客户采购方接受，而非防止 fork |
 | C 核心 Apache-2.0 + 企业层 ELv2/BUSL | 分层许可证 | 需明确"哪些目录属于企业层"，且改许可证要复测 `NOTICE`/第三方 license 守护 `tests/test_third_party_licenses.py` | 与 A 同类，但企业层与核心同仓 |
 
-推荐：**A 或 C**，因为 P5 的多租户/RBAC/SSO 一旦落地必然是与核心不同代码路径的能力，
-放在同一个 MIT 包里只会让第 85 行的宣称与实际可执行的权利不一致。
-B 可单独执行且与 A/C 不冲突（核心换 Apache-2.0 不改变企业层的授权问题）。
+**决定（2026-11）**：采用 **A**。核心保持 MIT，企业能力（多租户/RBAC/SSO）另发专有包，
+边界落在**发行件**而不是同一份代码里的开关上。当前 `license.py` 的 community/pro/
+enterprise 档位**保留但降级为「诚实的功能开关」**：`license.py` 自己的 docstring 已写明
+它是 `honesty mechanism, not DRM`，`SECURITY.md` 也把它列为"商业档位，不是安全控制"，
+因此对外（README / GTM / 采购材料）**不得**把它描述成权利边界，只能描述成版本提示。
 
-需要澄清的一点（实测，非推测）：**客户可见文本目前并没有宣称这个排他边界**——
-`grep -rn "开源核心" README.md GTM/index.html` 无命中，该表述只存在于本文件第 85 行与
-`docs/commercialization-gap-analysis.md:145` 两份内部规划文档。所以公开前必改的是
-**这两份文档里的一句话**（写成"MIT 开源 + 付费服务/另发的企业包"这类当前许可证
-真正支持的表述），而不是先改许可证。若维持第 85 行现状直接 public，等于把一份
-内部未自洽的形态描述公开在仓库里。
+**已执行的文字修订**：本文件第 85 行（原「双许可（开源核心 + 企业版功能开关）」）与
+`docs/commercialization-gap-analysis.md` 的对应表述，已改为
+「MIT 开源 + 付费服务/另行发布的专有企业包」——即当前许可证真正支持的写法。
+这一修订只改文档，**未改动任何许可证文本，也未新增 CLA**。
+
+**仍待维护者拍板（转 A 的执行项，不属于本次修订）**：企业能力何时从核心拆出、
+拆出后内部共享层如何版本同步（见上表 A 列"代价"）。在拆出之前，核心中的多租户相关
+代码仍受 MIT 约束——这与" MIT 核心 + 专有企业包"并不冲突，只是企业包尚未存在。
 
 ## P5 — 规模化
 

@@ -15,12 +15,13 @@
 
 ## 阻塞级差距（B 类：不解决过不了企业采购/安全评审）
 
-### B1. Web 控制台零鉴权（最致命）
+### B1. Web 控制台零鉴权（曾经最致命 · **已修复**，保留为历史记录）
 
-`fde_scope/web/app.py` 全部 36 条路由无任何认证授权：创建 engagement（app.py:107）、推进状态机（app.py:138）、文件上传（app.py:249）、skill 发布——任何能访问端口的人都能操作客户项目。默认绑 `127.0.0.1` 是唯一防线，`--host 0.0.0.0` 即失守；Form 端点无 CSRF 防护。全库无 APIKeyHeader/JWT/session。
+`fde_scope/web/app.py` 的 83 条 served 路由**当时**（本文件初稿时只有 36 条）无任何认证授权：创建 engagement、推进状态机、文件上传、skill 发布——任何能访问端口的人都能操作客户项目；默认绑 `127.0.0.1` 是唯一防线，`--host 0.0.0.0` 即失守。
+**该缺口已修复**（2026-10，`ApiTokenAuthMiddleware`）：token 只从 `FDE_SCOPE_API_TOKEN` 读，未设 token 时非回环来源一律 403，非公开路由需 Bearer/`X-API-Key`；公开路由见 `fde_scope/web/auth.py` 的 `PUBLIC_PATHS`（白名单按精确路径匹配）。**仍然成立的部分**：单 token 不是多用户/RBAC/SSO，Form 端点无 CSRF 防护，访问日志与审计流未签名——这些属于企业版范围。
 
 > 本节正文是 **2026-09-27 调研快照**，计数与 `file:line` 会漂移：2026-10-06 复测为声明 72 条
-> verb+path、`app.openapi()` 实暴露 69 条（差值 = 3 条安装态资产兜底路由；按 verb 口径
+> verb+path、`app.openapi()` 实暴露 83 条（差值 = 3 条安装态资产兜底路由；按 verb 口径
 > 写操作 24 条），逐条对照见
 > [`docs/api-reference.md`](api-reference.md)；行号请以函数名为准定位。结论本身（零鉴权）当时成立，
 > 但「默认回环是唯一防线」已被下面的两层门取代。
@@ -132,7 +133,7 @@ degraded 仍 200）。metrics/tracing 未做，留待后续。
 | 形态 | 状态 |
 |---|---|
 | PyPI 包 | 可用，0.1.0 Alpha |
-| Web 控制台 | 功能完整（36 路由）但无鉴权，单机定位 |
+| Web 控制台 | 功能完整（83 条 served 路由）但无鉴权，单机定位 |
 | macOS DMG | universal2 + CI release 齐，默认 ad-hoc 签名 |
 | PawApp 插件 | 18 路由，依赖私有宿主，面窄 |
 | Android | debug 签名 WebView 壳，玩具级 |
@@ -143,4 +144,4 @@ degraded 仍 200）。metrics/tracing 未做，留待后续。
 1. **P0 安全底线**：Web 层认证 + 审计日志 + 并发锁（B1/B3/B4）。
 2. **明确部署边界**：落地数据库做多用户版，或明确定位"单机版 + 企业内网部署"。
 3. **真实案例**：补齐 1-2 个 stub 连接器，跑通一个真实客户 POC，替换 mock 数据。
-4. **商业模式**：双许可（开源核心 + 企业版功能开关）是最自然的选择。
+4. **商业模式**：MIT 开源核心 + 付费服务/另行发布的专有企业包（2026-11 定稿；在同一个 MIT 发行件里切换「功能开关」**不**构成商业边界，详见 `commercialization-roadmap.md` 的「开源/商业边界决策」）。

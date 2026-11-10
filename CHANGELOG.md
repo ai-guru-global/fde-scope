@@ -20,8 +20,9 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 > those through `StaticFiles` rather than a decorator, so `app.openapi()` omits
 > them. `test_web_route_count_claim_is_honest` guards **11** advertised counts
 > across README, `docs/features.md`, `docs/features-en.md`, `web/i18n.py` and
-> `app.py`. It does **not** read this file or `docs/api-reference.md` — counts
-> here are corrected by hand, which is exactly how they went stale.
+> `app.py`, and (since 2026-11-10) it also pins `docs/api-reference.md`'s
+> exhaustive route table and the skill-catalog size, so those counts no longer
+> depend on being corrected by hand.
 >
 > **Releasing.** `python -m build` produces artifacts; it does not publish
 > anything. Publication is `git tag` + push + an upload to the index — and on PyPI
@@ -31,7 +32,123 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### ⚠️ Release gate — measured 2026-10-07
+### ✅ Release gate — re-measured 2026-11-10 (all four CI checks green)
+
+Origin: the 2026-11-03 assessment found CI red in four places and an engine that
+silently inflated its own held-out metrics. Both are now closed, by change and by
+test rather than by assertion. Numbers below are re-runnable; the commands are
+the CI commands.
+
+| Check | 2026-11-03 | 2026-11-10 |
+|---|---|---|
+| `ruff check .` | 3 errors (`GTM/dist_stage.py` UP031) | **all checks passed** |
+| `ruff format --check .` | 2 files | **204 files already formatted** |
+| `mypy fde_scope` | 2 errors (`web/sop.py`, `web/course.py`) | **success, 117 files** |
+| `pytest --cov=fde_scope --cov=pawapp/backend` | **89.83%** (< 90) | **91.07%** (gate reached) |
+| full suite | 1268 collected, exit 0 | **1303 passed, 4 skipped, exit 0** (64s) |
+| `tests/test_architecture_guard.py` | 11 passed | **14 passed** |
+
+#### Fixed — the corpus forge no longer validates itself
+
+The most serious defect in the project was not a crash: it was a **wrong number
+that looked right**. On the quickstart's 20 real rows the forge produced 415
+items, of which 395 were synthetic, and then **shuffled real and synthetic items
+together** into train/eval/test. Measured on the old code: eval was 95%
+synthetic with 29-32% of its members carrying a ≥0.90 near-duplicate in train;
+test was 100% synthetic with 36-38%. Any accuracy measured there measures the
+synthesizer, and the report showed only sizes, never provenance.
+
+Three changes, each pinned by a test (`tests/test_corpus_provenance.py`, 15
+guards — 8 of which fail against the previous behaviour):
+
+- **Synthesis is now followed by dedup** (`pipeline._dedup_against`): the
+  synthesizer runs after the dedup stage, so a no-op mutation could repeat a real
+  row verbatim. Real and synthetic rows are deduped together so the survivor is
+  always the *real* one, and every drop lands in `CorpusReport.dropped`.
+- **Real rows are partitioned first, across all three splits**
+  (`pipeline._split`); synthetic rows are laid on top of `train` only. `eval` and
+  `test` are therefore REAL-only. The trade-off is stated rather than hidden: a
+  20-row site dump now yields a 2/2 held-out set instead of a 41/42 set that
+  measured nothing. `synth_in_train=False` gives a fully real-only split.
+- **The report tells the truth about itself.** `CorpusSplit` derives `real` /
+  `synthetic` / `golden` / `trusted` from its own items (it can no longer *claim*
+  to be all-real); `CorpusReport` exposes `heldout_real`, `heldout_trusted` and
+  `synthetic_ratio`. The HTML deliverable prints provenance per split and states
+  plainly whether a metric from that split can support a quality claim, and
+  `fde-scope corpus` warns when the held-out set is too small to mean anything.
+
+Two further honesty fixes fell out of this: a corpus of one real row used to
+spend it on a 1-row eval and leave `train` 100% synthetic (now the real row
+trains); and seedless, template-only synthesis is downsampled to one exemplar per
+category instead of emitting 50 near-identical variations, which is padding the
+synthesizer's own contract forbids.
+
+`course-level-1` D4 taught students to assert `eval == 41` — the inflated number
+— so its rubric now asks for the honest one, and adds a check for the held-out
+real count. The machine-check total moved 91 → 92 accordingly, and
+`labs/README.md`, `test_course_drift_guard.py` and `test_course_verifier.py` were
+updated together so the book and the code still agree.
+
+#### Fixed — a 500 on the last phase of every engagement (PawApp)
+
+Found while writing the PawApp coverage tests, not by inspection:
+`Engagement.advance()` raises the builtin `StopIteration` at the terminal phase,
+but `run_in_threadpool(eng.advance, ...)` converts that to `RuntimeError`
+(PEP 479 / asyncio), so `except StopIteration:` around the await was **dead
+code** and the final advance answered **500**. Added
+`Engagement.advance_or_complete()`, which enforces gates identically but signals
+completion with a real exception (`PhaseComplete`); the PawApp tool uses it.
+`advance()` keeps raising `StopIteration` because the CLI and the web console
+depend on it — the fix is additive, not a change to the guarded transition path.
+
+#### Fixed — PawApp escaped the atomic-write invariant
+
+`pawapp/backend/main.py` wrote uploads, corpus reports, exported skills and
+runbooks with bare `Path.write_text()`, violating AGENTS.md invariant 4. The AST
+guard only scanned `fde_scope/`, so nothing caught it. All four writes now go
+through `fsutil.atomic_write_text`, and the guard's scope covers
+`pawapp/backend` — verified by re-introducing a bare write and watching it fail.
+
+#### Changed — docs that overstated what is true
+
+- `docs/api-reference.md` advertised **69 served routes** and was missing **10
+  routes entirely** (course labs/doctor, showcase registry, stakeholder share
+  links). It now lists all **83** and is matched against `app.openapi()` in both
+  directions — membership *and* count — by a new guard.
+- The skill catalog was advertised as **101 pages** in README and both feature
+  lists; it holds **122**. Guarded against the catalog checker's own page count.
+- **The license description contradicted the license.** The roadmap said
+  "双许可（开源核心 + 企业版功能开关）——已选定并实现" while `pyproject.toml`
+  ships plain MIT, which grants redistribution and commercial use — a feature
+  flag inside the same MIT artifact is not a boundary (the document's own
+  analysis said so, three paragraphs below the claim it contradicted). It now
+  reads **"MIT 开源核心 + 付费服务/另行发布的专有企业包"**, with the decision
+  recorded as made (option A) and the remaining maintainer call stated. No
+  license text changed and no CLA was added. The `license.py` tiers stay, labelled
+  for what they are — an honesty mechanism, not a right boundary. Guarded.
+
+#### Test additions
+
+- `tests/test_corpus_provenance.py` — 15 guards for the split/provenance
+  invariants above.
+- `tests/test_pawapp.py` — 12 new route tests (forge, KPI, skill publish/export,
+  runbook fallback incl. host failure and empty reply, handoff, agent tools,
+  corrupt-state tolerance, size limits, terminal advance), taking
+  `pawapp/backend/main.py` from **55% to 99%**.
+- `tests/test_engagement.py` — regression for the `advance_or_complete` contract.
+- `tests/test_architecture_guard.py` — 3 new doc-honesty guards (routes, catalog
+  size, license wording); the bare-write guard now also scans `pawapp/backend`.
+
+#### Still open before a public tag
+
+- **Not published.** No tag exists yet; PyPI upload is a separate, irreversible
+  step (`0.1.0` can never be reused). The wheel builds are verified, not shipped.
+- **No real customer POC.** Every seeded engagement is still fictional data;
+  replacing one with a real connector run remains the top product risk.
+- **Enterprise surface absent by design.** Multi-tenant/RBAC/SSO, CSRF, TLS and
+  signed audit streams are out of scope and documented as such.
+
+### ⚠️ Release gate — measured 2026-10-07 (superseded by the 2026-11-10 gate above)
 
 Green:
 
