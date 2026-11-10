@@ -14,7 +14,7 @@ Public surface:
 """
 
 from .context import EngagementContext, GateRecord, SafetyPosture, SiteInfo, SLOSpec, Stakeholder
-from .engagement import AdvanceBlocked, Engagement
+from .engagement import AdvanceBlocked, Engagement, PhaseComplete
 from .gates.base import Gate, GateResult
 from .handoff import build_handoff_package, render_handoff_summary
 from .phases import PHASES, Phase, Zone, phases_for_profile
@@ -26,6 +26,7 @@ __all__ = [
     "Gate",
     "GateResult",
     "GateRecord",
+    "PhaseComplete",
     "PHASES",
     "Phase",
     "SafetyPosture",

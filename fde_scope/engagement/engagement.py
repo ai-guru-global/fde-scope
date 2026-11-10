@@ -28,6 +28,24 @@ class AdvanceBlocked(Exception):
         super().__init__(result.summary())
 
 
+class PhaseComplete(Exception):
+    """Raised by :meth:`Engagement.advance_or_complete` at the terminal phase.
+
+    ``advance()`` signals "nothing left to do" with the builtin
+    ``StopIteration``. That is a ``LookupError``-family signal, and it does not
+    survive an async hop: a ``StopIteration`` raised inside ``asyncio``'s
+    threadpool is converted to ``RuntimeError`` (PEP 479 / asyncio), so an
+    ``except StopIteration`` around ``await run_in_threadpool(eng.advance)``
+    never fires and the caller answers 500 at the last phase. ``PhaseComplete``
+    is an ordinary exception, so both sync and async callers can catch it by
+    the same name.
+
+    ``advance()`` intentionally keeps raising ``StopIteration`` — the CLI and
+    the web console rely on it — so this is an additive entry point, not a
+    change to the guarded transition path.
+    """
+
+
 class Engagement:
     """An FDE engagement: a context + the phase state machine."""
 
@@ -113,6 +131,19 @@ class Engagement:
         )
         self.ctx.current_phase = nxt.slug
         return nxt
+
+    def advance_or_complete(self, force: bool = False) -> Phase:
+        """``advance`` with a terminal signal that survives ``await``.
+
+        Identical enforcement to :meth:`advance` (gates are re-evaluated and
+        recorded, ``force`` still evaluates) — only the terminal case differs:
+        :class:`PhaseComplete` instead of ``StopIteration``. Async callers
+        that run the advance in a worker thread must use this one; see
+        :class:`PhaseComplete`.
+        """
+        if self.is_complete:
+            raise PhaseComplete("Engagement already at terminal phase (disengage).")
+        return self.advance(force=force)
 
     def rollback(self, to_slug: str) -> Phase:
         """Roll the engagement back to an earlier phase.

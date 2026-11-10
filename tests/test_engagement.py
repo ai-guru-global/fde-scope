@@ -246,3 +246,53 @@ def test_save_roundtrip_after_atomic_write(tmp_path) -> None:
     ctx.customer = "Acme 2"
     ctx.save(target)
     assert EngagementContext.load(target).customer == "Acme 2"
+
+
+def test_advance_or_complete_signals_with_a_catchable_exception() -> None:
+    """Regression: the PawApp's last advance used to answer 500.
+
+    ``Engagement.advance`` raises the builtin ``StopIteration`` at the terminal
+    phase. ``run_in_threadpool(eng.advance, ...)`` converted that to
+    ``RuntimeError`` (PEP 479 / asyncio), so ``except StopIteration`` around
+    the await never fired. ``advance_or_complete`` must raise a real exception
+    that a coroutine can catch — and must still enforce gates exactly like
+    ``advance``.
+    """
+    import asyncio
+
+    from fde_scope.engagement import Engagement, EngagementContext, PhaseComplete
+
+    ctx = EngagementContext(id="eng-x", customer="Acme", profile="ticket")
+    eng = Engagement(ctx)
+
+    # Gate enforcement is unchanged: walk ungated transitions until a gate
+    # actually blocks, and prove the block happens through the thread hop too.
+    from fde_scope.engagement import AdvanceBlocked
+
+    async def _advance_in_thread() -> str:
+        return await asyncio.to_thread(eng.advance_or_complete)
+
+    blocked_at = None
+    for _ in range(18):
+        try:
+            asyncio.run(_advance_in_thread())
+        except AdvanceBlocked:
+            blocked_at = ctx.current_phase
+            eng.advance_or_complete(force=True)  # override, as an FDE would
+            break
+    assert blocked_at is not None, "some phase on the ticket path must block"
+
+    # Drive to the terminal phase, then expect PhaseComplete — not RuntimeError.
+    while True:
+        try:
+            eng.advance_or_complete(force=True)
+        except PhaseComplete:
+            break
+    assert eng.is_complete
+
+    try:
+        asyncio.run(_advance_in_thread())
+    except PhaseComplete:
+        pass
+    else:  # pragma: no cover
+        raise AssertionError("terminal advance must raise PhaseComplete across the threadpool")
