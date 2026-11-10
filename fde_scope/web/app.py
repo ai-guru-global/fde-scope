@@ -2470,25 +2470,40 @@ function toggleTheme(){
   try{localStorage.setItem('fde-theme', next)}catch(e){}
 }
 
+/* Every view that exists, derived from the DOM rather than hand-listed.
+   The list used to be hard-coded without 'ops', so the Ops view was rendered
+   on top of whichever view was open and could never be hidden again. */
+const VIEWS = () => Array.prototype.map.call(
+  document.querySelectorAll('main [id^="view-"]'), e => e.id.slice(5));
+
 function showView(name) {
-  ['workbench','skills','deploy','ontology'].forEach(v=>{
+  VIEWS().forEach(v=>{
     const e=document.getElementById('view-'+v); if(e) e.classList.toggle('hidden', v!==name);
   });
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
 }
 
+const VIEW_LOADERS = {
+  workbench: () => loadWorkbench(),
+  skills: () => loadSkills(),
+  deploy: () => renderDeploy(),
+  ontology: () => loadOntology(),
+  ops: () => loadOps(),
+};
+
 function go(name) {
+  if (!VIEWS().includes(name)) return;
   showView(name);
-  if (name==='skills') location.hash = 'skills';
-  else if (name==='deploy') location.hash = 'deploy';
-  else if (name==='ontology') location.hash = 'ontology';
-  else if (name==='ops') location.hash = 'ops';
-  else if (location.hash) history.replaceState(null,'',location.pathname);
-  if (name==='workbench') loadWorkbench();
-  if (name==='skills') loadSkills();
-  if (name==='deploy') renderDeploy();
-  if (name==='ontology') loadOntology();
-  if (name==='ops') loadOps();
+  // Keep the URL able to reproduce this view: the rail links to ?v=, and a
+  // click that changed the view without changing the address meant a reload
+  // (or a shared link) dropped the reader back on the workbench.
+  const url = new URL(location.href);
+  if (name === 'workbench') url.searchParams.delete('v'); else url.searchParams.set('v', name);
+  url.searchParams.delete('t'); url.searchParams.delete('e');
+  url.hash = '';
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
+  const load = VIEW_LOADERS[name];
+  if (load) load();
 }
 
 // -- 工作台 ---------------------------------------------------------------
@@ -2872,7 +2887,7 @@ function planHtml(plan) {
     </div>`;
   }).join('');
   return `
-    <div class="kpi-grid" style="margin-bottom:12px">
+    <div class="kpi-grid" id="deploy-sandbox" style="margin-bottom:12px">
       <div class="kpi"><div class="k">Agents</div><div class="v">${sum.agents ?? (m.agents||[]).length}</div></div>
       <div class="kpi"><div class="k">Bound 工具</div><div class="v" style="color:var(--good)">${(sum.bound_tools||[]).length}</div></div>
       <div class="kpi"><div class="k">Unbound 工具</div><div class="v" style="color:${(sum.unbound_tools||[]).length?'var(--warn)':'var(--fg)'}">${(sum.unbound_tools||[]).length}</div></div>
@@ -3174,7 +3189,7 @@ function contextHtml(ctx) {
   return `${contextEditorHtml(ctx)}<div class="card"><h2>现场 / Site</h2>${siteHtml}</div>
     <div class="card"><h2>干系人</h2><div class="tablewrap"><table><thead><tr><th>姓名</th><th>角色</th><th>Sponsor</th><th>成功指标</th></tr></thead><tbody>${stkRows||'<tr><td colspan="4" class="meta">未记录</td></tr>'}</tbody></table></div></div>
     <div class="card"><h2>成功标准</h2><ul class="note-list">${crit}</ul></div>
-    <div class="card"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>错误预算</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
+    <div class="card" id="ctx-slos"><h2>SLO</h2><div class="tablewrap"><table><thead><tr><th>名称</th><th>目标</th><th>错误预算</th><th>告警路由</th><th>窗口</th></tr></thead><tbody>${sloRows}</tbody></table></div></div>
     <div class="card"><h2>功能安全</h2><div class="tablewrap"><table><tbody>${safetyHtml}</tbody></table></div></div>
     <div class="card"><h2>产物与交付</h2>
       <div class="row"><label>语料</label>${esc(assets.corpus_summary||'—')}</div>
@@ -3957,10 +3972,10 @@ async function loadOps() {
   out.innerHTML = `
     <div class="sec-head"><svg class="ic"><use href="#i-gears"/></svg><h2>运维 · 连接器 / eval / flywheel / license</h2></div>
     ${errs.length ? `<div class="gate fail"><b>部分面板加载失败</b><div class="mt1 meta">${errs.map(esc).join('<br>')}</div></div>` : ''}
-    <div class="card"><h2>连接器注册表</h2>
+    <div class="card" id="ops-connectors"><h2>连接器注册表</h2>
       <p class="meta">导入级状态：注册表里 = 依赖齐；模块表有而注册表无 = 缺可选依赖。GET 不探测客户系统连通性——那是部署时的事。凭据 env 只显示名称与「是否已配置」，值不离开本进程。</p>
       <div class="tablewrap"><table><thead><tr><th>Slug</th><th>状态</th><th>说明</th><th>凭据 env</th></tr></thead><tbody>${connRows}</tbody></table></div></div>
-    <div class="card" style="margin-top:12px"><h2>Eval 基准</h2>
+    <div class="card" style="margin-top:12px" id="ops-eval"><h2>Eval 基准</h2>
       <p class="meta">指标与评分口径：${esc(String(Object.keys(ev.metrics||{}).length))} 项，全部确定性打分（LLM 只出现在生成回复那一步）。</p>
       ${metricRows?`<div class="tablewrap"><table><thead><tr><th>指标</th><th>说明</th></tr></thead><tbody>${metricRows}</tbody></table></div>`:''}
       <div class="row mt2">
@@ -3968,7 +3983,7 @@ async function loadOps() {
         <label>Agent</label><select id="ev-agent"><option value="mock">mock（规则，无需 LLM）</option><option value="mimo">mimo（需 LLM env）</option></select>
         <button onclick="runEval()">运行</button></div>
       <div id="ev-out" class="mt2"></div></div>
-    <div class="card" style="margin-top:12px"><h2>Data Flywheel</h2>
+    <div class="card" style="margin-top:12px" id="ops-flywheel"><h2>Data Flywheel</h2>
       <p class="meta">计数器是<b>本服务进程</b>内的（引擎在内存）；retrain 任务是<b>描述符</b>——本进程没有任何调度器在跑，交给外部编排器触发。</p>
       <div class="kpi-grid" style="margin:8px 0">
         <div class="kpi"><div class="k">collected</div><div class="v">${esc(String(s.collected??'—'))}</div></div>
@@ -3978,7 +3993,7 @@ async function loadOps() {
         <div class="kpi"><div class="k">store total</div><div class="v">${esc(String(s.store_total??'—'))}</div></div>
       </div>
       ${jobRows?`<div class="tablewrap"><table><thead><tr><th>任务</th><th>计划</th><th>门槛</th><th>类型</th></tr></thead><tbody>${jobRows}</tbody></table></div>`:''}</div>
-    <div class="card" style="margin-top:12px"><h2>License</h2>
+    <div class="card" style="margin-top:12px" id="ops-license"><h2>License</h2>
       <div class="row"><label>客户</label><b>${esc(li.customer||'—')}</b></div>
       <div class="row"><label>Tier</label><span class="pill ${li.tier==='community'?'':(li.tier==='pro'?'tkt':'ind')}">${esc(li.tier||'—')}</span>
         ${li.expired?'<span class="pill bad">已过期 → community</span>':''}
@@ -4012,17 +4027,97 @@ async function runEval() {
   }
 }
 
-if (location.hash === '#skills') go('skills');
-else if (location.hash === '#deploy') go('deploy');
-else if (location.hash === '#ontology') go('ontology');
-else if (location.hash === '#ops') go('ops');
-else loadWorkbench();
+/* ---- deep links ---------------------------------------------------------
+   The global rail links *into* the console, so the console has to understand
+   a destination, not just a view. Two forms:
+
+     /console?v=skills                     view
+     /console?v=workbench&t=evidence       view + engagement-detail tab
+     /console?v=workbench&t=sop&e=<eid>    ... on a named engagement
+     /console?v=ops#ops-eval               view, then scroll to an element
+
+   Before this, only four bare hashes (#skills) were understood, and no link
+   could reach a tab or a section — which is why those capabilities were only
+   discoverable by clicking around. The query string is read on load and on
+   in-page navigation (``go``), never rewritten, so a reload keeps the
+   destination. */
+function readDest() {
+  const q = new URLSearchParams(location.search);
+  const v = q.get('v');
+  return { view: v && VIEWS().includes(v) ? v : 'workbench', tab: q.get('t'), eid: q.get('e') };
+}
+
+function scrollToHash() {
+  const id = (location.hash || '').replace(/^#/, '');
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({block:'start', behavior:'smooth'});
+}
+
+/* Panes are rendered by the engagement loaders, so a section that lives in one
+   of them does not exist yet when the router runs. Poll briefly instead of
+   guessing a timeout: the element either appears or the reader lands at the top
+   of the view, which is the old behaviour anyway.
+
+   ``behavior:'instant'`` on purpose. Smooth scrolling is an animation, and an
+   animation that starts while a view's DOM is still being replaced is the one
+   case where "smooth" loses to "it actually arrived": the anchor was landing
+   mid-page under the sticky header on a first navigation. A deep link is a
+   destination assertion, not a transition. */
+function scrollToHashWhenReady(id, tries) {
+  if (!id) return;
+  const el = document.getElementById(id);
+  if (el) {
+    // Two passes, both instant. The first scroll lands the card under the
+    // sticky header; the second re-measures *after* the browser has laid out
+    // the freshly rendered view (a first-pass rect measured while the previous
+    // view's height was still applied overshot to blank canvas — observed in
+    // headless verification). Correcting once against a settled layout is
+    // cheaper and more reliable than guessing a delay.
+    const pad = 16;
+    const go = () => {
+      const y = el.getBoundingClientRect().top + window.scrollY - pad;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo({top: Math.max(0, Math.min(y, max)), behavior:'instant'});
+    };
+    go();
+    requestAnimationFrame(() => requestAnimationFrame(go));
+    return;
+  }
+  if ((tries||0) > 60) return;
+  setTimeout(() => scrollToHashWhenReady(id, (tries||0) + 1), 100);
+}
+
+async function applyDest() {
+  const d = readDest();
+  showView(d.view);
+  document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active', b.dataset.view===d.view));
+  const load = VIEW_LOADERS[d.view];
+  if (load) await load();
+
+  const section = (location.hash || '').replace(/^#/, '');
+  if (d.view === 'workbench' && (d.tab || d.eid)) {
+    // Selecting an engagement is what renders the tab panes at all; without one
+    // the tab link would silently land on the pick-a-project empty state.
+    if (d.eid) {
+      try { await selectEng(d.eid); } catch (e) {
+        // to_en() rewrites the whole document by exact match, so a string that
+        // only exists inside this function must have a pair in web/i18n.py.
+        toast('找不到该 engagement', 'warn');
+      }
+    }
+    if (d.tab && DETAIL_TABS.includes(d.tab)) {
+      const btn = document.querySelector(`.tab[data-tab="${d.tab}"]`);
+      if (btn && current) tab(d.tab, btn);
+    }
+  }
+  if (section) scrollToHashWhenReady(section);
+}
+
+applyDest();
 window.addEventListener('hashchange', () => {
-  if (location.hash === '#skills') go('skills');
-  else if (location.hash === '#deploy') go('deploy');
-  else if (location.hash === '#ontology') go('ontology');
-  else if (location.hash === '#ops') go('ops');
-  else go('workbench');
+  // Same objective, new anchor: scroll without rebuilding the view.
+  scrollToHashWhenReady((location.hash || '').replace(/^#/, ''));
 });
 </script>
 <dialog id="dlg-edit" aria-labelledby="dlg-edit-title">

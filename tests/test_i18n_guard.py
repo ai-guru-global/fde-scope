@@ -94,4 +94,8 @@ def test_english_rail_paths_are_english() -> None:
     for band in NAV_BANDS:
         for item in band.items:
             href = item.en_path or "/en" + item.path
-            assert f'<a href="{href}"' in rail, f"{item.key}: EN rail is missing {href}"
+            # Console destinations carry ``?v=workbench&t=sop``; the rail escapes
+            # the ``&`` as ``&amp;``, which is what a browser decodes back. Compare
+            # on the unescaped form so a multi-parameter link is still checked.
+            rendered = href.replace("&", "&amp;")
+            assert f'<a href="{rendered}"' in rail, f"{item.key}: EN rail is missing {href}"

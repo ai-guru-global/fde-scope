@@ -76,13 +76,24 @@ def test_every_rail_anchor_resolves_to_an_id_in_its_page() -> None:
     assert checked >= 100, f"guard lost its coverage (only {checked} anchors checked)"
 
 
-def test_every_page_carries_exactly_four_bands() -> None:
-    """Four bands is the navigation's shape: learners, engineers, workbench,
-    external. A fifth means either a real IA change (update this test and
-    DESIGN.md together) or the builder emitting the tree twice."""
+def test_every_page_carries_the_band_set_once() -> None:
+    """Every rail renders the same bands, exactly once, in the declared order.
+
+    Origin (2026-11-10): this used to assert the literal ``4``. That number was
+    the old IA — learners / engineers / workbench / external — and pinning it
+    meant the rail could never become a capability map without "breaking" a
+    test whose real subject was *consistency between pages*, not the count. The
+    invariant that matters is that the tree is emitted once and identically
+    everywhere; ``NAV_BANDS`` is the single source, and a page that dropped or
+    duplicated a band is the bug this catches.
+    """
+    from fde_scope.web.layout import NAV_BANDS
+
+    expected = [band.key for band in NAV_BANDS]
     for name, html in PAGES.items():
         nav = RAIL.search(html).group(0)
-        assert nav.count('<section class="sec') == 4, f"{name}: band count drifted"
+        found = re.findall(r'data-nav="([a-z-]+)"', nav)
+        assert found == expected, f"{name}: bands {found} != declared {expected}"
         assert nav.count('<div class="navtools">') == 1, f"{name}: navtools count"
 
 
@@ -94,7 +105,11 @@ def test_bands_are_collapsible_and_ship_open() -> None:
     for name, html in PAGES.items():
         nav = RAIL.search(html).group(0)
         bands = list(_BAND.finditer(nav))
-        assert len(bands) == 4, f"{name}: only {len(bands)} collapsible band(s) parsed"
+        from fde_scope.web.layout import NAV_BANDS
+
+        assert len(bands) == len(NAV_BANDS), (
+            f"{name}: parsed {len(bands)} collapsible bands, expected {len(NAV_BANDS)}"
+        )
         keys, problems = set(), []
         for b in bands:
             if b["open"] != "true":

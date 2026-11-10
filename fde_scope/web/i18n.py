@@ -820,6 +820,7 @@ I18N_PAIRS: list[tuple[str, str]] = [
         "'<div class=\"empty\">无待审草稿 — 自动捕获与 gate 提示会出现在这里</div>'",
         "'<div class=\"empty\">No drafts to review — auto-captures and gate prompts will appear here</div>'",
     ),
+    ("toast('找不到该 engagement', 'warn')", "toast('That engagement was not found', 'warn')"),
     ("toast('请填写标题','warn')", "toast('Please enter a title','warn')"),
     ("toast('技能已沉淀','ok')", "toast('Skill captured','ok')"),
     ("toast('已发布','ok')", "toast('Published','ok')"),

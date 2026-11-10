@@ -72,44 +72,114 @@ class NavBand(NamedTuple):
     items: tuple[NavItem, ...]
 
 
-#: Four shelves, in reader order: learn the method, read the reference, run the
-#: workbench, then the outward-facing site. ``external`` is last and alone
-#: because leaving the app is a different kind of action than scrolling it.
+#: The rail is the product's *capability map*, not a table of contents.
+#:
+#: Origin (2026-11-10): the rail carried 11 destinations while the product had
+#: ~18 capability families — the corpus engine, the eval framework, ontology,
+#: flywheel, license, connectors, evidence, share links and the entire console
+#: were reachable only by typing a CLI command or a hand-written hash URL. The
+#: console's five views were flat ``<button>`` elements with no ``href`` at all,
+#: so they could not be linked, bookmarked, or opened in a new tab.
+#:
+#: So each band below is one *capability family* rather than one page, and each
+#: row is one place a reader can land. Console destinations carry a ``?v=``
+#: (and for the workbench a ``?t=``) prefix: the router on ``/console`` reads
+#: them as view/engagement/tab and scrolls the target into view, which is what
+#: makes "语料引擎" a real link instead of a label. A destination with
+#: ``#anchor`` lives in the same document — assets, scripts and the flywheel
+#: have no route of their own yet, and the rail points at the section that
+#: owns them rather than inventing a page that does not exist.
+#:
+#: Every band is one level deep on purpose: ``side_nav`` expands only the active
+#: row, so a nested tree would have hidden most of the product behind a click.
+#: ``tests/test_nav_coverage.py`` pins the claim that every advertised
+#: capability has a row here.
 NAV_BANDS: tuple[NavBand, ...] = (
     NavBand(
-        "learners",
-        "FDE 学习者",
-        "FDE learners",
+        "start",
+        "开始",
+        "Start",
         (
             NavItem("overview", "/", "功能总览", "Overview"),
-            NavItem("course", "/course", "入门课程", "Intro course"),
-            NavItem("glossary", "/glossary", "名词解释", "Glossary"),
-            NavItem("certification", "/certification", "认证中心", "Certification"),
-            NavItem("showcase", "/showcase", "作品集登记", "Portfolio registry"),
+            NavItem("console", "/console", "Engagement 控制台", "Engagement console"),
+            NavItem("docs-workbench", "/docs/workbench-development-plan", "开发计划与差距", "Roadmap & gaps"),
         ),
     ),
     NavBand(
-        "engineers",
-        "FDE 工程师",
-        "FDE engineers",
+        "sop",
+        "SOP 流程 · 18 阶段",
+        "SOP · 18 phases",
         (
             NavItem("sop", "/sop", "SOP 全文", "SOP full text"),
+            NavItem("v-sop", "/console?v=workbench&t=sop", "阶段状态机", "Phase state machine"),
+            NavItem("v-gates", "/console?v=workbench&t=gates", "10 个门禁", "The 10 gates"),
+            NavItem("v-guided", "/console?v=workbench&t=guided", "引导模式", "Guided mode"),
+            NavItem("v-context", "/console?v=workbench&t=context", "现场上下文", "Engagement context"),
+            NavItem("v-journal", "/console?v=workbench&t=journal", "现场记录", "Field journal"),
+            NavItem("v-evidence", "/console?v=workbench&t=evidence", "证据与附件", "Evidence & assets"),
+            NavItem("v-retro", "/console?v=workbench&t=retro", "复盘与审计重放", "Retrospective"),
+            NavItem("v-audit", "/console?v=workbench&t=audit", "审计流", "Audit log"),
+        ),
+    ),
+    NavBand(
+        "data",
+        "数据与语料",
+        "Data & corpus",
+        (
+            NavItem("v-forge", "/console?v=workbench&t=forge", "语料引擎", "Corpus engine"),
+            NavItem("v-kpi", "/console?v=workbench&t=kpi", "KPI 计算", "KPI"),
+            NavItem("v-ops-conn", "/console?v=ops#ops-connectors", "数据连接器（10）", "Connectors (10)"),
+            NavItem("resources", "/resources", "GitHub 资源库", "GitHub resources"),
+        ),
+    ),
+    NavBand(
+        "eval",
+        "评估与飞轮",
+        "Eval & flywheel",
+        (
+            NavItem("v-eval", "/console?v=ops#ops-eval", "评估基准与 bad case", "Eval & bad cases"),
+            NavItem("v-flywheel", "/console?v=ops#ops-flywheel", "数据飞轮", "Data flywheel"),
+            NavItem("v-slo", "/console?v=workbench&t=context#ctx-slos", "SLO / 值班", "SLO & on-call"),
+        ),
+    ),
+    NavBand(
+        "deploy",
+        "部署与权限",
+        "Deploy & permission",
+        (
+            NavItem("v-deploy", "/console?v=deploy", "Agent 装配与部署", "Agent assembly"),
+            NavItem("v-sandbox", "/console?v=deploy#deploy-sandbox", "沙箱与租户隔离", "Sandbox & isolation"),
+            NavItem("v-handoff", "/console?v=workbench&t=handoff", "交接包与签收", "Handoff package"),
+            NavItem("v-lic", "/console?v=ops#ops-license", "License 档位", "License tiers"),
+        ),
+    ),
+    NavBand(
+        "knowledge",
+        "知识与资产",
+        "Knowledge & assets",
+        (
+            NavItem("v-skills", "/console?v=skills", "技能沉淀库", "Skill library"),
             NavItem(
                 "catalog",
                 "/catalog/index.html",
-                "技能手册库",
-                "Skills handbook",
+                "技能手册库（122 页）",
+                "Skills handbook (122)",
                 "/catalog/en/index.html",
             ),
+            NavItem("v-onto", "/console?v=ontology", "本体语义层", "Ontology"),
             NavItem("docs", "/docs/readme", "仓库文档", "Repo docs"),
-            NavItem("resources", "/resources", "GitHub 资源", "GitHub resources"),
+            NavItem("glossary", "/glossary", "名词解释", "Glossary"),
         ),
     ),
     NavBand(
-        "workbench",
-        "FDE 工作台",
-        "FDE workbench",
-        (NavItem("console", "/console", "Engagement 控制台", "Engagement console"),),
+        "learn",
+        "学习与认证",
+        "Learn & certify",
+        (
+            NavItem("course", "/course", "入门课程（8 天 · 92 项判分）", "Intro course (8 days)"),
+            NavItem("certification", "/certification", "认证中心", "Certification"),
+            NavItem("showcase", "/showcase", "作品集登记", "Portfolio registry"),
+        ),
     ),
     NavBand(
         "external",
@@ -118,6 +188,17 @@ NAV_BANDS: tuple[NavBand, ...] = (
         (NavItem("gtm", "/GTM/index.html", "GTM 官网", "GTM site", "/GTM/en/index.html"),),
     ),
 )
+
+
+def console_view_href(key: str, en: bool) -> str:
+    """The URL of a console view, for the rail's view switcher.
+
+    Mirrors the console's own query contract (``?v=<view>``; the default view is
+    addressed without it). Kept next to ``_href`` so the two ways of spelling a
+    console destination cannot drift.
+    """
+    base = "/en/console" if en else "/console"
+    return base if key == "workbench" else f"{base}?v={key}"
 
 
 def _href(item: NavItem, en: bool) -> str:
@@ -194,10 +275,17 @@ def side_nav(
                     href, label = entry
                     out.append(f'<a href="{escape(href, quote=True)}">{escape(label)}</a>')
             for i, (key, label) in enumerate(views):
+                # An <a>, not a <button>: these are destinations. As a button
+                # they had no href, so the reader could not open one in a new
+                # tab, copy it, or middle-click it — and the only way to reach
+                # Ops was to click. data-view keeps ``go()`` (and NAV_JS)
+                # working, and the href still carries the destination if the
+                # script fails.
+                href = console_view_href(key, en)
                 out.append(
-                    f'<button class="navbtn{" active" if i == 0 else ""}" '
-                    f'type="button" data-view="{key}" onclick="go(\'{key}\')">'
-                    f"{escape(label)}</button>"
+                    f'<a class="navbtn{" active" if i == 0 else ""}" '
+                    f'data-view="{key}" href="{escape(href, quote=True)}">'
+                    f"{escape(label)}</a>"
                 )
             out.append("</div>")
         out.append("</div></section>")
@@ -666,24 +754,17 @@ transition:color var(--dur) var(--ease),background-color var(--dur) var(--ease)}
    whitespace paid for twice. 30px rows against the 18px label is the density a
    workbench rail is read at. */
 .snav .rows{display:flex;flex-direction:column}
-/* A rail item is a rail item whether the router emitted a link or a button:
-   the console switches its views with <button class="navbtn">, and the two
-   must not grow separate selection languages. The button branch carries only
-   what the UA defaults force on it (chrome border, a font that is not the
-   page's) — and one of those defaults has to be *undone*: Blink sets
-   ``justify-content:center`` on ``<button>``, which is inert while the element
-   is ``inline-block`` but becomes live the moment the shared rule above makes it
-   a flex container. It then centres the stub-and-label group, so every button
-   row's text starts at a different column, one that moves with the label's
-   width — the longest item in a list drifts furthest left, and the tree stops
-   having a left edge. Links have no such default, which is why the mismatch
-   only ever appeared where a button sat beside an anchor. */
+/* A rail row is a rail row: every destination is an <a>, including the console
+   view switcher (``.navbtn``), which used to be a <button> with no href and so
+   could not be opened in a new tab, copied, or reached without a click. The
+   class survives because it is the hook ``go()`` and NAV_JS select on, and
+   because it marks "this link switches a view instead of loading a page" — the
+   two still share one selection language, which is why the fill rule below
+   names both. */
 .snav a,.snav .navbtn{display:flex;align-items:center;gap:var(--sp2);color:var(--muted);
 font-size:var(--fs-sm);line-height:1.3;text-align:left;padding:6px var(--sp3);
-border-radius:var(--r0);overflow-wrap:anywhere;
+border-radius:var(--r0);overflow-wrap:anywhere;justify-content:flex-start;
 transition:color var(--dur) var(--ease),background-color var(--dur) var(--ease)}
-.snav .navbtn{width:100%;justify-content:flex-start;background:transparent;border:0;
-cursor:pointer;font-family:inherit}
 .snav a:hover,.snav .navbtn:hover{color:var(--fg);background:var(--layer-02)}
 /* The ring is pulled inside the row because the row is flush with a scrolling
    container: ``outline-offset:2px`` on a full-bleed slab is clipped at both

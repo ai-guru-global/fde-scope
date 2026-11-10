@@ -100,9 +100,11 @@ def test_en_console_html(client) -> None:
     r = client.get("/en/console")
     assert r.status_code == 200
     assert '<html lang="en">' in r.text
-    assert "Workbench</button>" in r.text
-    assert "Skills</button>" in r.text
-    assert "工作台</button>" not in r.text
+    # The view switcher became real links (2026-11-10): a <button> has no href,
+    # so it could not be opened in a new tab or copied. Labels now close </a>.
+    assert 'data-view="workbench"' in r.text and ">Workbench</a>" in r.text
+    assert ">Skills</a>" in r.text
+    assert "工作台</a>" not in r.text
 
 
 def test_language_switcher_badges(client) -> None:
@@ -1236,8 +1238,8 @@ def test_console_has_workbench_and_skills_views(client) -> None:
     assert r.status_code == 200
     assert 'id="view-workbench"' in r.text
     assert 'id="view-skills"' in r.text
-    assert ">工作台</button>" in r.text
-    assert ">技能库</button>" in r.text
+    assert ">工作台</a>" in r.text
+    assert ">技能库</a>" in r.text
     assert "现场记录" in r.text
     assert "沉淀为技能" in r.text
     assert "草稿审阅队列" in r.text
@@ -1540,16 +1542,19 @@ def test_ops_license_api_reports_tier_without_the_key(client) -> None:
 def test_console_has_ops_view(client) -> None:
     """The ops view: nav button, container, hash route, four panels, eval runner."""
     html = client.get("/console").text
-    assert """onclick="go('ops')""" in html
+    # Ops is a link with a real href, so it is reachable from the global rail
+    # and from a copied URL, not only by clicking a button.
+    assert 'data-view="ops"' in html and "/console?v=ops" in html
     assert 'id="view-ops"' in html
     assert "loadOps" in html and "runEval" in html
-    assert "#ops" in html  # boot + hashchange routing
+    assert "VIEW_LOADERS" in html  # every view has a loader entry
+    assert "applyDest" in html  # ?v= / ?t= / #anchor routing on load
     assert "/api/connectors" in html and "/api/flywheel" in html and "/api/license" in html
     assert "/api/eval/run" in html
     # honesty pinned in the UI: process-local counters, descriptor-only jobs
     assert "本服务进程" in html and "描述符" in html
     en = client.get("/en/console").text
-    assert "onclick=\"go('ops')\">Ops</button>" in en
+    assert 'data-view="ops"' in en and ">Ops</a>" in en
     assert "<h2>Connector registry</h2>" in en
     assert "<h2>Eval benchmark</h2>" in en
     assert "mock (rule-based, no LLM)" in en
@@ -1614,7 +1619,7 @@ def test_console_has_ontology_view(client) -> None:
     assert 'data-view="ontology"' in html
     assert 'id="view-ontology"' in html
     assert "loadOntology" in html
-    assert "location.hash === '#ontology'" in html
+    assert "/console?v=ontology" in html
 
 
 def test_overview_has_ontology_section(client) -> None:
@@ -2123,9 +2128,9 @@ def test_engineer_rail_links_stay_in_app(client) -> None:
         assert _SOP_GITHUB not in page, path
         assert _CATALOG_GITHUB not in page, path
         assert ">SOP 全文</a>" in page, path
-        assert '<a href="/catalog/index.html">技能手册库</a>' in page, path
+        assert '<a href="/catalog/index.html">技能手册库（122 页）</a>' in page, path
         assert '<a href="/docs/readme">仓库文档</a>' in page, path
-        assert ">GitHub 资源</a>" in page, path  # matches plain and active form
+        assert ">GitHub 资源库</a>" in page, path  # matches plain and active form
         assert '<a href="/GTM/index.html">GTM 官网</a>' in page, path
         assert 'href="http' not in page, path  # nothing jumps off-site at all
     en_pages = (
@@ -2142,7 +2147,7 @@ def test_engineer_rail_links_stay_in_app(client) -> None:
         assert _SOP_GITHUB not in page, path
         assert _CATALOG_GITHUB not in page, path
         assert ">SOP full text</a>" in page, path
-        assert '<a href="/catalog/en/index.html">Skills handbook</a>' in page, path
+        assert '<a href="/catalog/en/index.html">Skills handbook (122)</a>' in page, path
         assert '<a href="/en/docs/readme">Repo docs</a>' in page, path
         assert ">GitHub resources</a>" in page, path
         assert '<a href="/GTM/en/index.html">GTM site</a>' in page, path
