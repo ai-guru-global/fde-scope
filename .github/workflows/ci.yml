@@ -172,6 +172,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # build_release.sh drives uv for the per-arch venv and the pyinstaller
+      # install; the runner image does not ship it. Without this the job died
+      # at line 72 with "uv: command not found" (exit 127) on every push.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Build the app bundle (ad-hoc signed, no DMG)
         run: ./appbuild/build_release.sh --arch arm64 --no-dmg
 
