@@ -27,6 +27,7 @@ from qwenpaw.pawapp import PawApp, get_ctx
 try:
     import fde_scope  # noqa: F401
     from fde_scope import __version__, paths
+    from fde_scope.fsutil import atomic_write_text
 except ModuleNotFoundError as exc:  # pragma: no cover — env guard
     raise ModuleNotFoundError(
         "fde_scope is not importable from the QwenPaw host process. "
@@ -195,6 +196,7 @@ async def advance_engagement(eid: str, force: bool = False, ctx=Depends(get_ctx)
         _save_engagement(eng)
         return {"advanced": False, "result": exc.result.__dict__}
     except StopIteration:
+        # synchronous route: the builtin is caught before it reaches a coroutine
         return {"advanced": False, "reason": "complete"}
     _save_engagement(eng)
     await _sync_storage_snapshot(ctx, [e.status() for e in _all_engagements()])
@@ -235,7 +237,7 @@ async def forge_corpus(
         raise HTTPException(status_code=422, detail="file is not valid UTF-8") from None
     safe_name = Path(file.filename or "").name or f"{uuid.uuid4().hex}.csv"
     tmp = paths.uploads_dir(create=True) / safe_name
-    tmp.write_text(text, encoding="utf-8")
+    atomic_write_text(tmp, text)
 
     rows = CSVConnector(str(tmp)).extract_sample(100000)
     cfg = CorpusConfig(min_samples_per_category=min_samples, synth_per_gap=synth_per_gap)
@@ -244,9 +246,7 @@ async def forge_corpus(
     report_dir = paths.reports_dir(create=True)
     out_html = report_dir / f"corpus_report_{report_id}.html"
     save_html(report, out_html)
-    (report_dir / f"corpus_report_{report_id}.json").write_text(
-        report.model_dump_json(indent=2), encoding="utf-8"
-    )
+    atomic_write_text(report_dir / f"corpus_report_{report_id}.json", report.model_dump_json(indent=2))
     return {
         "report_id": report_id,
         "total": report.total,
@@ -335,7 +335,7 @@ def export_skill(sid: str, fmt: str = Form("qwenpaw")) -> dict:
     for f in files:
         dest = paths.skills_export_dir() / f.name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(f.content, encoding="utf-8")
+        atomic_write_text(dest, f.content)
         out.append({"name": f.name, "content": f.content, "path": str(dest)})
     return {"skill_id": sid, "format": fmt, "files": out}
 
@@ -377,7 +377,7 @@ async def draft_runbook(eid: str, ctx=Depends(get_ctx)) -> dict:
         runbook_md = await run_in_threadpool(render_runbook, c)
     runbook_dir = paths.reports_dir(create=True)
     path = runbook_dir / f"runbook_{eid}.md"
-    path.write_text(runbook_md, encoding="utf-8")
+    atomic_write_text(path, runbook_md)
     return {"engagement_id": eid, "used_llm": used_llm, "path": str(path)}
 
 
@@ -465,15 +465,20 @@ async def fde_sop_status(engagement_id: str) -> dict:
 )
 async def fde_sop_advance(engagement_id: str, force: bool = False) -> dict:
     """Tool: advance the SOP state machine; returns blockers when a gate fails."""
-    from fde_scope.engagement import AdvanceBlocked
+    from fde_scope.engagement import AdvanceBlocked, PhaseComplete
 
     eng = await run_in_threadpool(_load_engagement, engagement_id)
     try:
-        await run_in_threadpool(eng.advance, force=force)
+        # ``advance`` raises the builtin ``StopIteration`` at the terminal
+        # phase, and asyncio turns that into ``RuntimeError`` when it crosses
+        # the threadpool — the old ``except StopIteration`` here was dead code
+        # and the last advance answered 500. ``advance_or_complete`` signals
+        # with a real exception that survives the await.
+        await run_in_threadpool(eng.advance_or_complete, force=force)
     except AdvanceBlocked as exc:
         await run_in_threadpool(_save_engagement, eng)
         return {"advanced": False, "blockers": exc.result.blockers}
-    except StopIteration:
+    except PhaseComplete:
         return {"advanced": False, "reason": "complete"}
     await run_in_threadpool(_save_engagement, eng)
     return {"advanced": True, "status": eng.status()}
