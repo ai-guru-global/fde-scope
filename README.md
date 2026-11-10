@@ -792,6 +792,7 @@ DMG 分发）。QwenPaw PawApp（[`pawapp/`](pawapp/)）则是同一引擎、同
 
 - [`docs/enhancement-plan.md`](docs/enhancement-plan.md) — **全面加强计划与进度台账**：逐页逐功能加强项、每条带 `file:line` 证据、分期路线图（详见 [加强计划](#-加强计划enhancement-plan)）
 - [`docs/workbench-gap-assessment.md`](docs/workbench-gap-assessment.md) — **2026-11-03 实测评估**：工程质量基线、CI/覆盖率/文档漂移，以及“入门学习 / 查阅 skills / 现场履约”三场景差距
+- [`docs/minimal-poc-plan.md`](docs/minimal-poc-plan.md) — **最小 POC 方案**：用一条真实数据链路替换一个 mock 案例，含样本量门槛（留出集 ≥60 条真实）、可证伪的验收标准、已逐步实跑的命令
 - [`docs/workbench-development-plan.md`](docs/workbench-development-plan.md) — **12 周开发计划**：M0 止血与发布 → M1 安装与入门闭环 → M2 技能检索 → M3 现场工作台 → M4 交付物与客户闭环 → M5 团队与硬化
 - [`docs/features.md`](docs/features.md) — 完整功能清单：18 阶段逐条说明 / 10 门禁执行流 / 连接器成熟度 / "功能 → 优点"速查表（English: [`docs/features-en.md`](docs/features-en.md)）
 - [`docs/user-guide.md`](docs/user-guide.md) — 客户侧快速上手：5 分钟跑通、核心概念、常用操作、env 速查、故障 FAQ
