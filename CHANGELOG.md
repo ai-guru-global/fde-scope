@@ -154,10 +154,33 @@ listed as unverified: `/course` renders **1.45 MB of real lesson content** from
 the wheel (no missing-sources notice), `/catalog/index.html` serves, and the
 `corpus` report carries the new per-split provenance.
 
-#### Still open before a public tag
+#### Released — 2026-11-10
 
-- **Not published.** No tag exists yet; PyPI upload is a separate, irreversible
-  step (`0.1.0` can never be reused). The wheel builds are verified, not shipped.
+`v0.1.0` is tagged and published at
+https://github.com/ai-guru-global/fde-scope/releases/tag/v0.1.0 with a macOS
+universal2 DMG + zip (36.9 MB), `SHA256SUMS` and `manifest.json`. CI is green on
+all seven jobs; the release job builds, verifies (`lipo`, `codesign --verify`),
+and attaches those artifacts.
+
+Two release-pipeline bugs only surfaced by actually tagging, and are fixed in
+this release:
+
+- The release workflow pinned `runs-on: macos-14`, which this org cannot
+  schedule — the tag run was cancelled in one second with "The configuration
+  'macos-14-arm64-us-default' is not supported" and no DMG was ever attached.
+  Now `macos-latest`, the label the CI job already proves works.
+- The macOS *smoke* step ran the bundle with `--help`, but the bundle's entry
+  point (`appbuild/launcher.py`) ignores arguments and starts the workbench, so
+  the step hung to the 6-hour timeout instead of failing. It now boots the
+  bundle with an isolated `FDE_SCOPE_HOME`, polls `/api/health`, checks
+  `/console`, and SIGTERMs it.
+
+#### Still open before PyPI
+
+- **PyPI not published.** The upload is irreversible (`0.1.0` can never be
+  reused, yank or not), so it stays a maintainer action. Procedure, with the
+  TestPyPI verification that must pass first:
+  [`docs/release-0.1.0.md`](docs/release-0.1.0.md).
 - **No real customer POC.** Every seeded engagement is still fictional data;
   replacing one with a real connector run remains the top product risk.
 - **Enterprise surface absent by design.** Multi-tenant/RBAC/SSO, CSRF, TLS and

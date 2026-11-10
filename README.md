@@ -68,18 +68,24 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 
 ## ⏱ 最短安装路径 · The shortest path in
 
-**先说结论，因为它不好听**：本项目**没有**"一条命令装完"的路径。PyPI 上 `fde-scope` 与 `fde_scope`
-目前均返回 **404**（未发布），仓库 `releases` 列表**为空**（无预打包产物）——2026-10-08 与 2026-11-10
-两次实测一致。对照开源同行的 `npx` 一键分发，这条差距被如实记在
+**先说结论，因为它不好听**：本项目**没有**"一条 `pip install` 装完"的路径。PyPI 上 `fde-scope` 与
+`fde_scope` 目前均返回 **404**（未发布，2026-10-08 与 2026-11-10 两次实测一致）。
+**但 macOS 用户有预打包产物了**：`v0.1.0` 的 DMG 见下方发布进度。对照开源同行的 `npx` 一键分发，这条差距被如实记在
 [`course-level-1/24`](course-level-1/24-开源对标与来源清单.md) §6 第 2/3 条，
 并作为短板登记在 [`course-level-1/13`](course-level-1/13-GTM页面与竞品对比.md) §6 第 11 项。
 
-> **发布进度（2026-11-10）**：挡住发布的四道 CI 检查现已全绿——`ruff check .`、
-> `ruff format --check .`、`mypy fde_scope` 通过，覆盖率 **91.07% ≥ 90%**，
-> 全量 **1304 passed / 4 skipped**。`v0.1.0` 本地构建与**干净 venv 安装已实测**
-> （`course doctor` → `✅ G0 通过`，`/course` 渲染 1.45 MB 真实课程正文，
-> `corpus` 报告正确标注留出集 provenance），但**尚未打 tag、尚未上传 PyPI**（公开是不可逆的一次性动作，`0.1.0` 这个版本号
-> 用掉就不能复用，留给维护者执行）。详见 [`CHANGELOG.md`](CHANGELOG.md) 的发布门。
+> **发布进度（2026-11-10）**：**`v0.1.0` 已发布** →
+> [GitHub Release](https://github.com/ai-guru-global/fde-scope/releases/tag/v0.1.0)
+> 提供 **macOS 通用二进制 DMG / zip**（universal2，36.9 MB，附 `SHA256SUMS` 与 `manifest.json`），
+> 下载双击即可用，无需装 Python。
+>
+> 同版本的四道 CI 检查全绿——`ruff check .`、`ruff format --check .`、`mypy fde_scope`
+> 通过，覆盖率 **91.07% ≥ 90%**，全量 **1304 passed / 4 skipped**；
+> wheel/sdist 干净 venv 安装已实测（`course doctor` → `✅ G0 通过`，
+> `/course` 渲染 1.45 MB 真实课程正文，`corpus` 报告正确标注留出集 provenance）。
+> **PyPI 仍未发布**——上传是不可逆的一次性动作（`0.1.0` 用掉就不能复用），
+> 操作手册见 [`docs/release-0.1.0.md`](docs/release-0.1.0.md)（先 TestPyPI 验证）。
+> 详见 [`CHANGELOG.md`](CHANGELOG.md) 的发布门。
 
 按"你想干什么"选一条最短的：
 
