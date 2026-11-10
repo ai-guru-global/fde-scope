@@ -403,6 +403,20 @@ def engagement_retrospective(eid: str) -> dict:
 # 页面本身在 PUBLIC_PATHS 里（只读课程），但这里读写的**是用户状态**，所以留在
 # 认证之内：默认本地单机不需要 token，设了 FDE_SCOPE_TOKEN 后就必须带 token。
 # 课程页的 JS 拿不到 token 时静默回退到 localStorage，不会因为 401 报错。
+@app.get("/api/course/lab-history")
+def course_lab_history(day: str | None = None) -> dict:
+    """逐日判分历史：每次运行的通过/失败计数与失败项 id（M1-05）。
+
+    课程页用它显示「最近一次」与趋势；不传 ``day`` 返回全部天。
+    """
+    from dataclasses import asdict
+
+    from fde_scope.course import lab_history
+
+    data = lab_history.history(day)
+    return {"days": {d: [{**asdict(run), "score": run.score} for run in runs] for d, runs in data.items()}}
+
+
 @app.get("/api/course/progress")
 def get_course_progress() -> dict:
     """已保存的阅读进度与练习勾选（换浏览器/清缓存后仍然在）。"""
@@ -2114,7 +2128,7 @@ __CONNECTOR_TILES__
 <div class="sec-head"><svg class="ic"><use href="#i-layers"/></svg><h2>架构清单 · 四层 + 横切</h2><span class="n">06</span></div>
 <p class="sec-note">证据化建模见 docs/architecture-model/。</p>
 <div class="grid cols-3">
-  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（89 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（90 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-compass"/></svg><div class="name">SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-gears"/></svg><div class="name">能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · ontology · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-wrench"/></svg><div class="name">横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>

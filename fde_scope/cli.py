@@ -1976,6 +1976,7 @@ def course_check(
     as_json: bool = typer.Option(False, "--json", help="Print results as plain JSON"),
     keep: bool = typer.Option(False, "--keep", help="保留临时工作目录并在结果里打印路径"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="逐条打印执行的命令与输出"),
+    show_history: bool = typer.Option(False, "--history", help="只打印该天的判分历史（不重新运行）"),
 ) -> None:
     """跑一天的机器判分（在临时目录里，不碰你的数据目录）。
 
@@ -1984,6 +1985,31 @@ def course_check(
     """
     from .course.catalog import lab_for
     from .course.verifier import run_all, run_lab
+
+    if show_history:
+        _banner("course check --history")
+        from .course import lab_history as _hist
+
+        days = _hist.history(None if day.lower() in ("all", "every", "*") else lab_for(day).day)
+        if not days:
+            console.print("还没有判分记录——先跑一次 [cyan]fde-scope course check D1[/cyan]")
+            raise typer.Exit(0)
+        t = Table(title="判分历史（每次运行一条）")
+        for col in ("天", "时间", "通过", "失败", "人工", "结果", "失败项"):
+            t.add_column(col)
+        for d, runs in sorted(days.items()):
+            for run in runs:
+                t.add_row(
+                    d,
+                    run.at[:16].replace("T", " "),
+                    str(run.passed),
+                    str(run.failed),
+                    str(run.manual),
+                    "[green]✅ 全绿[/green]" if run.ok else "[red]❌ 有红项[/red]",
+                    ", ".join(run.failed_ids[:4]) or "—",
+                )
+        console.print(t)
+        raise typer.Exit(0)
 
     if day.lower() in ("all", "every", "*"):
         results = run_all(keep=keep, verbose=verbose)

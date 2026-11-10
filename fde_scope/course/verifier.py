@@ -38,6 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from ..logutil import get_logger
 from .catalog import Lab, lab_for
 from .checks import (  # noqa: TC001 — public re-export, see __all__
     ArtifactCheck,
@@ -53,6 +54,8 @@ from .checks import (  # noqa: TC001 — public re-export, see __all__
     first_present,
     matches_any,
 )
+
+logger = get_logger("course.verifier")
 
 __all__ = [
     "CheckResult",
@@ -556,7 +559,7 @@ def run_lab(lab: Lab | str, keep: bool = False, verbose: bool = False) -> LabRes
                     )
                 )
                 result.failed += 1
-                return result
+                return _record_and_return(result)
         for check in lab.checks:
             check_result = _run_check(check, workspace)
             result.results.append(check_result)
@@ -581,6 +584,23 @@ def run_lab(lab: Lab | str, keep: bool = False, verbose: bool = False) -> LabRes
             result.failed += 1
     finally:
         workspace.dispose()
+    return _record_and_return(result)
+
+
+def _record_and_return(result: LabResult) -> LabResult:
+    """Persist the run to the day's history, then hand the result back.
+
+    Both exits of ``run_lab`` go through here so a run that dies on a setup
+    command is recorded too — that is exactly the run a learner needs to see
+    twice in a row before realising their environment is broken. History is a
+    convenience: a failure to write it must never swallow the grading result.
+    """
+    from .lab_history import record
+
+    try:
+        record(result)
+    except Exception:  # pragma: no cover - unwritable data root
+        logger.debug("lab history not recorded", exc_info=True)
     return result
 
 

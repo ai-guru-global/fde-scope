@@ -6,7 +6,7 @@
 > 两类场景。构建在 AgentScope 2.0 之上。
 >
 > 本文档是完整功能清单。所有条目均为有测试覆盖的可执行代码;数量类承诺
-> (18 阶段 / 10 门禁 / 89 路由…)由
+> (18 阶段 / 10 门禁 / 90 路由…)由
 > [架构守卫测试](../tests/test_architecture_guard.py) 钉死。
 >
 > English version: [`docs/features-en.md`](features-en.md)
@@ -139,7 +139,7 @@ flowchart TD
 | 表面 | 形态 | 功能 |
 |---|---|---|
 | CLI | `fde-scope` | 13 组命令:connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web |
-| Web 控制台 | FastAPI 单页,89 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图、认证中心(三家平台考试细则+考点大纲+样题+渠道尽调清单,逐条标注来源等级)、名词解释(全部术语按主题分组,同页卡片+即时搜索)、入门课程(Level 1 全部 26 篇课程文档按源文件渲染同页,文内引用改写为站内链接;页内实验判分:G0 自检 + D1–D8 逐日机器判分,与 CLI `course check` 同一 `run_lab`,一次性工作区不碰真实数据)、SOP 全文(源文件本地渲染,小节导航+表格)、技能手册库(生成门户站内挂载)、仓库文档(README 与 docs/ 20 篇本地渲染,GitHub 式锚点与图片全部站内化)、GitHub 资源(抓取仓库全量建档、许可×相关度双轴筛选、站内搜索,上游地址一律纯文本不出站)、作品集登记(审校规则逐条带教案出处与可信度分级,页面刻意不列任何登记条目,登记与审校走 token 之后的三个接口)、复盘(engagement 详情内「复盘」tab:SLA 时钟+阶段时间线+gate 统计,只读)、干系人只读分享(第二种凭据:链接里带 per-engagement token,明文只显示一次、落盘 sha256,轮换即吊销;`/share/{eid}` 渲染进度+SLA+门禁现况+客户签收——签收只写 `share.ack` 审计证据,不推进状态机,正式验收仍走 authed accept 流程;无效链接一律 404 不探测)、GTM 官网(成品站站内挂载,全部外链改写为站内路由或纯文本)——左栏不再有任何外跳 |
+| Web 控制台 | FastAPI 单页,90 路由 | engagement 看板(推进/回滚/阻塞检查)、门禁检查器、引导模式(阶段白话+产出清单+blocker→下一步+catalog 深链+AI 起草 context+目标拆解)、六张上下文卡片、corpus forge(≤10 MiB 上传)、KPI 探索器、报告浏览、Agent 部署预检、本体库只读视图、认证中心(三家平台考试细则+考点大纲+样题+渠道尽调清单,逐条标注来源等级)、名词解释(全部术语按主题分组,同页卡片+即时搜索)、入门课程(Level 1 全部 26 篇课程文档按源文件渲染同页,文内引用改写为站内链接;页内实验判分:G0 自检 + D1–D8 逐日机器判分,与 CLI `course check` 同一 `run_lab`,一次性工作区不碰真实数据)、SOP 全文(源文件本地渲染,小节导航+表格)、技能手册库(生成门户站内挂载)、仓库文档(README 与 docs/ 20 篇本地渲染,GitHub 式锚点与图片全部站内化)、GitHub 资源(抓取仓库全量建档、许可×相关度双轴筛选、站内搜索,上游地址一律纯文本不出站)、作品集登记(审校规则逐条带教案出处与可信度分级,页面刻意不列任何登记条目,登记与审校走 token 之后的三个接口)、复盘(engagement 详情内「复盘」tab:SLA 时钟+阶段时间线+gate 统计,只读)、干系人只读分享(第二种凭据:链接里带 per-engagement token,明文只显示一次、落盘 sha256,轮换即吊销;`/share/{eid}` 渲染进度+SLA+门禁现况+客户签收——签收只写 `share.ack` 审计证据,不推进状态机,正式验收仍走 authed accept 流程;无效链接一律 404 不探测)、GTM 官网(成品站站内挂载,全部外链改写为站内路由或纯文本)——左栏不再有任何外跳 |
 | QwenPaw PawApp | 桌面插件 | `/api/fde-scope` 下 18 路由 + 3 个 agent 工具 + skill provider,与 Web 同一引擎 |
 | macOS App | universal2 DMG | 双击即用;同一 FastAPI 对象(127.0.0.1:8737),单实例守护 + 健康检查 + 崩溃兜底 |
 

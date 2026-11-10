@@ -697,7 +697,35 @@ function courseFilter(q){
   var c = document.getElementById('cr-count'); if (c) c.textContent = q ? (shown + ' / ' + total) : '';
   var e = document.getElementById('cr-empty'); if (e) e.hidden = shown !== 0;
 }
-window.addEventListener('DOMContentLoaded', function(){ refreshProgress(); restoreTasks(); syncProgress(); });
+window.addEventListener('DOMContentLoaded', function(){ refreshProgress(); restoreTasks(); syncProgress(); loadLabHistory(); });
+// Lab history (M1-05): the last graded run per day, so a retry can be compared
+// with the attempt before it. Hidden until there is something to show.
+function loadLabHistory(){
+  var box = document.getElementById('lab-hist');
+  if (!box) return;
+  fetch('/api/course/lab-history').then(function(r){
+    if (!r.ok) throw new Error('unavailable');
+    return r.json();
+  }).then(function(d){
+    var days = d.days || {}, keys = Object.keys(days).sort();
+    if (!keys.length) return;
+    var rows = [], latest = null;
+    keys.forEach(function(day){
+      var runs = days[day] || []; if (!runs.length) return;
+      var last = runs[runs.length - 1];
+      latest = last;
+      var mark = last.ok ? '\u2705' : '\u274c';
+      rows.push('<div>' + day + '\u00a0' + mark + '\u00a0' + last.passed + '/' + last.score +
+        (runs.length > 1 ? '\u00a0<small>(' + runs.length + ' ' + '次/' + ' runs)</small>' : '') +
+        (last.failed_ids && last.failed_ids.length ? '\u00a0\u00b7\u00a0' + last.failed_ids.join(', ') : '') +
+        '</div>');
+    });
+    document.getElementById('lab-hist-body').innerHTML = rows.join('');
+    document.getElementById('lab-hist-sum').textContent =
+      latest ? (latest.at || '').slice(0, 16).replace('T', ' ') : '';
+    box.hidden = false;
+  }).catch(function(){});   // no history yet, or unauthorised: stay hidden
+}
 """
 
 
@@ -828,6 +856,10 @@ __ICON_SPRITE__
         }"><div id="cr-bar"></div></div>
 <span id="cr-lab" class="meta">0 / {len(_CHAPTERS)}</span>
 </div>
+<details id="lab-hist" class="course-note" hidden>
+<summary>{p("判分历史", "Grading history")} <span id="lab-hist-sum" class="meta"></span></summary>
+<div id="lab-hist-body" class="meta"></div>
+</details>
 <div class="csearch">
 <input id="cr-q" type="search" aria-label="{p("搜索课程内容", "Search the course")}"
  placeholder="{
