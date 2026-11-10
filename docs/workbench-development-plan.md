@@ -91,14 +91,21 @@
 
 | ID | 任务 | 主要改动 | 验收 | 估时 |
 |---|---|---|---|---|
-| M1-01 | 安装包带上内容 | `pyproject.toml` force-include `docs/skills-catalog/site` + 精选 docs（README/user-guide/api-reference/onboarding/features/architecture）；sdist 同步；更新 wheel 体积累计说明 | 干净 venv 装 wheel 后 `/catalog` 与 `/docs/user-guide` 有内容，不是提示页 | 1d |
+| ✅ M1-01 | 安装包带上内容 | `pyproject.toml` force-include `docs/skills-catalog/site` + 精选 docs（README/user-guide/api-reference/onboarding/features/architecture）；sdist 同步；更新 wheel 体积累计说明 | 干净 venv 装 wheel 后 `/catalog` 与 `/docs/user-guide` 有内容，不是提示页 | 1d |
 | M1-02 | DMG 带上内容与冒烟 | `appbuild/FDEScope.spec` 的 `datas` 增加 `_data/course-level-1`、`docs/skills-catalog/site`、精选 docs；`macos-smoke` 增加 `/course`、`/catalog` 断言 | 构建出的 DMG 中两页非空 | 1d |
-| M1-03 | `fde-scope demo` | 新 CLI 命令：播种一个明显虚构的 demo engagement + 3 条技能 + 一份 corpus；打印 10 分钟走查；`--reset` | 空数据根执行后 `/console` 有 demo，且命令可重复执行 | 1.5d |
-| M1-04 | 学习进度落盘 | 新增 `fde_scope/course/progress.py`；`GET/PUT /api/course/progress`；课程 JS 优先服务端、离线回退 localStorage；原子写 | 清浏览器缓存/换浏览器后进度仍在；断网时仍可勾选 | 2d |
-| M1-05 | Lab 历史 | `run_lab` 结果落盘（day、时间、通过数/总数、失败项 id）；课程页显示最近一次与历史 | 连跑 D3 两次，历史有两条 | 1d |
+| ✅ M1-03 | `fde-scope demo` | 新 CLI 命令：播种一个明显虚构的 demo engagement + 3 条技能 + 一份 corpus；打印 10 分钟走查；`--reset` | 空数据根执行后 `/console` 有 demo，且命令可重复执行 | 1.5d |
+| ✅ M1-04 | 学习进度落盘 | 新增 `fde_scope/course/progress.py`；`GET/PUT /api/course/progress`；课程 JS 优先服务端、离线回退 localStorage；原子写 | 清浏览器缓存/换浏览器后进度仍在；断网时仍可勾选 | 2d |
+| ✅ M1-05 | Lab 历史 | `run_lab` 结果落盘（day、时间、通过数/总数、失败项 id）；课程页显示最近一次与历史 | 连跑 D3 两次，历史有两条 | 1d |
 | M1-06 | 节级搜索 + 分章加载 | 构建期生成节级索引；搜索返回节级结果与锚点；课程页支持按章懒加载 | 搜索“门禁”能列出具体小节并可跳转；首屏加载量明显下降 | 1.5d |
 
 ### 出口标准
+
+> **进度（2026-11-10）**：M1-01 / M1-03 / M1-04 / M1-05 已完成并逐项实测；M1-02（DMG 内容）与 M1-06（节级搜索）未做。
+>
+> - 干净 venv 装 wheel：`/catalog` 667 KB（原为提示页）、20 篇 `/docs/*` 全部渲染、`course doctor` G0 通过。
+> - `fde-scope demo`：1 个停在门禁前的 engagement + 3 条技能 + 1 份真实锻造的语料报告；可重复执行，`--reset` 只删自己的数据。
+> - 真实浏览器（CDP）：勾选 2 章 → 服务端收到；清空 localStorage 后刷新 → 从服务端恢复为 2 / 26。
+> - `course check D3` 连跑两次 → `--history` 列出两条，带失败项 id。
 
 - 干净 venv：`pip install fde-scope && fde-scope demo && fde-scope web`，浏览器完成 D1 判分。
 - 清空 localStorage 或换浏览器，阅读进度与练习勾选仍在。
