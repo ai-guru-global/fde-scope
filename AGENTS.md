@@ -85,12 +85,13 @@ changing engagement, deploy or persistence code. Full context:
 ## Regression anchors
 
 - Full suite: `make test` (or `.venv/bin/python -m pytest -q`) —
-  as of 2026-11-10: **1303 passed, 4 skipped, exit 0** (~64s).
+  as of 2026-11-10 (after the nav rewrite): **1346 passed, 4 skipped, exit 0** (~62s).
 - Coverage gate: `pytest --cov=fde_scope --cov=pawapp/backend`
   → must stay **≥ 90%** (`fail_under` in `pyproject.toml`).
 - Real-library runtime tests: `pytest -m agentscope` (needs the
   `agentscope` extra; skipped otherwise).
-- Contract guards: `pytest tests/test_architecture_guard.py` (14 guards).
+- Contract guards: `pytest tests/test_architecture_guard.py` (15 guards) ·
+  navigation coverage: `pytest tests/test_nav_coverage.py` (42 checks).
 - Lint/format/type — **the CI commands, repo-wide**, not just `fde_scope tests`:
   `ruff check . && ruff format --check . && mypy fde_scope`.
   (This anchor used to say `ruff check fde_scope tests`, which was green while
