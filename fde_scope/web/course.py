@@ -604,13 +604,48 @@ function toggleTheme(){
   h.dataset.theme = n;
   try { localStorage.setItem('fde-theme', n); } catch(e) {}
 }
-// -- read progress / practice checkboxes / chapter filter (all client-side) --
+// -- read progress / practice checkboxes / chapter filter -------------------
+// localStorage stays the instant, offline source of truth for rendering; the
+// server copy is a mirror so the record survives a cleared cache or another
+// browser (M1-04). Every write goes to both, every load prefers the server and
+// unions it with whatever this browser had, so neither side can lose ticks.
+var _server = { read:{}, tasks:{} };
+var _synced = false;
 function _store(k){ try { return JSON.parse(localStorage.getItem(k)||'{}'); } catch(e){ return {}; } }
 function _save(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+function _union(a, b){
+  var out = {};
+  Object.keys(a||{}).forEach(function(k){ if (a[k]) out[k] = true; });
+  Object.keys(b||{}).forEach(function(k){ if (b[k]) out[k] = true; });
+  return out;
+}
+function _pushProgress(){
+  var body = JSON.stringify({read:_store('fde-course-read'), tasks:_store('fde-course-tasks')});
+  try {
+    fetch('/api/course/progress', {method:'PUT', headers:{'Content-Type':'application/json'}, body:body})
+      .catch(function(){});   // offline / 401: localStorage already has it
+  } catch(e) {}
+}
+function syncProgress(){
+  return fetch('/api/course/progress').then(function(r){
+    if (!r.ok) throw new Error('no server copy');
+    return r.json();
+  }).then(function(d){
+    _server = {read:d.read||{}, tasks:d.tasks||{}};
+    _synced = true;
+    var read = _union(_store('fde-course-read'), _server.read);
+    var tasks = _union(_store('fde-course-tasks'), _server.tasks);
+    _save('fde-course-read', read); _save('fde-course-tasks', tasks);
+    refreshProgress(); restoreTasks();
+    // Push the union back so a browser that was ahead of the server catches it up.
+    _pushProgress();
+  }).catch(function(){ _synced = false; });
+}
 function toggleRead(key){
   var m = _store('fde-course-read');
   if (m[key]) delete m[key]; else m[key] = true;
   _save('fde-course-read', m);
+  _pushProgress();
   refreshProgress();
 }
 function refreshProgress(){
@@ -639,6 +674,7 @@ document.addEventListener('change', function(e){
   var k = sec.id + '::' + Array.prototype.indexOf.call(sec.querySelectorAll('li.task'), li);
   if (e.target.checked) m[k] = true; else delete m[k];
   _save('fde-course-tasks', m);
+  _pushProgress();
 });
 function restoreTasks(){
   var m = _store('fde-course-tasks');
@@ -661,7 +697,7 @@ function courseFilter(q){
   var c = document.getElementById('cr-count'); if (c) c.textContent = q ? (shown + ' / ' + total) : '';
   var e = document.getElementById('cr-empty'); if (e) e.hidden = shown !== 0;
 }
-window.addEventListener('DOMContentLoaded', function(){ refreshProgress(); restoreTasks(); });
+window.addEventListener('DOMContentLoaded', function(){ refreshProgress(); restoreTasks(); syncProgress(); });
 """
 
 

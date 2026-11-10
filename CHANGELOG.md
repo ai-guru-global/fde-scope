@@ -14,7 +14,7 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 >
 > Numbers in this file are deliberately few and each is re-measurable:
 > 18 phases and 10 default gates are pinned by `tests/test_architecture_guard.py`;
-> so is the console's route count — **86 declared `(verb, path)` pairs, 83 served**
+> so is the console's route count — **89 declared `(verb, path)` pairs, 86 served**
 > (measured 2026-10-09). The gap is exactly 3 install-time asset fallbacks
 > (`/catalog`, `/GTM`, `/gh-resources` `{rest:path}`): a source checkout serves
 > those through `StaticFiles` rather than a decorator, so `app.openapi()` omits

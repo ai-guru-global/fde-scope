@@ -588,8 +588,8 @@ I18N_PAIRS: list[tuple[str, str]] = [
     ),
     ('<div class="name">UI 层</div>', '<div class="name">UI layer</div>'),
     (
-        "CLI（Typer，全延迟导入）· Web 控制台（86 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
-        "CLI (Typer, fully lazy imports) · Web console (86 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
+        "CLI（Typer，全延迟导入）· Web 控制台（89 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。",
+        "CLI (Typer, fully lazy imports) · Web console (89 routes) · QwenPaw PawApp (18 routes /api/fde-scope) · "
         "macOS app (double-click DMG — this console).",
     ),
     ('<div class="name">SOP 层</div>', '<div class="name">SOP layer</div>'),

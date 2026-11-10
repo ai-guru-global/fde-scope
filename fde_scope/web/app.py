@@ -397,6 +397,40 @@ def engagement_retrospective(eid: str) -> dict:
 # course labs（实验判分：真实 CLI 在一次性工作区里跑 —— fde_scope.course.verifier；
 # 与 CLI `fde-scope course check` 同一 run_lab，学习平台与执行引擎共用一个真相）
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 学习进度（M1-04）：localStorage 之外的持久化副本
+# ---------------------------------------------------------------------------
+# 页面本身在 PUBLIC_PATHS 里（只读课程），但这里读写的**是用户状态**，所以留在
+# 认证之内：默认本地单机不需要 token，设了 FDE_SCOPE_TOKEN 后就必须带 token。
+# 课程页的 JS 拿不到 token 时静默回退到 localStorage，不会因为 401 报错。
+@app.get("/api/course/progress")
+def get_course_progress() -> dict:
+    """已保存的阅读进度与练习勾选（换浏览器/清缓存后仍然在）。"""
+    from fde_scope.course import progress
+
+    return progress.load().as_dict()
+
+
+@app.put("/api/course/progress")
+def put_course_progress(body: dict) -> dict:
+    """覆盖保存进度。客户端发送它持有的完整映射，服务端不做增量合并。"""
+    from fde_scope.course import progress
+
+    try:
+        return progress.save(body).as_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+
+@app.delete("/api/course/progress")
+def delete_course_progress() -> dict:
+    """清除已保存的学习进度（学习者重新开始）。"""
+    from fde_scope.course import progress
+
+    progress.clear()
+    return {"cleared": True}
+
+
 @app.get("/api/course/labs")
 def course_labs_registry() -> list[dict]:
     """D1–D8 实验注册表：每天的门禁、产出与判分项数（只读元数据）。"""
@@ -2080,7 +2114,7 @@ __CONNECTOR_TILES__
 <div class="sec-head"><svg class="ic"><use href="#i-layers"/></svg><h2>架构清单 · 四层 + 横切</h2><span class="n">06</span></div>
 <p class="sec-note">证据化建模见 docs/architecture-model/。</p>
 <div class="grid cols-3">
-  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（86 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
+  <div class="tile"><svg class="ic"><use href="#i-monitor"/></svg><div class="name">UI 层</div><div class="desc">CLI（Typer，全延迟导入）· Web 控制台（89 路由）· QwenPaw PawApp（18 路由 /api/fde-scope）· macOS App（DMG 双击即用，即本控制台）。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-compass"/></svg><div class="name">SOP 层</div><div class="desc">engagement/：18 阶段 · 4 zones · 10 个可执行 gate（advance 实时重评估）+ handoff；profiles/：ticket · manufacturing 场景选择器。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-gears"/></svg><div class="name">能力层</div><div class="desc">connectors · corpus · deploy · eval · flywheel · integrations · ontology · skills —— 核心数据管线，规则为底、LLM 可选增强。</div></div>
   <div class="tile"><svg class="ic"><use href="#i-wrench"/></svg><div class="name">横切层</div><div class="desc">llm.py（唯一 LLM 出口，失败回退规则路径）· config.py · templates/（Jinja 报告与 runbook）· paths.py（data_root 唯一路径解析）。</div></div>

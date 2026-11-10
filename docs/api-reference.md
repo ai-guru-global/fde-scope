@@ -323,9 +323,9 @@ status ∈ `draft | published | archived`。
 | `/reports/*` | 生成的 runbook / 语料报告 / 审计导出（StaticFiles；**不在白名单**，认证开启时需 token） |
 | `/catalog/*` | 技能手册库静态站（仓库含生成产物时挂载；两个 `index.html` 在白名单，其余需 token） |
 
-## 路由全量对照（83 条 served）
+## 路由全量对照（86 条 served）
 
-上面各节按功能挑选讲解，**不声称穷举**；本节是穷举锚点：83 条 served
+上面各节按功能挑选讲解，**不声称穷举**；本节是穷举锚点：86 条 served
 `(verb, path)` 逐条列出，与 `app.openapi()` 一一对应。
 
 **本表没有测试守卫**（`test_architecture_guard.py` 只核对代码里的声明数与
@@ -402,6 +402,9 @@ PY
 | `GET /api/course/doctor` | 读 | G0 入学门自检（环境探测，只读）：解释器、包、教案目录、数据目录。 |
 | `GET /api/course/labs` | 读 | D1–D8 实验注册表：每天的门禁、产出与判分项数（只读元数据）。 |
 | `POST /api/course/labs/{day}/grade` | 写 | 机器判分一天：在一次性工作区里对真实 CLI 跑全部检查（多次子进程，秒级）。 |
+| `GET /api/course/progress` | 读 | 已保存的阅读进度与练习勾选（换浏览器/清缓存后从服务端恢复；课程页优先用它，失败回退 localStorage）。 |
+| `PUT /api/course/progress` | 写 | 覆盖保存进度：客户端发送它持有的完整 `{read, tasks}` 映射；未知/畸形条目被丢弃，超过 256 KiB 返回 422。原子写。 |
+| `DELETE /api/course/progress` | 写 | 清除已保存的学习进度（重新开始）。 |
 | `GET /share/{eid}`（`?t=` share token） | 读（share token） | 干系人只读页：进度 + SLA + 门禁现况 + 签收表单。凭据是链接里的 share token（auth 中间件 share 分支校验），无效/撤销/不存在一律 404。 |
 | `POST /share/{eid}/ack`（`?t=` share token） | 写（share token） | 客户签收 → `share.ack` 审计事件（证据，不推进状态机）；正式验收仍走 authed accept 流程。 |
 | `GET /api/engagements/{eid}/gates` | 读 | 对当前 context 适用（`applies()`）的每个 gate 实时 `check()`。 † |
@@ -464,7 +467,7 @@ FastAPI 默认挂载，实测均为 200：
 
 | 路径 | 内容 |
 |---|---|
-| `GET /openapi.json` | 机器可读的 83 条 served 路由 + 全部请求/响应 schema |
+| `GET /openapi.json` | 机器可读的 86 条 served 路由 + 全部请求/响应 schema |
 | `GET /docs` | Swagger UI |
 | `GET /redoc` | ReDoc |
 

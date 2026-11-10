@@ -295,7 +295,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 **Surfaces**
 
 - [x] CLI — `fde-scope` (connect / corpus / deploy / eval / flywheel / engage / gate / skill / ontology / qwenpaw / handoff / kpi / web)
-- [x] Web console — FastAPI, 86 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
+- [x] Web console — FastAPI, 89 routes: workbench + engagement dashboard + guided mode（引导 tab：阶段引导 / AI 起草 context / 目标拆解）+ journal + skills + corpus forge + KPI explorer + ontology 本体库
 - [x] QwenPaw PawApp — desktop plugin, 18 routes under `/api/fde-scope`, 3 agent tools, skill provider
 - [x] macOS app — double-click DMG (universal2, signed/notarized release path, same console as `fde-scope web`)
 
@@ -319,7 +319,7 @@ carries the full evidence index. 完整的中文功能清单(逐项说明、连�
 flowchart TB
     subgraph surfaces["Surfaces · 四个入口,同一引擎同一数据根"]
         CLI["fde-scope CLI<br/>13 组命令"]
-        WEB["web/ FastAPI 控制台<br/>86 路由 · 单页"]
+        WEB["web/ FastAPI 控制台<br/>89 路由 · 单页"]
         PAW["pawapp/ QwenPaw 插件<br/>/api/fde-scope · 18 路由"]
         MAC["macOS App<br/>universal2 DMG"]
     end
@@ -385,7 +385,7 @@ flowchart TB
 | 6 | `skills/` | Methodology capture (draft → published → archived, dual-format export) | ❌ |
 | 7 | `integrations/` | QwenPaw bundle export + ACP adapter + manifest validator | ❌ |
 | 8 | `ontology/` | Semantic layer: TBox schemas + SKOS concepts + ABox stores, SHACL-lite validation, JSON-LD 1.1 export | ❌ |
-| **Web** | `web/` | FastAPI engagement console (86 routes, single-page, JSON APIs) | ❌ |
+| **Web** | `web/` | FastAPI engagement console (89 routes, single-page, JSON APIs) | ❌ |
 | **PawApp** | `pawapp/` | QwenPaw desktop plugin (18 routes under `/api/fde-scope`) | ❌ |
 | Cross | `llm.py` · `config.py` · `templates/` · `paths.py` | Optional LLM egress (fallback), tenant config, Jinja reports, single data-root resolution | ❌ |
 
@@ -404,7 +404,7 @@ fde-scope/
 │   ├── skills/           # methodology capture (draft → published → archived)
 │   ├── integrations/     # QwenPaw bundle export + ACP adapter + manifest validator
 │   ├── ontology/         # TBox schemas + SKOS concepts + ABox stores + JSON-LD export (data/*.yaml built-ins)
-│   └── web/              # FastAPI engagement console (86 routes)
+│   └── web/              # FastAPI engagement console (89 routes)
 ├── pawapp/               # QwenPaw desktop plugin (18 routes under /api/fde-scope)
 ├── appbuild/             # macOS app packaging (PyInstaller, universal2 DMG)
 ├── GTM/                  # product / GTM landing page (single-file HTML)
