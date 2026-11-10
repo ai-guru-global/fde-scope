@@ -28,10 +28,17 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install (core + dev + mysql)
+      # `agentscope` is included on purpose, not for convenience: the
+      # deploy/ and connectors/documents.py modules only import it lazily, so
+      # without the extra their ~135 statements are unreachable by any test and
+      # the coverage gate (90%) is met only because those lines count as
+      # missed. Measured 2026-11-10: bare install 89.88%, with the extra
+      # installed 91.07% at identical statement count. Installing it here
+      # means the gate measures the code the product actually runs.
+      - name: Install (core + dev + mysql + agentscope)
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev,mysql]"
+          python -m pip install -e ".[dev,mysql,agentscope]"
 
       - name: Lint (ruff)
         run: |

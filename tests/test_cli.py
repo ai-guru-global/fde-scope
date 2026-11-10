@@ -607,3 +607,166 @@ def test_connect_preview_lands_under_the_data_root(tmp_path: Path, sample_csv: P
     assert r.exit_code == 0, r.stdout
     assert (data_home / "samples" / "preview.json").is_file()
     assert not (tmp_path / "samples").exists()  # never the CWD
+
+
+# ---------------------------------------------------------------------------
+# `fde-scope demo` (M1-03) through the real CLI, not just the module.
+# ---------------------------------------------------------------------------
+def test_cli_demo_seeds_and_prints_the_tour(tmp_path, monkeypatch) -> None:
+    """The command the README tells a new user to run first."""
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.paths import engagements_dir
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    result = CliRunner().invoke(app, ["demo"])
+    assert result.exit_code == 0, result.output
+    assert "演示数据就绪" in result.output
+    assert "接下来 10 分钟这么走" in result.output
+    # the tour names the console rows the rail now provides
+    assert "阶段状态机" in result.output and "10 个门禁" in result.output
+    assert list(engagements_dir().glob("eng-demo-*.json"))
+
+
+def test_cli_demo_json_is_machine_readable(tmp_path, monkeypatch) -> None:
+    import json
+
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    result = CliRunner().invoke(app, ["demo", "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["seeded"] is True
+    assert payload["engagement_id"] == "eng-demo-ticket"
+
+
+def test_cli_demo_reset(tmp_path, monkeypatch) -> None:
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.paths import engagements_dir
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    CliRunner().invoke(app, ["demo"])
+    out = CliRunner().invoke(app, ["demo", "--reset"])
+    assert out.exit_code == 0, out.output
+    assert "已删除" in out.output
+    assert not list(engagements_dir().glob("eng-demo-*.json"))
+
+
+def test_cli_course_check_history_when_empty(tmp_path, monkeypatch) -> None:
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    out = CliRunner().invoke(app, ["course", "check", "D1", "--history"])
+    assert out.exit_code == 0, out.output
+    assert "还没有判分记录" in out.output
+
+
+def test_cli_course_check_history_renders_rows(tmp_path, monkeypatch) -> None:
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.course import lab_history
+
+    class _Check:
+        id = "report"
+        status = "fail"
+
+        @property
+        def scored(self) -> bool:
+            return True
+
+    class _Result:
+        day = "D3"
+        passed = 12
+        failed = 1
+        manual = 1
+        results = [_Check()]
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    lab_history.record(_Result())
+    lab_history.record(_Result())
+
+    out = CliRunner().invoke(app, ["course", "check", "D3", "--history"])
+    assert out.exit_code == 0, out.output
+    assert "判分历史" in out.output
+    assert out.output.count("有红项") == 2
+
+
+def test_cli_course_check_json_emits_plain_json(tmp_path, monkeypatch) -> None:
+    """`--json` is promised machine-readable; a stub run keeps it fast."""
+    import json
+
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.course.catalog import lab_for
+    from fde_scope.course.checks import CheckResult
+    from fde_scope.course.verifier import LabResult
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    lab = lab_for("D1")
+    stub = LabResult(day=lab.day, title=lab.title, gate=lab.gate, deliverable=lab.deliverable)
+    stub.results = [CheckResult(id="x", gate=lab.gate, ask="ask", status="pass")]
+    stub.passed = 1
+    # `course_check` imports run_lab inside its body, so the only patchable
+    # symbol is the one on the verifier module.
+    monkeypatch.setattr("fde_scope.course.verifier.run_lab", lambda *a, **k: stub)
+
+    out = CliRunner().invoke(app, ["course", "check", "D1", "--json"])
+    assert out.exit_code == 0, out.output
+    payload = json.loads(out.output)
+    assert payload["labs"][0]["day"] == lab.day
+    assert payload["labs"][0]["passed"] == 1
+    assert payload["ok"] is True and payload["failed"] == 0
+
+
+def test_cli_course_check_history_all_days(tmp_path, monkeypatch) -> None:
+    """`--history` with no day prints every day that has runs."""
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.course import lab_history
+
+    class _Run:
+        def __init__(self, day: str) -> None:
+            self.day = day
+            self.passed = 10
+            self.failed = 0
+            self.manual = 1
+            self.results: list = []
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    lab_history.record(_Run("D1"))
+    lab_history.record(_Run("D3"))
+
+    out = CliRunner().invoke(app, ["course", "check", "all", "--history"])
+    assert out.exit_code == 0, out.output
+    assert "D1" in out.output and "D3" in out.output
+    assert "全绿" in out.output
+
+
+def test_cli_demo_twice_reports_replacement(tmp_path, monkeypatch) -> None:
+    """Idempotency, observed through the CLI (the acceptance criterion)."""
+    from typer.testing import CliRunner
+
+    from fde_scope.cli import app
+    from fde_scope.paths import engagements_dir
+
+    monkeypatch.setenv("FDE_SCOPE_HOME", str(tmp_path))
+    runner = CliRunner()
+    first = runner.invoke(app, ["demo"])
+    assert first.exit_code == 0, first.output
+    assert "已替换" not in first.output
+
+    second = runner.invoke(app, ["demo"])
+    assert second.exit_code == 0, second.output
+    assert "已替换上一次的 1 个演示 engagement" in second.output
+    assert len(list(engagements_dir().glob("eng-demo-*.json"))) == 1
