@@ -80,6 +80,7 @@ CAPABILITIES: dict[str, str] = {
     "showcase": "showcase",
     # Entry points
     "overview": "overview",
+    "quickstart": "docs-workbench",
     "console": "console",
     "gtm": "gtm",
 }

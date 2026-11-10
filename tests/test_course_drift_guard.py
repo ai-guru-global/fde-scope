@@ -348,8 +348,8 @@ def _book_line(rel: str, anchor: str) -> str:
 
 # (file, pattern, occurrences, values the book asserts)
 COUNT_CLAIMS: list[tuple[str, str, int, tuple[str, ...]]] = [
-    ("01-课程设计说明书.md", r"(\d+) 条命令的 CLI", 1, ("18",)),
-    ("12-附录-术语表与模板库.md", r"(\d+) 条命令", 1, ("18",)),
+    ("01-课程设计说明书.md", r"(\d+) 条命令的 CLI", 1, ("19",)),
+    ("12-附录-术语表与模板库.md", r"(\d+) 条命令", 1, ("19",)),
     ("07-实战剧本与案例库.md", r"全部 (\d+) 个门禁", 1, ("10",)),
     ("12-附录-术语表与模板库.md", r"全部 (\d+) 个门禁", 1, ("10",)),
     ("12-附录-术语表与模板库.md", r"全部 (\d+) 行", 1, ("10",)),

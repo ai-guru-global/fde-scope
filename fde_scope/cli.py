@@ -2026,5 +2026,60 @@ def course_check(
     raise typer.Exit(0 if not failed else 1)
 
 
+@app.command()
+def demo(
+    reset: bool = typer.Option(False, "--reset", help="删除演示数据后退出（不重新播种）"),
+    json_out: bool = typer.Option(False, "--json", help="以纯 JSON 输出（便于脚本核对）"),
+) -> None:
+    """[Start] 播种一个可直接浏览的演示工作台（全部虚构数据，可重复执行）。"""
+    import json as _json
+
+    from . import demo as _demo
+
+    result = _demo.run(reset=reset)
+    if json_out:
+        typer.echo(_json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    _banner("demo")
+    if reset:
+        console.print(f"🧹 已删除 {result['removed']} 个演示 engagement 及其报告。")
+        return
+
+    if result["removed"]:
+        console.print(f"♻️  已替换上一次的 {result['removed']} 个演示 engagement。")
+    console.print(f"✅ 演示数据就绪（{_demo._DISCLAIMER}）")
+    console.print()
+    table = Table(title="种下了什么", show_header=True)
+    for col in ("对象", "内容"):
+        table.add_column(col)
+    table.add_row(
+        "engagement", f"[bold]{result['engagement_id']}[/bold]（{result['phase']} · {result['zone']}）"
+    )
+    table.add_row("技能库", f"{result['skills']} 条已发布技能")
+    c = result["corpus"]
+    table.add_row(
+        "语料报告",
+        f"{c['total']} 条（真实 {c['real']} / 合成 {c['synthetic']}）"
+        f" · 留出集真实 {c['heldout_real']} 条{'（可信）' if c['heldout_trusted'] else ''}",
+    )
+    console.print(table)
+
+    console.print()
+    console.print("[bold]接下来 10 分钟这么走[/bold]（别再读文档，直接看）：")
+    console.print("  1. [cyan]fde-scope web[/cyan] → 打开 http://127.0.0.1:8000/console")
+    console.print("  2. 左侧「SOP 流程」→ 点 [bold]阶段状态机[/bold]：这个项目停在 success_criteria")
+    console.print("  3. 点 [bold]10 个门禁[/bold]：看它为什么被拦——不是勾选框，是谓词")
+    if result["blockers"]:
+        console.print("     💡 当前 blockers：")
+        for b in result["blockers"]:
+            console.print(f"        • {b}")
+    console.print("  4. 补齐后点「推进」看它通过；想强行推进就用 force——会写进审计流")
+    console.print("  5. 左侧「数据与语料」→ [bold]语料引擎[/bold]：看留出集为什么只有几条真实样本")
+    console.print("  6. 左侧「知识与资产」→ [bold]技能沉淀库[/bold]：3 条已发布技能")
+    console.print()
+    console.print("[dim]演示数据全部虚构。清空：[/dim][cyan]fde-scope demo --reset[/cyan]")
+
+
 if __name__ == "__main__":
     main()

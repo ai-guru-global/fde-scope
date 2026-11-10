@@ -86,11 +86,16 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 > **PyPI 仍未发布**——上传是不可逆的一次性动作（`0.1.0` 用掉就不能复用），
 > 操作手册见 [`docs/release-0.1.0.md`](docs/release-0.1.0.md)（先 TestPyPI 验证）。
 > 详见 [`CHANGELOG.md`](CHANGELOG.md) 的发布门。
+>
+> **安装后第一件事**：`fde-scope demo` 会种下一个可直接浏览的演示工作台
+> （1 个停在门禁前的 engagement + 3 条技能 + 一份真实锻造的语料报告，全部虚构数据），
+> 然后 `fde-scope web` 打开控制台就能看到产品在干什么，而不是五个空白页。
 
 按"你想干什么"选一条最短的：
 
 | 你想干什么 | 最短路径 | 前置 |
 |---|---|---|
+| **先看一眼它长什么样**（开发者） | `git clone` → `uv sync --extra web` → `uv run fde-scope demo` → `uv run fde-scope web` | Python ≥3.11 + uv |
 | **只读课程，什么都不装** | 直接在 GitHub 读 [`course-level-1/`](course-level-1/) 下的 Markdown（Level 1 全本，¥0 永久公开） | 会点链接 |
 | **跑通一条链路**（学员 / 评估者） | `git clone` → `uv sync` → `uv run fde-scope course doctor` | Python ≥3.11 + uv |
 | **没有 uv** | `git clone` → `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` | Python ≥3.11 |
