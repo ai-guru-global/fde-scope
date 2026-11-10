@@ -37,7 +37,7 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 from markdown_it.renderer import RendererHTML
 
-from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, side_nav
+from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, SubnavEntry, side_nav
 
 _SOP_DIRNAME = "docs"
 _SOP_FILENAME = "fde_sop_full.md"
@@ -96,7 +96,7 @@ def _rail_label(heading: str) -> str:
     return heading.split("（", 1)[0].strip() or heading
 
 
-def _rail_subnav(sections: list[tuple[str, str]], en: bool) -> tuple[str, ...]:
+def _rail_subnav(sections: list[tuple[str, str]], en: bool) -> tuple[SubnavEntry, ...]:
     """The ``##`` outline as :func:`~.layout.side_nav` leaf entries.
 
     An EN heading the table does not know keeps its zh title: a wrong

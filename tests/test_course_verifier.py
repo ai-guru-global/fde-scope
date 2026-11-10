@@ -5,7 +5,7 @@ feature. Three things could go silently wrong once the labs exist, and each has
 a name here:
 
 * **The book's numbers drift from the registry.** ``labs/README.md`` states
-  "91 个判分项 + 9 个人工项" and "81 个契约项 + 10 个写作项" with a per-day
+  "92 个判分项 + 9 个人工项" and "82 个契约项 + 10 个写作项" with a per-day
   split. Those numbers are what a student uses to decide whether their
   environment is broken or their writing is not done. So the assertion parses
   the README and compares it to the catalog: the prose *is* the test input, and
@@ -13,7 +13,7 @@ a name here:
 * **A writing item is a fake gate.** ``check all`` going red on ``TODO`` is only
   honest if writing the words turns it green. The warm oracle proves that.
 * **The cold oracle is the documented result.** On a machine that has written
-  nothing, ``check all`` must fail exactly the 10 writing items and pass all 81
+  nothing, ``check all`` must fail exactly the 10 writing items and pass all 82
   contract items — a red contract item means the tool or the lesson drifted, and
   this is the only place that distinction is enforced.
 
@@ -422,7 +422,7 @@ def test_readme_per_day_split_matches_the_registry() -> None:
             f"README says {lab.day}={contract}契约/{writing}写作, registry says "
             f"{len(contract_checks(lab))}/{len(writing_checks(lab))}"
         )
-    assert sum(a for a, _ in classes.values()) == 81, (
+    assert sum(a for a, _ in classes.values()) == 82, (
         "the cold-green count the README quotes is the contract total"
     )
 
@@ -739,7 +739,7 @@ def test_course_check_rejects_an_unknown_day_with_exit_two(bad: str) -> None:
 
 
 def test_cold_run_all_fails_exactly_the_writing_items() -> None:
-    """A machine that has written nothing: 81 green, 10 red, 9 manual, exit 1.
+    """A machine that has written nothing: 82 green, 10 red, 9 manual, exit 1.
 
     This is the run labs/README.md quotes. The red set must equal the writing
     set — a red contract item means the tool or the lesson drifted, and it is
@@ -749,7 +749,7 @@ def test_cold_run_all_fails_exactly_the_writing_items() -> None:
     passed = sum(r.passed for r in results)
     failed = sum(r.failed for r in results)
     manual = sum(r.manual for r in results)
-    assert (passed, failed, manual) == (81, 10, 9), [r.lines() for r in results if not r.ok]
+    assert (passed, failed, manual) == (82, 10, 9), [r.lines() for r in results if not r.ok]
 
     assert all(r.ok for r in results if r.day == "D1"), "D1 grades no writing, so it must be green cold"
     for r in results:
@@ -777,7 +777,7 @@ def test_warm_run_all_is_fully_green() -> None:
     _complete_all_drafts()
     results = run_all()
     assert sum(r.failed for r in results) == 0, [r.lines() for r in results if not r.ok]
-    assert sum(r.passed for r in results) == 91
+    assert sum(r.passed for r in results) == 92
     assert sum(r.manual for r in results) == 9
     assert all(r.ok for r in results)
 

@@ -74,6 +74,12 @@ class CorpusConfig(BaseModel):
     synth_quality_min_score: float = 3.5
     # Split ratios (train / eval / test).
     split_ratios: tuple[float, float, float] = (0.8, 0.1, 0.1)
+    # Whether generated items may enter the training slice. An FDE usually
+    # wants the augmentation (a real 20-row site dump is not a fine-tuning
+    # set); ``eval``/``test`` stay REAL-only regardless. Set false to keep
+    # train real-only too — e.g. to publish a "how much data do you actually
+    # have" figure, or when synthetic style would teach the model nothing.
+    synth_in_train: bool = True
     # Scenario profile — selects connectors / KPIs / gates (ticket | manufacturing).
     profile: str = "ticket"
 

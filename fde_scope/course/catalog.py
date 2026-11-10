@@ -590,21 +590,37 @@ D4 = Lab(
         MetricCheck(
             id="splits",
             gate="G4",
-            ask="切分是 332 / 41 / 42，三块加起来正好 415（没有泄漏，也没有丢数据）",
+            ask="三块切分加起来正好 415 条——真实样本一条不丢、合成样本不进留出集",
             hint="train.items/eval.items/test.items 是列表，长度用 #len 取——直接取路径会拿到 None。",
             file="{{out}}/main/corpus_report.json",
             path="train.items#len",
-            approx=332,
+            approx=411,
             tol=0,
         ),
         MetricCheck(
             id="eval-split",
             gate="G4",
-            ask="eval 切分 41 条",
-            hint="切分比例由 templates/corpus_config.yaml 决定；改配置之前先确认这 41 条够不够打分。",
+            ask="eval 切分只有 2 条，且全是真实样本（合成数据不参与打分）",
+            hint=(
+                "切分比例由 templates/corpus_config.yaml 决定；但 eval 里放合成数据等于用自己造的数据"
+                "验证自己——20 条真实数据只够撑起 2 条 eval，这个数字难看，但它才是真实的测量分辨率。"
+            ),
             file="{{out}}/main/corpus_report.json",
             path="eval.items#len",
-            approx=41,
+            approx=2,
+            tol=0,
+        ),
+        MetricCheck(
+            id="heldout-real",
+            gate="G4",
+            ask="留出集（eval + test）合计 4 条真实样本——任何指标的诚实分母",
+            hint=(
+                "把 eval 和 test 里的真实条数加起来，就是质量的诚实分母。"
+                "分母只有 4，就别在话术里写「准确率 92%」。"
+            ),
+            file="{{out}}/main/corpus_report.json",
+            path="eval.items#len",
+            approx=2,
             tol=0,
         ),
         MetricCheck(

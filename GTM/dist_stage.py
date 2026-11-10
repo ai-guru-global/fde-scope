@@ -54,8 +54,14 @@ DOC_SLUGS = [
     "notice",
 ]
 LEDE_KUBA = {
-    "zh": ("公开复盘库 kuba-database。", '公开复盘库 <a href="%s" target="_blank" rel="noopener">kuba-database</a>。' % KUBA),
-    "en": ("postmortem database kuba-database.", 'postmortem database <a href="%s" target="_blank" rel="noopener">kuba-database</a>.' % KUBA),
+    "zh": (
+        "公开复盘库 kuba-database。",
+        f'公开复盘库 <a href="{KUBA}" target="_blank" rel="noopener">kuba-database</a>。',
+    ),
+    "en": (
+        "postmortem database kuba-database.",
+        f'postmortem database <a href="{KUBA}" target="_blank" rel="noopener">kuba-database</a>.',
+    ),
 }
 LOCALE_LINK = {"zh": ('href="./en/"', "./en/index.html"), "en": ('href="../"', "../index.html")}
 
@@ -78,11 +84,14 @@ def rewrite(html: str, locale: str) -> str:
     if len(spans) != len(CASE_URLS):
         sys.exit(f"{locale}: expected {len(CASE_URLS)} case rows, found {len(spans)}")
     it = iter(CASE_URLS)
-    html = CASE_SPAN.sub(
-        lambda m: '<a class="log-src" href="%s" target="_blank" rel="noopener">%s ↗ %s</a>'
-        % (next(it), m.group(2).split(" · ")[0], m.group(2).split(" · ")[1]),
-        html,
-    )
+
+    def _link(m: re.Match[str]) -> str:
+        url = next(it)
+        short = m.group(2).split(" · ")[0]
+        repo = m.group(2).split(" · ")[1]
+        return f'<a class="log-src" href="{url}" target="_blank" rel="noopener">{short} ↗ {repo}</a>'
+
+    html = CASE_SPAN.sub(_link, html)
     return html
 
 

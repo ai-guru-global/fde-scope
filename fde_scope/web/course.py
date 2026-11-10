@@ -42,7 +42,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from ..course.catalog import LABS as _LAB_REGISTRY
-from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, side_nav
+from .layout import BASE_CSS, PROSE_CSS, SHELL_CSS, SHELL_JS, SubnavEntry, side_nav
 from .mdrender import (
     AUTOLINK as _AUTOLINK,
 )
@@ -406,7 +406,7 @@ _CHAPTER_RAIL: dict[str, tuple[str, str]] = {
 }
 
 
-def _rail_subnav(en: bool) -> tuple[str, ...]:
+def _rail_subnav(en: bool) -> tuple[SubnavEntry, ...]:
     """The chapter outline as ``side_nav`` entries.
 
     A bare ``str`` is a group caption and an ``(href, label)`` pair is a leaf,
@@ -858,7 +858,9 @@ __ICON_SPRITE__
             )
         }</p>
 <div class="labbar">
-<button class="btn ghost" type="button" onclick="labDoctor()">{p("G0 环境自检", "G0 environment check")}</button>
+<button class="btn ghost" type="button" onclick="labDoctor()">{
+            p("G0 环境自检", "G0 environment check")
+        }</button>
 <span id="lab-doctor" class="meta" aria-live="polite"></span>
 </div>
 <div class="lablist">{"".join(chips)}</div>

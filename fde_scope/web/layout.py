@@ -43,7 +43,16 @@ translation pass that previously had to carry a key for every link.
 """
 
 from html import escape
-from typing import NamedTuple
+from typing import NamedTuple, TypeAlias
+
+#: One entry of a rail's expanded sub-list. A bare ``str`` renders a
+#: ``.sgrp`` caption and an ``(href, label)`` pair renders a leaf, so a single
+#: alias describes both shapes a page hands to :func:`side_nav`. Each page
+#: used to annotate its own builder as ``tuple[str, ...]`` (or
+#: ``tuple[tuple[str, str], ...]``), which was narrower than the contract and
+#: made ``mypy`` reject the call; declaring the union once keeps every rail on
+#: the same vocabulary as the renderer.
+SubnavEntry: TypeAlias = str | tuple[str, str]
 
 
 class NavItem(NamedTuple):
@@ -121,7 +130,7 @@ def side_nav(
     active: str = "",
     *,
     en: bool = False,
-    subnav: tuple = (),
+    subnav: tuple[SubnavEntry, ...] = (),
     views: tuple = (),
 ) -> str:
     """Build the four-band rail.

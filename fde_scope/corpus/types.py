@@ -100,7 +100,14 @@ class CoverageReport(BaseModel):
 
 
 class CorpusSplit(BaseModel):
-    """A train/eval/test slice of the corpus."""
+    """A train/eval/test slice of the corpus.
+
+    The provenance counts are derived from ``items`` rather than passed in, so
+    a split can never *claim* to be all-real while holding synthetic rows: the
+    report reads exactly what the split holds. ``real`` is the denominator an
+    eval number has to be read against — a synthetic item in ``eval``/``test``
+    measures the synthesizer, not the model.
+    """
 
     name: str
     items: list[CorpusItem]
@@ -108,6 +115,29 @@ class CorpusSplit(BaseModel):
     @property
     def size(self) -> int:
         return len(self.items)
+
+    @property
+    def real(self) -> int:
+        """Items with :attr:`Provenance.REAL` (the only honest denominator)."""
+        return sum(1 for i in self.items if i.provenance == Provenance.REAL)
+
+    @property
+    def synthetic(self) -> int:
+        return sum(1 for i in self.items if i.provenance == Provenance.SYNTHETIC)
+
+    @property
+    def golden(self) -> int:
+        return sum(1 for i in self.items if i.provenance == Provenance.GOLDEN)
+
+    @property
+    def trusted(self) -> bool:
+        """True when the split is free of generated items.
+
+        Only a trusted split supports a claim about model quality; an
+        untrusted one is still usable (e.g. a demo), but callers that report
+        metrics must say which kind they were given.
+        """
+        return self.synthetic == 0 and self.size > 0
 
 
 class CorpusReport(BaseModel):
@@ -128,3 +158,22 @@ class CorpusReport(BaseModel):
     test: CorpusSplit
     dropped: int = 0  # items removed by dedup / quality gate
     pii_entities_masked: int = 0
+
+    @property
+    def heldout_real(self) -> int:
+        """Real items across ``eval`` + ``test`` — the honest held-out count.
+
+        Zero means every number measured on this split measures the
+        synthesizer, not the model, and no accuracy claim can be made.
+        """
+        return self.eval.real + self.test.real
+
+    @property
+    def heldout_trusted(self) -> bool:
+        """True when both held-out splits are free of generated items."""
+        return self.eval.trusted and self.test.trusted
+
+    @property
+    def synthetic_ratio(self) -> float:
+        """Share of the whole corpus that was generated (0.0 when empty)."""
+        return self.synthetic / self.total if self.total else 0.0

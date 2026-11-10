@@ -209,6 +209,17 @@ def corpus(
         f"✅ Corpus forged: [bold]{report.real}[/bold] real + "
         f"[bold]{report.synthetic}[/bold] synthetic = [bold]{report.total}[/bold] total"
     )
+    # Held-out provenance, stated up front: a metric measured on a synthetic
+    # eval set measures the synthesizer, not the model. Saying so here keeps
+    # the first number an operator reads from being the misleading one.
+    heldout = (
+        f"✅ Held-out (eval+test): [bold]{report.heldout_real}[/bold] real samples "
+        f"(eval {report.eval.size}, test {report.test.size})"
+    )
+    if report.heldout_trusted and report.heldout_real > 0:
+        console.print(heldout)
+    else:
+        console.print(f"[yellow]⚠ {heldout} — too small for a quality claim[/yellow]")
     if report.coverage.gaps:
         console.print("[yellow]⚠ Coverage gaps:[/yellow]")
         for g in report.coverage.gaps:

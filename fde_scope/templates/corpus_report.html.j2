@@ -94,11 +94,23 @@
 
     <h2>数据分割</h2>
     <div class="grid">
-      <div class="card"><div class="label">train</div><div class="num">{{ report.train.size }}</div></div>
-      <div class="card"><div class="label">eval</div><div class="num">{{ report.eval.size }}</div></div>
-      <div class="card"><div class="label">test</div><div class="num">{{ report.test.size }}</div></div>
+      <div class="card"><div class="label">train</div><div class="num">{{ report.train.size }}</div>
+        <div class="meta">真实 {{ report.train.real }} · 合成 {{ report.train.synthetic }}</div></div>
+      <div class="card"><div class="label">eval</div><div class="num">{{ report.eval.size }}</div>
+        <div class="meta">真实 {{ report.eval.real }} · 合成 {{ report.eval.synthetic }}</div></div>
+      <div class="card"><div class="label">test</div><div class="num">{{ report.test.size }}</div>
+        <div class="meta">真实 {{ report.test.real }} · 合成 {{ report.test.synthetic }}</div></div>
       <div class="card"><div class="label">golden</div><div class="num">{{ report.golden }}</div></div>
     </div>
+    <p class="note">
+      留出集（eval + test）共 <strong>{{ report.heldout_real }}</strong> 条真实样本，
+      {% if report.heldout_trusted %}
+      不含合成数据——在留出集上得到的指标可以用于判断模型质量。
+      {% else %}
+      <strong>含合成数据</strong>——在留出集上得到的指标衡量的是合成器，不是模型，不能作为质量结论。
+      {% endif %}
+      全库合成占比 {{ "%.0f%%"|format(report.synthetic_ratio * 100) }}。
+    </p>
 
     <footer>由 FDE Scope 生成 · 基于真实 AgentScope 2.0 API · 此报告为可审计交付物</footer>
   </div>

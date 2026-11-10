@@ -26,6 +26,11 @@ from .types import CorpusItem, CorpusReport, CorpusSplit, CoverageReport, Proven
 
 logger = get_logger("corpus.pipeline")
 
+#: ``CorpusSynthesizer`` stamps ``channel`` with this value on items it makes
+#: with no real seed rows (template-only). Kept as a module constant so the
+#: pipeline and the synthesizer cannot drift apart on the marker.
+_SEEDLESS_CHANNEL = "synthetic"
+
 if TYPE_CHECKING:
     from fde_scope.config import CorpusConfig
     from fde_scope.connectors import DataConnector
@@ -106,23 +111,37 @@ class CorpusForge:
             extractor=self._extractor,
         )
 
-        # Step 4: merge + split
-        full = real_items + synthetic
-        train, eval_split, test = self._split(full, self.config.split_ratios)
+        # Step 3.5: dedup across the merged corpus. Synthesis *follows* the
+        # dedup stage, so without this second pass a generated item can repeat
+        # a real one verbatim (a no-op mutation is common: 4 of the 7 openers
+        # are "" and the rule path seeds from real text). Items are deduped
+        # together so a surviving duplicate is the *real* row, never the copy.
+        synthetic = self._dedup_against(real_items, synthetic)
+
+        # Step 4: split. Real and generated items are assigned separately so
+        # that eval/test can stay REAL-only (see ``_split``).
+        train, eval_split, test = self._split(real_items, synthetic, self.config.split_ratios)
 
         dropped = self.deduper.dropped_count + self.gate.dropped_count
+        full = real_items + synthetic
         logger.info(
-            "forge done: %d items (%d real / %d synthetic), %d dropped, %d PII masked",
+            "forge done: %d items (%d real / %d synthetic), %d dropped, %d PII masked; "
+            "held-out real=%d (eval %d real/%d, test %d real/%d)",
             len(full),
-            sum(1 for i in full if i.provenance == Provenance.REAL),
-            sum(1 for i in full if i.provenance == Provenance.SYNTHETIC),
+            len(real_items),
+            len(synthetic),
             dropped,
             self.scrubber.masked_count,
+            eval_split.real + test.real,
+            eval_split.real,
+            eval_split.size,
+            test.real,
+            test.size,
         )
         return CorpusReport(
             total=len(full),
-            real=sum(1 for i in full if i.provenance == Provenance.REAL),
-            synthetic=sum(1 for i in full if i.provenance == Provenance.SYNTHETIC),
+            real=len(real_items),
+            synthetic=len(synthetic),
             golden=sum(1 for i in full if i.provenance == Provenance.GOLDEN),
             coverage=coverage,
             train=train,
@@ -150,25 +169,94 @@ class CorpusForge:
         return out, dict(counts)
 
     def _split(
-        self, items: list[CorpusItem], ratios: tuple[float, float, float]
+        self,
+        real_items: list[CorpusItem],
+        synthetic: list[CorpusItem],
+        ratios: tuple[float, float, float],
     ) -> tuple[CorpusSplit, CorpusSplit, CorpusSplit]:
-        """Deterministic, stratification-light split.
+        """Split with provenance-aware placement.
 
-        v0 is a stable shuffle (seeded) + ratio cut. Real stratification by
-        category is a roadmap item; for now we keep the split reproducible.
+        **Real items are partitioned first, across all three splits**, using
+        the configured ratios and a seeded shuffle (reproducible). Only then
+        are synthetic items laid on top of ``train`` — and only when
+        ``synth_in_train`` allows it. ``eval`` and ``test`` therefore hold
+        *only* real (or golden) rows, which is the whole point: a held-out
+        set containing generated text measures the synthesizer, not the
+        model. The previous implementation shuffled the merged list, so eval
+        and test were 95-100% synthetic on a real 20-row dump and 29-36% of
+        their members had a near-duplicate in train.
+
+        The trade-off is honest and stated in the report: a small site corpus
+        yields a small (or empty) held-out set. That is the true measurement
+        resolution, and the report exposes ``heldout_real`` so a customer can
+        see it instead of being handed an inflated number.
         """
         import random
 
-        r = list(items)
         rng = random.Random(0)
-        rng.shuffle(r)
-        n = len(r)
+        real = list(real_items)
+        rng.shuffle(real)
+        n = len(real)
         t = max(int(n * ratios[0]), 0)
         e = max(int(n * ratios[1]), 0)
-        train = CorpusSplit(name="train", items=r[:t])
-        eval_split = CorpusSplit(name="eval", items=r[t : t + e])
-        test = CorpusSplit(name="test", items=r[t + e :])
-        return train, eval_split, test
+        # A real row that would land in train has priority over a held-out row:
+        # otherwise a 1-row corpus puts its only real sample in eval, leaving
+        # train as pure synthetic — the worst of both worlds (no real training
+        # signal, and an untrusted eval). Below ~10 real rows the held-out set
+        # shrinks to nothing anyway, so this only ever moves a row out of an
+        # empty-because-too-small train.
+        if n > 0 and t == 0:
+            t = 1
+        train_items = real[:t]
+        eval_items = real[t : t + e]
+        test_items = real[t + e :]
+
+        if self.config.synth_in_train:
+            train_items = [*train_items, *self._cap_seedless(synthetic)]
+
+        return (
+            CorpusSplit(name="train", items=train_items),
+            CorpusSplit(name="eval", items=eval_items),
+            CorpusSplit(name="test", items=test_items),
+        )
+
+    def _cap_seedless(self, synthetic: list[CorpusItem]) -> list[CorpusItem]:
+        """Downsample template-only synthetic items to one per category.
+
+        With no real seed rows the synthesizer emits ``_template(category)``
+        variations, which are near-identical by construction: on an empty
+        input the quickstart config used to yield 50 same-shape rows per
+        category. Dedup cannot help (Jaccard on short texts falls under the
+        threshold), so the duplicate is structural rather than textual. One
+        exemplar per category is what the gap actually calls for — the rest
+        is padding, and the synthesizer's own contract says it never pads.
+
+        Seeded synthesis (``channel`` picked from the real seed) is left
+        alone: it is real vocabulary, which is the reason to synthesize at
+        all.
+        """
+        kept: list[CorpusItem] = []
+        seen_seedless: set[str] = set()
+        for item in synthetic:
+            if item.channel == _SEEDLESS_CHANNEL:
+                if item.category in seen_seedless:
+                    continue
+                seen_seedless.add(item.category)
+            kept.append(item)
+        if len(kept) != len(synthetic):
+            self.deduper.dropped_count += len(synthetic) - len(kept)
+        return kept
+
+    def _dedup_against(self, real_items: list[CorpusItem], synthetic: list[CorpusItem]) -> list[CorpusItem]:
+        """Drop synthetic items that duplicate a real one or an earlier synthetic.
+
+        Runs the configured :class:`~fde_scope.corpus.agents.Deduplication`
+        stage over ``real + synthetic`` in that order, returns only the
+        synthetic survivors, and counts every drop in ``deduper.dropped_count``
+        so ``CorpusReport.dropped`` keeps meaning "removed by dedup / gate".
+        """
+        merged = self.deduper([*real_items, *synthetic])
+        return [i for i in merged if i.provenance == Provenance.SYNTHETIC]
 
     def _empty_report(self) -> CorpusReport:
         empty_cov = CoverageReport(
