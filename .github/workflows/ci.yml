@@ -183,7 +183,35 @@ jobs:
       - name: Build the app bundle (ad-hoc signed, no DMG)
         run: ./appbuild/build_release.sh --arch arm64 --no-dmg
 
-      - name: Smoke — the bundle exists and its CLI runs
+      # The bundle's entry point is appbuild/launcher.py, not the fde-scope
+      # CLI: it opens the Web workbench and *blocks* until the server stops.
+      # The old step ran the bundle with `--help`, which the launcher ignores —
+      # so it started a server and hung until the 6h job timeout instead of
+      # failing. This checks what the bundle actually is: it boots, serves
+      # /api/health, and shuts down cleanly.
+      - name: Smoke — the bundle boots, serves, and exits
         run: |
+          set -euo pipefail
+          APP="appbuild/dist/FDE Scope.app/Contents/MacOS/FDE Scope"
           ls -la "appbuild/dist/FDE Scope.app/Contents/MacOS/"
-          "appbuild/dist/FDE Scope.app/Contents/MacOS/FDE Scope" --help
+          export FDE_SCOPE_HOME="$RUNNER_TEMP/fde-smoke"
+          export FDE_SCOPE_PORT=8737
+          "$APP" & APP_PID=$!
+          trap 'kill -TERM $APP_PID 2>/dev/null || true' EXIT
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:8737/api/health" | grep -q '"status":"ok"'; then
+              ok=1; break
+            fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::bundle did not answer /api/health within 60s"
+            cat "$FDE_SCOPE_HOME/fde-scope-app.log" 2>/dev/null || true
+            exit 1
+          fi
+          echo "health OK"
+          curl -fsS "http://127.0.0.1:8737/console" >/dev/null && echo "console OK"
+          kill -TERM $APP_PID
+          wait $APP_PID || true
+          trap - EXIT
