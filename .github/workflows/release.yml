@@ -24,7 +24,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
+    # `macos-14` is not schedulable for this org — the v0.1.0 tag run was
+    # cancelled with "The configuration 'macos-14-arm64-us-default' is not
+    # supported", while the CI job pinned to `macos-latest` schedules and
+    # passes on the same repo. Use the label that actually gets a runner.
+    runs-on: macos-latest
     env:
       arch: universal
     steps:
