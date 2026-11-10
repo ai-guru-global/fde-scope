@@ -55,6 +55,16 @@ changing engagement, deploy or persistence code. Full context:
    返回 500）。在协程里用 `advance_or_complete()`（抛 `PhaseComplete`）；
    同步调用点可继续用 `advance()`。守卫：`tests/test_engagement.py`。
 
+10. **左侧目录 = 能力地图，新功能必须有行。** `fde_scope/web/layout.py` 的
+    `NAV_BANDS` 不是站点目录，而是"产品有哪些能力、各从哪进"。新增用户可见能力
+    时，同一个 PR 里要加两样：`NAV_BANDS` 里的一行，和
+    `tests/test_nav_coverage.py` 的 `CAPABILITIES` 条目（`能力 → 行 key`）。
+    只加其一，`test_nav_coverage.py` 会红——这是 2026-11-10 之前"语料引擎/eval/
+    ontology/飞轮/许可证/连接器/证据/分享链接"全都只能靠敲命令才能到的原因。
+    控制台目的地用 `?v=<view>&t=<tab>`，由控制台 `applyDest()` 解析；行上的
+    `#anchor` 必须在控制台文档里真的有 `id=`。控制台视图切换器必须是 `<a href>`，
+    不能是 `<button>`（无 href = 不能新标签打开/复制）。
+
 ## Dangerous operations (ask first / require a test)
 
 - Directly assigning engagement state-machine fields (`phase`, `zone`,
