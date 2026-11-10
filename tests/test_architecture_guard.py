@@ -89,10 +89,55 @@ def test_wheel_ships_the_course_the_reader_depends_on() -> None:
     data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     targets = data["tool"]["hatch"]["build"]["targets"]
     force_include = targets["wheel"]["force-include"]
-    assert list(force_include) == ["course-level-1"]
     assert force_include["course-level-1"] == f"fde_scope/_data/{_COURSE_DIRNAME}"
     # an sdist without the lessons cannot build a wheel that has them
     assert "course-level-1" in targets["sdist"]["include"]
+
+    # The quickstart fixtures ride along for the same reason: `course doctor`
+    # G0 looks for them under `_data` and failed on every pip install until
+    # they were shipped. Pin the exact set so a future force-include entry is a
+    # deliberate decision rather than an accident of formatting.
+    assert list(force_include) == [
+        "course-level-1",
+        "examples/quickstart_csv",
+        "examples/quickstart_manufacturing",
+    ], force_include
+    for src in ("examples/quickstart_csv", "examples/quickstart_manufacturing"):
+        assert force_include[src] == f"fde_scope/_data/{src}"
+        assert src in targets["sdist"]["include"]
+
+
+def test_course_doctor_finds_fixtures_in_the_wheel_data_copy() -> None:
+    """The fixture check must pass from the packaged copy, not just a checkout.
+
+    It resolves ``examples/quickstart_*`` against three bases — the repo root,
+    the wheel's ``_data``, and CWD — so this pins the ``_data`` half by running
+    the check from a directory where nothing is CWD-relative.
+    """
+    import os
+    import tempfile
+
+    from fde_scope.course.doctor import _fixtures_item
+
+    here = Path(__file__).resolve()
+    for rel in (
+        "examples/quickstart_csv/sample_tickets.csv",
+        "examples/quickstart_manufacturing/station_samples.jsonl",
+    ):
+        assert (here.parents[1] / rel).is_file(), f"repo is missing {rel}"
+
+    data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    force_include = data["tool"]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+    for src in ("examples/quickstart_csv", "examples/quickstart_manufacturing"):
+        assert force_include[src] == f"fde_scope/_data/{src}"
+
+    cwd = os.getcwd()
+    try:
+        os.chdir(tempfile.mkdtemp())
+        item = _fixtures_item()
+    finally:
+        os.chdir(cwd)
+    assert item.status == "ok", f"{item.status}: {getattr(item, 'detail', '')}"
 
 
 def _read(path: str) -> str:

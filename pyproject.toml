@@ -100,10 +100,20 @@ packages = ["fde_scope"]
 # Measured 2026-10-08 (uv build --wheel): course-level-1/ holds 47 *.md
 # (26 top-level lessons + 20 labs + 1 en) and the wheel carries all 47 —
 # missing: none, extra: none. Re-measure this line when a lesson lands.
-force-include = { "course-level-1" = "fde_scope/_data/course-level-1" }
+# `course doctor`'s G0 gate checks for the two quickstart fixtures under
+# `examples/`, and doctor.py *already* looks for them in the wheel's `_data`
+# copy (same two bases as :func:`labs_root`) — but nothing ever put them there,
+# so G0 failed with "找不到 examples/quickstart_*" on every pip install while
+# passing in a checkout. Only the two fixtures the doctor and the D1/D3 smoke
+# commands read are shipped; `seed_mock_engagements.py` and the ontology example
+# stay checkout-only (that would put a demo script in every install).
+[tool.hatch.build.targets.wheel.force-include]
+"course-level-1" = "fde_scope/_data/course-level-1"
+"examples/quickstart_csv" = "fde_scope/_data/examples/quickstart_csv"
+"examples/quickstart_manufacturing" = "fde_scope/_data/examples/quickstart_manufacturing"
 
 [tool.hatch.build.targets.sdist]
-include = ["fde_scope", "course-level-1", "README.md", "pyproject.toml"]
+include = ["fde_scope", "course-level-1", "examples/quickstart_csv", "examples/quickstart_manufacturing", "README.md", "pyproject.toml"]
 
 [tool.coverage.run]
 source = ["fde_scope"]
