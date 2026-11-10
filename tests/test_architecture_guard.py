@@ -93,18 +93,35 @@ def test_wheel_ships_the_course_the_reader_depends_on() -> None:
     # an sdist without the lessons cannot build a wheel that has them
     assert "course-level-1" in targets["sdist"]["include"]
 
-    # The quickstart fixtures ride along for the same reason: `course doctor`
-    # G0 looks for them under `_data` and failed on every pip install until
-    # they were shipped. Pin the exact set so a future force-include entry is a
-    # deliberate decision rather than an accident of formatting.
-    assert list(force_include) == [
-        "course-level-1",
-        "examples/quickstart_csv",
-        "examples/quickstart_manufacturing",
-    ], force_include
-    for src in ("examples/quickstart_csv", "examples/quickstart_manufacturing"):
-        assert force_include[src] == f"fde_scope/_data/{src}"
-        assert src in targets["sdist"]["include"]
+    # Everything the app serves at runtime rides along for the same reason:
+    # `course doctor` G0 looks for the fixtures, the reading room documents and
+    # the 122-page handbook all live outside the package. The build table and
+    # `fde_scope.assets.PACKAGED_ASSETS` must agree — a build entry with no
+    # resolver is bytes nobody can serve, and a resolver with no build entry is
+    # a notice page on every install (which is exactly how /catalog and the 20
+    # documents shipped blank before 2026-11-10).
+    from fde_scope.assets import PACKAGED_ASSETS
+
+    # A path already inside a force-included *directory* needs no entry of its
+    # own (`course-level-1/en/README.md` arrives with `course-level-1`), so it is
+    # excluded rather than duplicated in the build table — duplicating it makes
+    # hatchling fail with "second file at the same path".
+    covered_by_dir = {
+        p
+        for p in PACKAGED_ASSETS
+        if any(
+            p.startswith(d + "/")
+            for d in ("course-level-1", "examples/quickstart_csv", "examples/quickstart_manufacturing")
+        )
+    }
+    assert set(force_include) == set(PACKAGED_ASSETS) - covered_by_dir, (
+        f"build/shipping mismatch: only-in-build={sorted(set(force_include) - set(PACKAGED_ASSETS))} "
+        f"only-in-assets={sorted(set(PACKAGED_ASSETS) - covered_by_dir - set(force_include))}"
+    )
+    for src, dest in force_include.items():
+        assert dest.startswith("fde_scope/_data/"), (src, dest)
+        if src in ("course-level-1", "examples/quickstart_csv", "examples/quickstart_manufacturing"):
+            assert dest == f"fde_scope/_data/{src}", (src, dest)
 
 
 def test_course_doctor_finds_fixtures_in_the_wheel_data_copy() -> None:

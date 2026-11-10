@@ -19,6 +19,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from .. import paths
+from ..assets import asset_root
 from ..engagement import Engagement
 from ..storage import get_storage_backend
 
@@ -105,22 +106,23 @@ def _delete(eid: str) -> None:
 def catalog_site_dir() -> Path | None:
     """The generated skills-catalog portal dir, or None when unavailable.
 
-    Resolved against the repo layout (read-only asset, absolute path — unlike
-    the CWD-relative reports dir). An installed wheel without ``docs/`` gets
-    None and /catalog answers with an in-app notice instead.
+    Resolved through :func:`fde_scope.assets.asset_root`, so a checkout reads
+    ``docs/skills-catalog/site`` and an installed wheel reads the copy
+    ``force-include`` put in ``fde_scope/_data/``. Nothing gets None unless the
+    asset is genuinely absent from both, in which case /catalog still answers
+    with an in-app notice instead of a 404.
     """
-    d = Path(__file__).resolve().parents[2] / "docs" / "skills-catalog" / "site"
-    return d if d.is_dir() else None
+    return asset_root(str(Path("docs") / "skills-catalog" / "site"))
 
 
 def gtm_site_dir() -> Path | None:
     """The hand-authored GTM portal dir (repo-root ``GTM/``), or None.
 
-    Conditional for the same reason as :func:`catalog_site_dir`: a wheel
-    install ships neither ``GTM/`` nor ``docs/``.
+    Conditional for the same reason as :func:`catalog_site_dir`: absent from
+    both the checkout and the package means absent, which is the only case that
+    still yields None.
     """
-    d = Path(__file__).resolve().parents[2] / "GTM"
-    return d if d.is_dir() else None
+    return asset_root("GTM")
 
 
 def resources_site_dir() -> Path | None:
@@ -131,9 +133,10 @@ def resources_site_dir() -> Path | None:
     this root, so a portal link like ``../mirror/…`` resolves whether the site
     is opened from disk or served here. We return the *root* rather than
     ``site/`` so the mount exists as soon as the mirrors land — the portal is
-    built later by ``scripts/build_resources_site.py``. A wheel install ships no
-    ``docs/`` and gets None, so the rail's ``/gh-resources`` links fall through
-    to an in-app notice instead of a 404 (mirrors the ``/catalog`` precedent).
+    built later by ``scripts/build_resources_site.py``. Resolved through
+    :func:`fde_scope.assets.asset_root` like the catalog, so an install serves
+    the mirrors too; None only when neither base has the directory, in which
+    case the rail's ``/gh-resources`` links fall through to an in-app notice
+    instead of a 404.
     """
-    d = Path(__file__).resolve().parents[2] / "docs" / "github-resources"
-    return d if d.is_dir() else None
+    return asset_root(str(Path("docs") / "github-resources"))

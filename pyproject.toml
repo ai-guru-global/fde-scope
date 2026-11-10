@@ -107,13 +107,47 @@ packages = ["fde_scope"]
 # passing in a checkout. Only the two fixtures the doctor and the D1/D3 smoke
 # commands read are shipped; `seed_mock_engagements.py` and the ontology example
 # stay checkout-only (that would put a demo script in every install).
+# Every read-only asset the app serves at runtime is copied inside the package
+# and found through `fde_scope.assets.asset_root` (checkout first, `_data`
+# second). `tests/test_architecture_guard.py` keeps this table and
+# `assets.PACKAGED_ASSETS` in agreement, because a build entry with no resolver
+# is bytes nobody can serve — which is exactly how the catalog, the 20
+# documents and the GitHub-resources portal were blank notice pages on every
+# install while passing in a checkout.
 [tool.hatch.build.targets.wheel.force-include]
 "course-level-1" = "fde_scope/_data/course-level-1"
 "examples/quickstart_csv" = "fde_scope/_data/examples/quickstart_csv"
 "examples/quickstart_manufacturing" = "fde_scope/_data/examples/quickstart_manufacturing"
+# The `examples` doc slug renders this README through /docs/examples
+# The 122-page skills handbook portal (two self-contained HTML files, 1.3 MB)
+"docs/skills-catalog/site" = "fde_scope/_data/docs/skills-catalog/site"
+# The document reader's `*.md` bodies (the slug allowlist lives in web/auth.py)
+# The 20 documents web/docs_reader.py renders. Generated from that module's
+# own `_DOCS` table — keep them in sync, never hand-edit this list alone.
+"README.md" = "fde_scope/_data/docs/README.md"
+"docs/fde-research.md" = "fde_scope/_data/docs/fde-research.md"
+"docs/fde_playbook.md" = "fde_scope/_data/docs/fde_playbook.md"
+"docs/features.md" = "fde_scope/_data/docs/features.md"
+"docs/features-en.md" = "fde_scope/_data/docs/features-en.md"
+"docs/user-guide.md" = "fde_scope/_data/docs/user-guide.md"
+"docs/api-reference.md" = "fde_scope/_data/docs/api-reference.md"
+"docs/onboarding-customer.md" = "fde_scope/_data/docs/onboarding-customer.md"
+"docs/architecture.md" = "fde_scope/_data/docs/architecture.md"
+"docs/ontology.md" = "fde_scope/_data/docs/ontology.md"
+"docs/agentscope_api_mapping.md" = "fde_scope/_data/docs/agentscope_api_mapping.md"
+"docs/manufacturing_scenario.md" = "fde_scope/_data/docs/manufacturing_scenario.md"
+"docs/llm_integration.md" = "fde_scope/_data/docs/llm_integration.md"
+"docs/qwenpaw_integration.md" = "fde_scope/_data/docs/qwenpaw_integration.md"
+"docs/skills.md" = "fde_scope/_data/docs/skills.md"
+"docs/code_review_checklist.md" = "fde_scope/_data/docs/code_review_checklist.md"
+"examples/README.md" = "fde_scope/_data/docs/examples-README.md"
+"LICENSE" = "fde_scope/_data/docs/LICENSE"
+"NOTICE" = "fde_scope/_data/docs/NOTICE"
 
 [tool.hatch.build.targets.sdist]
-include = ["fde_scope", "course-level-1", "examples/quickstart_csv", "examples/quickstart_manufacturing", "README.md", "pyproject.toml"]
+include = ["fde_scope", "course-level-1", "examples/quickstart_csv",
+           "examples/quickstart_manufacturing", "docs/skills-catalog/site", "docs/*.md",
+           "README.md", "pyproject.toml"]
 
 [tool.coverage.run]
 source = ["fde_scope"]

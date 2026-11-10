@@ -133,6 +133,21 @@ _MD = demoting_markdown(_DocsRenderer)
 
 
 def _default_root() -> Path:
+    """Where the documents live: the checkout when there is one, else ``_data``.
+
+    ``render()`` resolves ``docs/<slug>.md`` under this root. In a checkout that
+    is the repo root; in a wheel the documents arrive at
+    ``fde_scope/_data/docs/`` via ``force-include``, and the packaged
+    ``_data`` base is the one that exists. Returning the first existing base
+    keeps every call site's ``root / "docs" / ...`` arithmetic unchanged.
+    """
+    from ..assets import _candidates
+
+    for base in _candidates():
+        if (base / "docs").is_dir():
+            return base
+    # Neither base has a docs/ directory: keep the old behaviour (repo root) so
+    # the caller's "no such document" path is the one that runs.
     return Path(__file__).resolve().parents[2]
 
 
@@ -367,6 +382,18 @@ def render(slug: str, locale: str = "zh", root: Path | None = None) -> str:
 
     relpath, zh_title, en_title = next((path, zh, eng) for s, path, zh, eng in _DOCS if s == slug)
     source = (root if root is not None else _default_root()) / relpath
+    if not source.is_file() and root is None:
+        # README.md / LICENSE / NOTICE sit at the repo root but are packaged
+        # under ``_data/docs/``, because a wheel has exactly one directory to
+        # put non-package files in. Try the packaged layout before declaring the
+        # document missing (which renders the "not in this install" notice).
+        from ..assets import _candidates
+
+        for base in _candidates():
+            alt = base / "docs" / relpath
+            if alt.is_file():
+                source = alt
+                break
     body: str | None
     toc: list[tuple[int, str, str]] = []
     try:
