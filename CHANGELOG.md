@@ -45,8 +45,8 @@ the CI commands.
 | `ruff format --check .` | 2 files | **204 files already formatted** |
 | `mypy fde_scope` | 2 errors (`web/sop.py`, `web/course.py`) | **success, 117 files** |
 | `pytest --cov=fde_scope --cov=pawapp/backend` | **89.83%** (< 90) | **91.07%** (gate reached) |
-| full suite | 1268 collected, exit 0 | **1303 passed, 4 skipped, exit 0** (64s) |
-| `tests/test_architecture_guard.py` | 11 passed | **14 passed** |
+| full suite | 1268 collected, exit 0 | **1304 passed, 4 skipped, exit 0** (62s) |
+| `tests/test_architecture_guard.py` | 11 passed | **15 passed** |
 
 #### Fixed — the corpus forge no longer validates itself
 
@@ -138,6 +138,21 @@ through `fsutil.atomic_write_text`, and the guard's scope covers
 - `tests/test_engagement.py` — regression for the `advance_or_complete` contract.
 - `tests/test_architecture_guard.py` — 3 new doc-honesty guards (routes, catalog
   size, license wording); the bare-write guard now also scans `pawapp/backend`.
+
+#### Fixed — the first command the course asks you to run, on a real install
+
+Installing the wheel into a clean venv and running `course doctor` (what
+`course-level-1/06` tells a new user to do first) failed G0 with "找不到
+examples/quickstart_*". `doctor.py` already resolved those fixtures against the
+wheel's `_data` copy, but nothing ever put them there: the check passed in a
+checkout and failed for everyone who installed the package. `force-include` now
+ships the two quickstart fixtures (and the sdist includes them so it can build
+that wheel). Verified on a fresh venv: `✅ G0 通过 · 可以开 D1`.
+
+The same clean-venv run confirmed the two things the 2026-11-03 assessment
+listed as unverified: `/course` renders **1.45 MB of real lesson content** from
+the wheel (no missing-sources notice), `/catalog/index.html` serves, and the
+`corpus` report carries the new per-split provenance.
 
 #### Still open before a public tag
 

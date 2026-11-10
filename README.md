@@ -76,8 +76,9 @@ and a Python library that turns the SOP from a checklist into enforced engineeri
 
 > **发布进度（2026-11-10）**：挡住发布的四道 CI 检查现已全绿——`ruff check .`、
 > `ruff format --check .`、`mypy fde_scope` 通过，覆盖率 **91.07% ≥ 90%**，
-> 全量 **1303 passed / 4 skipped**。`v0.1.0` 本地构建与干净 venv 安装已验证，
-> 但**尚未打 tag、尚未上传 PyPI**（公开是不可逆的一次性动作，`0.1.0` 这个版本号
+> 全量 **1304 passed / 4 skipped**。`v0.1.0` 本地构建与**干净 venv 安装已实测**
+> （`course doctor` → `✅ G0 通过`，`/course` 渲染 1.45 MB 真实课程正文，
+> `corpus` 报告正确标注留出集 provenance），但**尚未打 tag、尚未上传 PyPI**（公开是不可逆的一次性动作，`0.1.0` 这个版本号
 > 用掉就不能复用，留给维护者执行）。详见 [`CHANGELOG.md`](CHANGELOG.md) 的发布门。
 
 按"你想干什么"选一条最短的：
